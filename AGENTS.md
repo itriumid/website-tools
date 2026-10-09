@@ -63,6 +63,7 @@ ships.**
   Content-Security-Policy in `vite.config.ts` (a `<meta>` tag on each page, with script hashes
   SvelteKit adds) and `_headers` (`frame-ancestors`) enforces it, and the footer's promise has to
   stay true. Don't loosen the policy to make something work.
+- **Cloudflare must not add its analytics.** `_headers` sends `Cache-Control: … no-transform` on every page, which makes Cloudflare leave pages unchanged. Without it, Cloudflare's Web Analytics (enabled by default for sites it proxies) injects a script the policy then blocks, and "no analytics" would rest on the policy alone. `src/headers.test.ts` guards it.
 - **Inline styles and `data:` URLs are blocked.** Use Tailwind classes, and keep
   `build.assetsInlineLimit: 0`. The one allowed inline style is SvelteKit's route announcer, by
   hash; `src/csp.test.ts` fails when a SvelteKit update changes it.
