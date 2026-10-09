@@ -6,7 +6,7 @@ export const MAIN_SITE_URL = 'https://itrium.id';
 export const EMAIL = 'hello@itrium.id';
 export const SECURITY_EMAIL = 'security@itrium.id';
 export const GITHUB_URL = 'https://github.com/itriumid';
-export const SOURCE_URL = 'https://github.com/itriumid/tools';
+export const SOURCE_URL = 'https://github.com/itriumid/website-tools';
 
 export const TITLE = 'Free tools · Itrium';
 export const DESCRIPTION =
