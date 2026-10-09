@@ -1,0 +1,23 @@
+.handbook
+
+# Output
+.output
+.wrangler
+/.svelte-kit
+/build
+node_modules
+
+# OS
+Thumbs.db
+
+# Env
+.env
+.env.*
+!.env.example
+
+# Vite
+vite.config.ts.timestamp-*
+
+# Cloudflare
+.dev.vars*
+!.dev.vars.example
