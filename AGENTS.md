@@ -53,13 +53,63 @@ reopened — and skip it otherwise.
 
 ## This repository
 
-<!--
-  Repository-specific instructions go here and are owned by this repository. Nothing syncs
-  this file back to the handbook, so edit freely. Good things to put here:
-    - what this project is, and its stack
-    - build, test and lint commands, and which of them to run before calling a change done
-    - known gotchas specific to this codebase
-  Anything that would apply to every repository belongs in the handbook instead.
--->
+The web tools of tools.itrium.id: prerendered pages (`/`, `/whatsapp-click-to-chat`,
+`/split-bill`), SvelteKit 3 with TypeScript and Tailwind CSS v4, on Cloudflare Workers through
+`@sveltejs/adapter-cloudflare`. Cloudflare's Workers Builds deploys `main`, so **anything merged
+ships.**
 
-_To be filled in._
+- **The tools run in the browser and nothing leaves it.** No network requests, no cookies, no
+  storage, no analytics, nothing loaded from another domain (fonts, images, scripts). The
+  Content-Security-Policy in `vite.config.ts` (a `<meta>` tag on each page, with script hashes
+  SvelteKit adds) and `_headers` (`frame-ancestors`) enforces it, and the footer's promise has to
+  stay true. Don't loosen the policy to make something work.
+- **Inline styles and `data:` URLs are blocked.** Use Tailwind classes, and keep
+  `build.assetsInlineLimit: 0`. The one allowed inline style is SvelteKit's route announcer, by
+  hash; `src/csp.test.ts` fails when a SvelteKit update changes it.
+- **Shared Split Bill links must keep opening.** The format is in `src/lib/split-bill.ts`
+  (`#data=` plus the bill compressed with `lz-string`). Links made on zakir.id before the tools
+  moved here exist in the wild; the test with one of them must keep passing.
+- **Rules apart from pages.** What a tool decides (dividing a bill, building a chat link) lives
+  in `src/lib/*.ts` with tests, not in the `.svelte` files.
+- **Level AA of the Web Content Accessibility Guidelines**, per
+  `.handbook/conventions/rules/engineering.md`: contrast on every surface, controls named and
+  reachable by keyboard, state never shown by color alone. Fields and buttons use
+  `--control-border`, which reaches 3:1; the softer `--border` is only for dividing lines.
+- **The copy is public, in Itrium's voice.** The text lives in `src/lib/content.ts`; read
+  `.handbook/conventions/reference/brand.md` first, and show any wording change to the user
+  before committing it. Rhodonite only: this site has no palette picker.
+- **Colors come from the tokens in `src/app.css`,** the same as itrium.id's, plus
+  `--control-border`. Pink marks the primary action and focus, nothing else.
+- **`static/.well-known/security.txt` expires.** A test fails a month before its `Expires` date;
+  push it out another year when it does.
+- **Brand files** (`src/lib/*.svg`, the icons and `og-image.png` in `static/`) are copies from
+  `~/Itrium/Assets`. Regenerate them there, never edit them here.
+- **SvelteKit 3:** configuration is passed to `sveltekit()` in `vite.config.ts` (there's no
+  `svelte.config.js`), and `#lib` replaces `$lib`.
+
+### Commands
+
+| What       | Command        |
+| ---------- | -------------- |
+| Install    | `pnpm install` |
+| Dev server | `pnpm dev`     |
+| Type-check | `pnpm check`   |
+| Lint       | `pnpm lint`    |
+| Format     | `pnpm format`  |
+| Test       | `pnpm test`    |
+| Build      | `pnpm build`   |
+| Preview    | `pnpm preview` |
+
+Before calling a change done, run `pnpm check`, `pnpm lint`, `pnpm test` and `pnpm build`. Then
+open the built site and use it: the build doesn't catch a Content-Security-Policy violation, but
+the browser's console does.
+
+### Environment gotchas
+
+- Node is lazy-loaded through shell functions in the owner's zsh setup. If `node` or `pnpm`
+  resolves to a function instead of a binary, run
+  `unfunction node npm npx pnpm; . "$HOME/.nvm/nvm.sh"`.
+- `pnpm-workspace.yaml` keeps esbuild's and workerd's install scripts off. Without workerd,
+  `wrangler dev` doesn't run locally; `pnpm preview` (Vite) serves the build instead, but ignores
+  `_headers`. Turning either script on is a dependency decision, so ask first.
+- TypeScript stays on 6.x until typescript-eslint, svelte-check and SvelteKit support 7.
