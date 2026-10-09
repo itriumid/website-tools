@@ -136,7 +136,8 @@
 		class="absolute z-10 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-control-border bg-surface p-1 shadow-lg"
 		onmousedown={(event) => event.preventDefault()}
 	>
-		{#each shown as choice, index (choice.value)}
+		<!-- Only while open: a closed list of 190 countries would otherwise be sent with every page. -->
+		{#each open ? shown : [] as choice, index (choice.value)}
 			<li
 				id={optionId(index)}
 				role="option"
@@ -158,7 +159,9 @@
 				{/if}
 			</li>
 		{:else}
-			<li class="px-3 py-4 text-center text-sm text-muted" role="presentation">No match</li>
+			{#if open}
+				<li class="px-3 py-4 text-center text-sm text-muted" role="presentation">No match</li>
+			{/if}
 		{/each}
 	</ul>
 	<p class="sr-only" role="status">{open ? `${shown.length} choices` : ''}</p>
