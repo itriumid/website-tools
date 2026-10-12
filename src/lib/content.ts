@@ -18,7 +18,6 @@ export const INTRODUCTION =
 
 export const NO_TRACKING =
 	'This site has no cookies, no analytics and no trackers. What you type stays in your browser.';
-export const FOOTNOTE = 'Itrium is the Indonesian word for yttrium: element 39.';
 
 export const WHATSAPP = {
 	path: '/whatsapp-click-to-chat' as const,
