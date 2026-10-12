@@ -44,3 +44,16 @@ export const SPLIT_BILL = {
 };
 
 export const TOOLS = [WHATSAPP, SPLIT_BILL];
+
+// Bigger things from us that run in the browser too, on sites of their own: their data lives
+// in the browser, and a site of its own keeps it apart from everything else.
+export const ELSEWHERE_HEADING = 'On sites of their own';
+export const ELSEWHERE = [
+	{
+		name: 'Amber',
+		url: 'https://amber.itrium.id',
+		summary:
+			'Lists for to-dos and bucket lists, with categories, tags, steps and search. It works offline, and your lists stay on your device.',
+		label: 'Open Amber'
+	}
+];
