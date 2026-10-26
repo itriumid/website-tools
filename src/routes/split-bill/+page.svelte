@@ -18,6 +18,7 @@
 		type BillState
 	} from '#lib/split-bill.js';
 	import {
+		besideField,
 		card,
 		cardHeading,
 		field,
@@ -202,7 +203,7 @@
 					<label for="person" class={label}>Name</label>
 					<input id="person" type="text" autocomplete="off" bind:value={newPerson} class={field} />
 				</div>
-				<button type="submit" disabled={!newPerson.trim()} class={smallButton + ' h-[42px]'}
+				<button type="submit" disabled={!newPerson.trim()} class={`${smallButton} ${besideField}`}
 					>Add person</button
 				>
 			</form>
@@ -268,7 +269,7 @@
 						class={field}
 					/>
 				</div>
-				<button type="submit" disabled={!canAddItem} class={smallButton + ' h-[42px]'}
+				<button type="submit" disabled={!canAddItem} class={`${smallButton} ${besideField}`}
 					>Add item</button
 				>
 			</form>
