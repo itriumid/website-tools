@@ -3,13 +3,27 @@
 [Itrium](https://itrium.id)'s free web tools, live at [tools.itrium.id](https://tools.itrium.id):
 
 - **WhatsApp click-to-chat**: make a link that opens a WhatsApp chat with any phone number.
-- **Split bill**: split a bill fairly, with tax and service, and share it as a link.
+- **Split bill**: split a bill fairly, with tax and service, and share it as a short link.
 
 They run in your browser. There's no account, no cookies, no analytics, and nothing you type is
-sent to a server: a shared bill lives in the part of the address after the `#`, which browsers
-never send. A strict Content-Security-Policy (set in [`vite.config.ts`](vite.config.ts) and
-[`_headers`](_headers)) allows scripts and files from the site itself and nothing else, and
-blocks every connection that isn't to the site.
+sent to a server, except a bill you share, and that only encrypted. A strict
+Content-Security-Policy (set in [`vite.config.ts`](vite.config.ts) and [`_headers`](_headers))
+allows scripts and files from the site itself and nothing else, and blocks every connection that
+isn't to the site.
+
+## How sharing a bill works
+
+1. The page makes a random 16-character code. From it, it derives two things: a name for the
+   bill and an encryption key. The code itself never leaves the browser.
+2. The bill is compressed, encrypted with that key (AES-GCM), and left on our server under the
+   name, in a Worker of its own ([`share/`](share)). The link is the page's address plus
+   `#bill=` and the code, and the part after the `#` is never sent to a server.
+3. Whoever opens the link derives the same name and key, fetches the bill, and decrypts it.
+4. The server deletes the bill after 30 days. Whoever shared it can delete it sooner from the
+   same browser, which keeps a token for it; the server keeps only a hash of that token.
+
+If the server can't be reached, the page copies a long link instead, holding the whole bill
+after the `#` like the links from before short links existed. Those keep opening.
 
 ## Stack
 
