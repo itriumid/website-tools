@@ -2,6 +2,10 @@
  * Where shared bills wait: a Worker with a Durable Object per bill. It has no address of its own
  * (no workers.dev, no route, no preview URLs): only the tools' site reaches it, through a service
  * binding, at tools.itrium.id/api/. https://developers.cloudflare.com/workers/wrangler/configuration/
+ *
+ * Its own Workers Builds project deploys it: repository itriumid/website-tools, branch main, deploy
+ * command `npx wrangler deploy --config share/wrangler.jsonc`, build watch path `share/*`. Only a
+ * push that changes this folder builds it; there's no other way to start a build.
  */
 {
 	"$schema": "../node_modules/wrangler/config-schema.json",
