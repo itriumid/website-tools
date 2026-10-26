@@ -59,7 +59,7 @@ const isPercentage = (value: unknown): value is number =>
 	typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 100;
 
 /** What a link says, checked: anyone can write a link, so nothing in it is trusted as it comes. */
-function readBill(value: unknown): BillState | undefined {
+export function readBill(value: unknown): BillState | undefined {
 	if (!isRecord(value) || !Array.isArray(value.people) || !Array.isArray(value.items)) {
 		return undefined;
 	}

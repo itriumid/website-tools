@@ -58,18 +58,36 @@ The web tools of tools.itrium.id: prerendered pages (`/`, `/whatsapp-click-to-ch
 `@sveltejs/adapter-cloudflare`. Cloudflare's Workers Builds deploys `main`, so **anything merged
 ships.**
 
-- **The tools run in the browser and nothing leaves it.** No network requests, no cookies, no
-  storage, no analytics, nothing loaded from another domain (fonts, images, scripts). The
+- **The tools run in the browser, and nothing leaves it unencrypted.** No cookies, no analytics,
+  nothing loaded from another domain (fonts, images, scripts), and no network requests except
+  sharing a bill, which someone starts themselves and which carries only what `src/lib/share.ts`
+  encrypted with a key from the link's code. The only storage is the tokens of bills shared from
+  this device (`localStorage`, so whoever shared a bill can delete it). The
   Content-Security-Policy in `vite.config.ts` (a `<meta>` tag on each page, with script hashes
-  SvelteKit adds) and `_headers` (`frame-ancestors`) enforces it, and the footer's promise has to
-  stay true. Don't loosen the policy to make something work.
+  SvelteKit adds) and `_headers` (`frame-ancestors`) keeps every connection on the site itself,
+  and the footer's promise has to stay true. Don't add another connection, and don't loosen the
+  policy to make something work.
+- **Shared bills wait in their own Worker** (`share/`, `itrium-backend-tools`): a Durable Object
+  per bill, holding only encrypted bytes, deleted after thirty days (`LIFETIME`) or sooner by
+  whoever shared it (a token whose hash is kept; `DELETE` needs the token), at most 64 KB
+  (`LIMIT`). The server never sees a code or a key: a bill is named by a hash of the code. The
+  rules are in `share/bills.ts`, apart from Cloudflare and tested in Node; `share/index.ts` is
+  only the Worker and the Durable Object around them. The Worker has no address of its own (no
+  workers.dev, route or preview URLs); the site reaches it at `/api/` through a service binding
+  (`SHARE` in `wrangler.jsonc`, forwarded by `src/hooks.server.ts`). `pnpm check` type-checks it
+  against Cloudflare's runtime types, which `wrangler types` writes to
+  `share/worker-configuration.d.ts` (not committed). It deploys as its own Workers Builds project
+  (`npx wrangler deploy --config share/wrangler.jsonc`, watching `share/*`), and must exist before
+  the site deploys with the binding.
 - **Cloudflare must not add its analytics.** `_headers` sends `Cache-Control: … no-transform` on every page, which makes Cloudflare leave pages unchanged. Without it, Cloudflare's Web Analytics (enabled by default for sites it proxies) injects a script the policy then blocks, and "no analytics" would rest on the policy alone. `src/headers.test.ts` guards it.
 - **Inline styles and `data:` URLs are blocked.** Use Tailwind classes, and keep
   `build.assetsInlineLimit: 0`. The one allowed inline style is SvelteKit's route announcer, by
   hash; `src/csp.test.ts` fails when a SvelteKit update changes it.
-- **Shared Split Bill links must keep opening.** The format is in `src/lib/split-bill.ts`
-  (`#data=` plus the bill compressed with `lz-string`). Links made on zakir.id before the tools
-  moved here exist in the wild; the test with one of them must keep passing.
+- **Shared Split Bill links must keep opening.** Short links are `#bill=` and a 16-character
+  code (80 bits; `src/lib/share.ts`). Long links are `#data=` plus the bill compressed with
+  `lz-string` (`src/lib/split-bill.ts`): still made when the server can't be reached, and links
+  made on zakir.id before the tools moved here exist in the wild; the test with one of them must
+  keep passing.
 - **Rules apart from pages.** What a tool decides (dividing a bill, building a chat link) lives
   in `src/lib/*.ts` with tests, not in the `.svelte` files.
 - **Level AA of the Web Content Accessibility Guidelines**, per
