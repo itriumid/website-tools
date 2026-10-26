@@ -21,3 +21,6 @@ vite.config.ts.timestamp-*
 # Cloudflare
 .dev.vars*
 !.dev.vars.example
+
+# Cloudflare's runtime types for the share Worker, made by `pnpm check:share`
+share/worker-configuration.d.ts

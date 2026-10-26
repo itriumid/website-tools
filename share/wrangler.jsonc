@@ -1,0 +1,19 @@
+/**
+ * Where shared bills wait: a Worker with a Durable Object per bill. It has no address of its own
+ * (no workers.dev, no route, no preview URLs): only the tools' site reaches it, through a service
+ * binding, at tools.itrium.id/api/. https://developers.cloudflare.com/workers/wrangler/configuration/
+ */
+{
+	"$schema": "../node_modules/wrangler/config-schema.json",
+	"name": "itrium-backend-tools",
+	"main": "index.ts",
+	"compatibility_date": "2026-10-26",
+	"workers_dev": false,
+	"preview_urls": false,
+	"durable_objects": {
+		"bindings": [{ "name": "BILL", "class_name": "Bill" }]
+	},
+	"migrations": [{ "tag": "v1", "new_sqlite_classes": ["Bill"] }],
+	// No logs of requests are kept: not who shared a bill, not who opened it.
+	"observability": { "enabled": false }
+}
