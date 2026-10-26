@@ -18,6 +18,17 @@
 		type BillState
 	} from '#lib/split-bill.js';
 	import {
+		SHORT_PREFIX,
+		codeFromHash,
+		deleteBill,
+		forget,
+		openBill,
+		remember,
+		shareBill,
+		sharedHere,
+		type Shared
+	} from '#lib/share.js';
+	import {
 		besideField,
 		card,
 		cardHeading,
@@ -110,8 +121,22 @@
 	}
 
 	/* ─── Sharing ─── */
-	let copied: 'yes' | 'failed' | undefined = $state();
-	let copiedTimer: ReturnType<typeof setTimeout> | undefined;
+	type Status =
+		| { kind: 'opening' }
+		| { kind: 'gone' }
+		| { kind: 'unreachable' }
+		| { kind: 'copied' }
+		| { kind: 'copied-long' }
+		| { kind: 'copy-failed' }
+		| { kind: 'deleted' }
+		| { kind: 'delete-failed' };
+	let status: Status | undefined = $state();
+	let sharing = $state(false);
+	// The bill as it was last shared from here, so sharing it again unchanged reuses its link.
+	let lastShared: { json: string; code: string } | undefined;
+	// The shared copy this device can delete: the one the address points to, if it shared it.
+	let deletable: Shared | undefined = $state();
+	let confirmingDelete = $state(false);
 
 	function open(state: BillState) {
 		people = state.people;
@@ -121,29 +146,95 @@
 		currencyCode = state.currencyCode;
 	}
 
-	// A link opens the bill it holds, now or if the address changes later.
+	// A link opens the bill it holds, now or if the address changes later: a short link fetches
+	// it, and a long one (the only kind before short links) carries it whole.
 	onMount(() => {
-		const read = () => {
-			const shared = billFromHash(location.hash);
-			if (shared) open(shared);
+		const read = async () => {
+			const code = codeFromHash(location.hash);
+			if (!code) {
+				const shared = billFromHash(location.hash);
+				if (shared) open(shared);
+				return;
+			}
+			status = { kind: 'opening' };
+			const result = await openBill(code);
+			if (codeFromHash(location.hash) !== code) return;
+			if ('problem' in result) {
+				status = { kind: result.problem === 'gone' ? 'gone' : 'unreachable' };
+				return;
+			}
+			open(result);
+			lastShared = { json: JSON.stringify(bill), code };
+			deletable = sharedHere(code);
+			status = undefined;
 		};
-		read();
+		void read();
 		addEventListener('hashchange', read);
 		return () => removeEventListener('hashchange', read);
 	});
 
-	async function copyLink() {
-		const hash = billToHash(bill);
-		// The address bar now holds the bill too, so copying it from there works as well.
-		history.replaceState(null, '', hash);
-		try {
-			await navigator.clipboard.writeText(`${location.origin}${location.pathname}${hash}`);
-			copied = 'yes';
-		} catch {
-			copied = 'failed';
+	/** The short link to the bill as it is, sharing it if it changed; the long one if that fails. */
+	async function linkToBill(): Promise<{ url: string; long: boolean }> {
+		const json = JSON.stringify(bill);
+		let hash: string;
+		let long = false;
+		if (lastShared?.json === json) {
+			hash = `${SHORT_PREFIX}${lastShared.code}`;
+		} else {
+			const result = await shareBill(bill);
+			if ('problem' in result) {
+				hash = billToHash(bill);
+				long = true;
+			} else {
+				remember(result);
+				lastShared = { json, code: result.code };
+				deletable = result;
+				hash = `${SHORT_PREFIX}${result.code}`;
+			}
 		}
-		clearTimeout(copiedTimer);
-		copiedTimer = setTimeout(() => (copied = undefined), 3000);
+		// The address bar now holds the link too, so copying it from there works as well.
+		history.replaceState(null, '', hash);
+		return { url: `${location.origin}${location.pathname}${hash}`, long };
+	}
+
+	async function copyLink() {
+		sharing = true;
+		status = undefined;
+		confirmingDelete = false;
+		const link = linkToBill();
+		try {
+			// Safari only lets a page copy while it's handling the press, so the link is handed
+			// over as a promise, before the server has answered. Browsers without that copy after.
+			if (typeof ClipboardItem !== 'undefined' && 'write' in navigator.clipboard) {
+				const text = link.then(({ url }) => new Blob([url], { type: 'text/plain' }));
+				await navigator.clipboard.write([new ClipboardItem({ 'text/plain': text })]);
+			} else {
+				await navigator.clipboard.writeText((await link).url);
+			}
+			status = { kind: (await link).long ? 'copied-long' : 'copied' };
+		} catch {
+			await link;
+			status = { kind: 'copy-failed' };
+		}
+		sharing = false;
+	}
+
+	async function deleteShared() {
+		if (!deletable) return;
+		const shared = deletable;
+		confirmingDelete = false;
+		const problem = await deleteBill(shared);
+		if (problem) {
+			status = { kind: 'delete-failed' };
+			return;
+		}
+		forget(shared.code);
+		deletable = undefined;
+		lastShared = undefined;
+		if (codeFromHash(location.hash) === shared.code) {
+			history.replaceState(null, '', location.pathname);
+		}
+		status = { kind: 'deleted' };
 	}
 
 	let confirmingClear = $state(false);
@@ -156,6 +247,9 @@
 		currencyCode = DEFAULT_CURRENCY_CODE;
 		history.replaceState(null, '', location.pathname);
 		confirmingClear = false;
+		deletable = undefined;
+		confirmingDelete = false;
+		status = undefined;
 	}
 </script>
 
@@ -185,6 +279,11 @@
 	</p>
 	<h1 class="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">{SPLIT_BILL.name}</h1>
 	<p class="mt-3 text-muted">{SPLIT_BILL.introduction}</p>
+	<p class="mt-4 empty:hidden" role="status">
+		{#if status?.kind === 'opening'}{SPLIT_BILL.sharing
+				.opening}{:else if status?.kind === 'gone'}{SPLIT_BILL.sharing
+				.gone}{:else if status?.kind === 'unreachable'}{SPLIT_BILL.sharing.unreachable}{/if}
+	</p>
 
 	<div class="mt-8 space-y-6">
 		<!-- People -->
@@ -452,7 +551,7 @@
 		{#if items.length || people.length}
 			<div>
 				<div class="flex flex-col gap-3 sm:flex-row">
-					<button type="button" onclick={copyLink} class="{primaryButton} flex-1"
+					<button type="button" onclick={copyLink} disabled={sharing} class="{primaryButton} flex-1"
 						>Copy a link to this bill</button
 					>
 					{#if confirmingClear}
@@ -477,10 +576,32 @@
 					{/if}
 				</div>
 				<p class="mt-3 min-h-5 text-sm" role="status">
-					{#if copied === 'yes'}Link copied. Anyone with it sees this bill.{:else if copied === 'failed'}We
-						couldn't copy it. The link is in your address bar now: copy it from there.{/if}
+					{#if status?.kind === 'copied'}{SPLIT_BILL.sharing
+							.copied}{:else if status?.kind === 'copied-long'}{SPLIT_BILL.sharing
+							.copiedLong}{:else if status?.kind === 'copy-failed'}{SPLIT_BILL.sharing
+							.copyFailed}{:else if status?.kind === 'deleted'}{SPLIT_BILL.sharing
+							.deleted}{:else if status?.kind === 'delete-failed'}{SPLIT_BILL.sharing
+							.deleteFailed}{/if}
 				</p>
-				<p class="mt-1 text-sm text-muted">{SPLIT_BILL.privacy}</p>
+				{#if deletable}
+					{#if confirmingDelete}
+						<div class="mt-2 flex flex-wrap items-center gap-2" role="group" aria-label="Delete">
+							<span class="text-sm">{SPLIT_BILL.sharing.deleteQuestion}</span>
+							<button type="button" onclick={deleteShared} class={smallButton}>Yes, delete</button>
+							<button type="button" onclick={() => (confirmingDelete = false)} class={smallButton}
+								>Keep it</button
+							>
+						</div>
+					{:else}
+						<button
+							type="button"
+							onclick={() => (confirmingDelete = true)}
+							class="mt-2 min-h-9 text-sm text-muted underline underline-offset-4 hover:text-text"
+							>Delete the shared copy</button
+						>
+					{/if}
+				{/if}
+				<p class="mt-3 text-sm text-muted">{SPLIT_BILL.privacy}</p>
 			</div>
 		{/if}
 	</div>
