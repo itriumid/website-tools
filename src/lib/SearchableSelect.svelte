@@ -50,7 +50,9 @@
 			0,
 			choices.findIndex((choice) => choice.value === value)
 		);
-		select?.select();
+		// Selected a frame later: Safari puts the caret where the box was pressed once the click is
+		// handled, and typing would then add to the current choice instead of replacing it.
+		if (select) requestAnimationFrame(() => select.select());
 	}
 
 	function closeList() {
