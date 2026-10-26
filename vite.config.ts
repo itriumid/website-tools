@@ -40,7 +40,7 @@ export default defineConfig({
 	build: { assetsInlineLimit: 0 },
 	test: {
 		expect: { requireAssertions: true },
-		include: ['src/**/*.test.ts'],
+		include: ['src/**/*.test.ts', 'share/**/*.test.ts'],
 		environment: 'node'
 	}
 });
