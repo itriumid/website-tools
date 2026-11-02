@@ -67,6 +67,8 @@ ships.**
   SvelteKit adds) and `_headers` (`frame-ancestors`) keeps every connection on the site itself,
   and the footer's promise has to stay true. Don't add another connection, and don't loosen the
   policy to make something work.
+- **Never a native `<select>`.** WebKit's own styling for it breaks `style-src 'self'` (a policy
+  refusal in the console on every page that has one). Use `SearchableSelect` or radio buttons.
 - **Shared bills wait in their own Worker** (`share/`, `itrium-backend-tools`): a Durable Object
   per bill, holding only encrypted bytes, deleted after thirty days (`LIFETIME`) or sooner by
   whoever shared it (a token whose hash is kept; `DELETE` needs the token), at most 64 KB

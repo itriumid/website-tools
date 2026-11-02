@@ -3,6 +3,7 @@
 	import { resolve } from '$app/paths';
 	import SearchableSelect, { type Choice } from '#lib/SearchableSelect.svelte';
 	import Seo from '#lib/Seo.svelte';
+	import Toggletip from '#lib/Toggletip.svelte';
 	import { SPLIT_BILL } from '#lib/content.js';
 	import { CURRENCIES } from '#lib/countries.js';
 	import {
@@ -13,6 +14,9 @@
 		billToHash,
 		calculateBill,
 		formatAmount,
+		ADJUSTMENT_KINDS,
+		type AdjustmentKind,
+		type BillAdjustment,
 		type BillItem,
 		type BillPerson,
 		type BillState
@@ -32,6 +36,8 @@
 		besideField,
 		card,
 		cardHeading,
+		checkRow,
+		checkbox,
 		field,
 		label,
 		primaryButton,
@@ -55,16 +61,29 @@
 	let taxInput: number | null = $state(DEFAULT_TAX_PERCENTAGE);
 	let serviceInput: number | null = $state(DEFAULT_SERVICE_PERCENTAGE);
 	let currencyCode = $state(DEFAULT_CURRENCY_CODE);
+	let taxIncluded = $state(false);
+	let serviceIncluded = $state(false);
+	let taxOnService = $state(false);
+	let adjustments: BillAdjustment[] = $state([]);
 
 	const percentage = (value: number | null) =>
 		typeof value === 'number' && Number.isFinite(value) ? Math.min(100, Math.max(0, value)) : 0;
 
-	const bill: BillState = $derived({
-		people: $state.snapshot(people),
-		items: $state.snapshot(items),
-		taxPercentage: percentage(taxInput),
-		servicePercentage: percentage(serviceInput),
-		currencyCode
+	const bill: BillState = $derived.by(() => {
+		const state: BillState = {
+			people: $state.snapshot(people),
+			items: $state.snapshot(items),
+			taxPercentage: percentage(taxInput),
+			servicePercentage: percentage(serviceInput),
+			currencyCode
+		};
+		// Only what says something goes in, the way a link reads back: shorter links, and a bill
+		// that didn't change still compares equal to the one last shared.
+		if (taxIncluded) state.taxIncluded = true;
+		if (serviceIncluded) state.serviceIncluded = true;
+		if (taxOnService && !taxIncluded) state.taxOnService = true;
+		if (adjustments.length) state.adjustments = $state.snapshot(adjustments);
+		return state;
 	});
 	const totals = $derived(calculateBill(bill));
 	const symbol = $derived(CURRENCIES.find((c) => c.code === currencyCode)?.symbol ?? currencyCode);
@@ -120,6 +139,54 @@
 		item.assignedPersonIds = everyoneHasIt(item) ? [] : people.map((person) => person.id);
 	}
 
+	/* ─── Charges and adjustments ─── */
+
+	// Prices that include tax nearly always include service too, and tax can't be charged on
+	// service once it's in the price: ticking one sets the others, so the odd mix needs a choice.
+	function setTaxIncluded(included: boolean) {
+		taxIncluded = included;
+		if (included) {
+			serviceIncluded = true;
+			taxOnService = false;
+		}
+	}
+
+	const KIND_NAMES: Record<AdjustmentKind, string> = {
+		discount: 'Discount',
+		rounding: 'Rounding',
+		other: 'Other'
+	};
+	let newAdjustmentKind: AdjustmentKind = $state('discount');
+	let newAdjustmentName = $state('');
+	let newAdjustmentAmount: number | null = $state(null);
+	// A discount always takes off; rounding and other adjustments go whichever way the receipt says.
+	let newAdjustmentAdds = $state(false);
+	const canAddAdjustment = $derived(newAdjustmentAmount !== null && newAdjustmentAmount > 0);
+
+	function addAdjustment() {
+		if (!canAddAdjustment || newAdjustmentAmount === null) return;
+		const adds = newAdjustmentKind !== 'discount' && newAdjustmentAdds;
+		adjustments.push({
+			id: newId(),
+			kind: newAdjustmentKind,
+			name: newAdjustmentName.trim() || KIND_NAMES[newAdjustmentKind],
+			amount: adds ? newAdjustmentAmount : -newAdjustmentAmount
+		});
+		newAdjustmentName = '';
+		newAdjustmentAmount = null;
+		newAdjustmentAdds = false;
+	}
+
+	function removeAdjustment(id: string) {
+		adjustments = adjustments.filter((adjustment) => adjustment.id !== id);
+	}
+
+	const signed = (amount: number) => `${amount < 0 ? '−' : '+'}${money(Math.abs(amount))}`;
+	const discountsOf = (state: BillState) =>
+		(state.adjustments ?? []).filter((adjustment) => adjustment.kind === 'discount');
+	const lateAdjustmentsOf = (state: BillState) =>
+		(state.adjustments ?? []).filter((adjustment) => adjustment.kind !== 'discount');
+
 	/* ─── Sharing ─── */
 	type Status =
 		| { kind: 'opening' }
@@ -144,6 +211,10 @@
 		taxInput = state.taxPercentage;
 		serviceInput = state.servicePercentage;
 		currencyCode = state.currencyCode;
+		taxIncluded = state.taxIncluded ?? false;
+		serviceIncluded = state.serviceIncluded ?? false;
+		taxOnService = state.taxOnService ?? false;
+		adjustments = state.adjustments ?? [];
 	}
 
 	// A link opens the bill it holds, now or if the address changes later: a short link fetches
@@ -245,6 +316,10 @@
 		taxInput = DEFAULT_TAX_PERCENTAGE;
 		serviceInput = DEFAULT_SERVICE_PERCENTAGE;
 		currencyCode = DEFAULT_CURRENCY_CODE;
+		taxIncluded = false;
+		serviceIncluded = false;
+		taxOnService = false;
+		adjustments = [];
 		history.replaceState(null, '', location.pathname);
 		confirmingClear = false;
 		deletable = undefined;
@@ -286,6 +361,19 @@
 	</p>
 
 	<div class="mt-8 space-y-6">
+		<!-- The bill: what's decided before any price is typed -->
+		<section class={card} aria-labelledby="bill-heading">
+			<h2 id="bill-heading" class={cardHeading}>The bill</h2>
+			<label for="currency" class={label}>Currency</label>
+			<SearchableSelect
+				id="currency"
+				choices={currencyChoices}
+				value={currencyCode}
+				onchange={(value) => (currencyCode = value)}
+				placeholder="Type a currency or a country"
+			/>
+		</section>
+
 		<!-- People -->
 		<section class={card} aria-labelledby="people-heading">
 			<h2 id="people-heading" class={cardHeading}>
@@ -439,19 +527,9 @@
 			{/if}
 		</section>
 
-		<!-- Tax, service and currency -->
-		<section class={card} aria-labelledby="extras-heading">
-			<h2 id="extras-heading" class={cardHeading}>Tax, service and currency</h2>
-			<div class="mb-4">
-				<label for="currency" class={label}>Currency</label>
-				<SearchableSelect
-					id="currency"
-					choices={currencyChoices}
-					value={currencyCode}
-					onchange={(value) => (currencyCode = value)}
-					placeholder="Type a currency or a country"
-				/>
-			</div>
+		<!-- Charges and adjustments, in the order a receipt prints them: after the items -->
+		<section class={card} aria-labelledby="charges-heading">
+			<h2 id="charges-heading" class={cardHeading}>Charges and adjustments</h2>
 			<div class="grid grid-cols-2 gap-4">
 				<div>
 					<label for="tax" class={label}>Tax (%)</label>
@@ -480,6 +558,177 @@
 					/>
 				</div>
 			</div>
+
+			<div class="mt-4 space-y-1">
+				<div class="flex flex-wrap items-center gap-x-1">
+					<label class={checkRow}>
+						<input
+							type="checkbox"
+							checked={taxIncluded}
+							onchange={(event) => setTaxIncluded(event.currentTarget.checked)}
+							class={checkbox}
+						/>
+						Prices include tax
+					</label>
+					<Toggletip
+						label="About prices that include tax"
+						text={SPLIT_BILL.explanations.taxIncluded}
+					/>
+				</div>
+				<div class="flex flex-wrap items-center gap-x-1">
+					<label class={checkRow}>
+						<input type="checkbox" bind:checked={serviceIncluded} class={checkbox} />
+						Prices include service
+					</label>
+				</div>
+				<div class="flex flex-wrap items-center gap-x-1">
+					<label class="{checkRow} {taxIncluded ? 'text-muted' : ''}">
+						<input
+							type="checkbox"
+							checked={taxOnService && !taxIncluded}
+							disabled={taxIncluded}
+							onchange={(event) => (taxOnService = event.currentTarget.checked)}
+							class={checkbox}
+						/>
+						Tax is charged on service too
+					</label>
+					<Toggletip label="About tax on service" text={SPLIT_BILL.explanations.taxOnService} />
+				</div>
+			</div>
+
+			<div class="mt-6 border-t border-border pt-5">
+				<div class="flex flex-wrap items-center gap-x-1">
+					<h3 class="text-base font-semibold">Adjustments</h3>
+					<Toggletip label="About adjustments" text={SPLIT_BILL.explanations.adjustments} />
+				</div>
+
+				{#if adjustments.length}
+					<ul class="mt-3 divide-y divide-border rounded-xl border border-border bg-bg">
+						{#each adjustments as adjustment (adjustment.id)}
+							<li class="flex items-center justify-between gap-3 py-2 pr-2 pl-4 text-sm">
+								<span class="min-w-0">
+									<span class="font-medium break-words">{adjustment.name}</span>
+									<span class="text-muted"> · {KIND_NAMES[adjustment.kind]}</span>
+								</span>
+								<span class="flex shrink-0 items-center gap-1">
+									{signed(adjustment.amount)}
+									<button
+										type="button"
+										onclick={() => removeAdjustment(adjustment.id)}
+										aria-label="Remove {adjustment.name}"
+										class="inline-flex size-8 items-center justify-center rounded-full text-muted hover:bg-surface hover:text-text"
+									>
+										<svg
+											class="size-4"
+											xmlns="http://www.w3.org/2000/svg"
+											fill="none"
+											viewBox="0 0 24 24"
+											stroke="currentColor"
+											stroke-width="2"
+											aria-hidden="true"
+										>
+											<path
+												stroke-linecap="round"
+												stroke-linejoin="round"
+												d="M6 18L18 6M6 6l12 12"
+											/>
+										</svg>
+									</button>
+								</span>
+							</li>
+						{/each}
+					</ul>
+				{:else}
+					<p class="mt-2 text-sm text-muted">
+						None. Add a discount or rounding if the receipt has one.
+					</p>
+				{/if}
+
+				<!-- Radio buttons, not a <select>: WebKit's own styling for a select breaks this site's
+				     style-src policy, and three choices are quicker to tap than a menu anyway. -->
+				<form
+					class="mt-4 space-y-3"
+					onsubmit={(event) => {
+						event.preventDefault();
+						addAdjustment();
+					}}
+				>
+					<fieldset>
+						<legend class={label}>Type</legend>
+						<div class="flex flex-wrap gap-x-5">
+							{#each ADJUSTMENT_KINDS as kind (kind)}
+								<label class={checkRow}>
+									<input
+										type="radio"
+										name="adjustment-kind"
+										value={kind}
+										bind:group={newAdjustmentKind}
+										class={checkbox}
+									/>
+									{KIND_NAMES[kind]}
+								</label>
+							{/each}
+						</div>
+					</fieldset>
+					<div class="grid gap-3 sm:grid-cols-[1fr_9rem]">
+						<div>
+							<label for="adjustment-name" class={label}>Name on the receipt</label>
+							<input
+								id="adjustment-name"
+								type="text"
+								autocomplete="off"
+								placeholder={KIND_NAMES[newAdjustmentKind]}
+								bind:value={newAdjustmentName}
+								class={field}
+							/>
+						</div>
+						<div>
+							<label for="adjustment-amount" class={label}>Amount</label>
+							<input
+								id="adjustment-amount"
+								type="number"
+								inputmode="decimal"
+								min="0"
+								step="any"
+								bind:value={newAdjustmentAmount}
+								class={field}
+							/>
+						</div>
+					</div>
+					<div class="flex flex-wrap items-center justify-between gap-3">
+						{#if newAdjustmentKind === 'discount'}
+							<p class="text-sm text-muted">Comes off the bill.</p>
+						{:else}
+							<fieldset class="flex flex-wrap items-center gap-x-5">
+								<legend class="sr-only">Does it take off or add?</legend>
+								<label class={checkRow}>
+									<input
+										type="radio"
+										name="adjustment-direction"
+										checked={!newAdjustmentAdds}
+										onchange={() => (newAdjustmentAdds = false)}
+										class={checkbox}
+									/>
+									Takes off
+								</label>
+								<label class={checkRow}>
+									<input
+										type="radio"
+										name="adjustment-direction"
+										checked={newAdjustmentAdds}
+										onchange={() => (newAdjustmentAdds = true)}
+										class={checkbox}
+									/>
+									Adds
+								</label>
+							</fieldset>
+						{/if}
+						<button type="submit" disabled={!canAddAdjustment} class="{smallButton} {besideField}"
+							>Add adjustment</button
+						>
+					</div>
+				</form>
+			</div>
 		</section>
 
 		<!-- The split -->
@@ -492,18 +741,30 @@
 						<dt>Subtotal</dt>
 						<dd>{money(totals.subtotal)}</dd>
 					</div>
-					{#if bill.taxPercentage > 0}
+					{#each discountsOf(bill) as adjustment (adjustment.id)}
 						<div class="flex justify-between gap-4 text-muted">
-							<dt>Tax ({bill.taxPercentage}%)</dt>
-							<dd>{money(totals.tax)}</dd>
+							<dt class="break-words">{adjustment.name}</dt>
+							<dd class="shrink-0">{signed(adjustment.amount)}</dd>
 						</div>
-					{/if}
+					{/each}
 					{#if bill.servicePercentage > 0}
 						<div class="flex justify-between gap-4 text-muted">
 							<dt>Service ({bill.servicePercentage}%)</dt>
-							<dd>{money(totals.service)}</dd>
+							<dd>{bill.serviceIncluded ? 'included' : money(totals.service)}</dd>
 						</div>
 					{/if}
+					{#if bill.taxPercentage > 0}
+						<div class="flex justify-between gap-4 text-muted">
+							<dt>Tax ({bill.taxPercentage}%{bill.taxOnService ? ', on service too' : ''})</dt>
+							<dd>{bill.taxIncluded ? 'included' : money(totals.tax)}</dd>
+						</div>
+					{/if}
+					{#each lateAdjustmentsOf(bill) as adjustment (adjustment.id)}
+						<div class="flex justify-between gap-4 text-muted">
+							<dt class="break-words">{adjustment.name}</dt>
+							<dd class="shrink-0">{signed(adjustment.amount)}</dd>
+						</div>
+					{/each}
 					<div
 						class="flex justify-between gap-4 border-t border-border pt-2 text-base font-semibold"
 					>
@@ -535,7 +796,7 @@
 										<span class="font-semibold">{money(share.total)}</span>
 										{#if share.base !== share.total}
 											<span class="block text-xs text-muted">
-												{money(share.base)} before tax and service
+												{money(share.base)} before charges and adjustments
 											</span>
 										{/if}
 									</td>
