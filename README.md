@@ -11,6 +11,11 @@ Content-Security-Policy (set in [`vite.config.ts`](vite.config.ts) and [`_header
 allows scripts and files from the site itself and nothing else, and blocks every connection that
 isn't to the site.
 
+Split bill can read a receipt: you paste its text, or scan it with your phone's own text
+recognition (Scan Text on iPhone, Live Text, Google Lens), and
+[`src/lib/receipt.ts`](src/lib/receipt.ts) turns it into items, tax and service in the browser.
+No photo or text is sent anywhere.
+
 ## How sharing a bill works
 
 1. The page makes a random 16-character code. From it, it derives two things: a name for the
