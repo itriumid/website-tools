@@ -66,7 +66,8 @@ ships.**
   Content-Security-Policy in `vite.config.ts` (a `<meta>` tag on each page, with script hashes
   SvelteKit adds) and `_headers` (`frame-ancestors`) keeps every connection on the site itself,
   and the footer's promise has to stay true. Don't add another connection, and don't loosen the
-  policy to make something work.
+  policy to make something work. `img-src` allows `blob:` for one thing, approved by the owner: a
+  receipt photo picked in Split bill, shown on the device so Live Text can read it.
 - **Never a native `<select>`.** WebKit's own styling for it breaks `style-src 'self'` (a policy
   refusal in the console on every page that has one). Use `SearchableSelect` or radio buttons.
 - **Receipts are read in the browser** by `src/lib/receipt.ts`, from text the phone's own text

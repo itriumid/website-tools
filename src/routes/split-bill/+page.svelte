@@ -212,6 +212,14 @@
 	}
 	let scanning = $state(false);
 	let receiptText = $state('');
+	// A photo the person picked, shown from an address inside the browser (blob:) so Live Text can
+	// read it. It's never uploaded or kept, and the address is let go once it isn't shown.
+	let photoUrl: string | undefined = $state();
+
+	function showPhoto(file: File | undefined) {
+		if (photoUrl) URL.revokeObjectURL(photoUrl);
+		photoUrl = file ? URL.createObjectURL(file) : undefined;
+	}
 	let scanned: ScannedReceipt | undefined = $state();
 	let reviewLines: ReviewLine[] = $state([]);
 	let reviewAdjustments: ReviewAdjustment[] = $state([]);
@@ -230,6 +238,7 @@
 	}
 
 	function closeScan() {
+		showPhoto(undefined);
 		scanning = false;
 		scanned = undefined;
 		receiptText = '';
@@ -495,7 +504,27 @@
 						readScan();
 					}}
 				>
-					<label for="receipt-text" class={label}>{SPLIT_BILL.scanning.field}</label>
+					<label for="receipt-photo" class={label}>{SPLIT_BILL.scanning.photo}</label>
+					<p id="receipt-photo-hint" class="mb-2 text-sm text-muted">
+						{SPLIT_BILL.scanning.photoHint}
+					</p>
+					<input
+						id="receipt-photo"
+						type="file"
+						accept="image/*"
+						aria-describedby="receipt-photo-hint"
+						onchange={(event) => showPhoto(event.currentTarget.files?.[0])}
+						class="block w-full text-sm text-muted file:mr-3 file:min-h-9 file:cursor-pointer file:rounded-full file:border file:border-control-border file:bg-transparent file:px-4 file:text-sm file:font-medium file:text-text hover:file:bg-bg"
+					/>
+					{#if photoUrl}
+						<img
+							src={photoUrl}
+							alt={SPLIT_BILL.scanning.photoAlt}
+							class="mt-3 max-h-[70vh] w-full rounded-xl border border-border object-contain"
+						/>
+					{/if}
+
+					<label for="receipt-text" class="{label} mt-5">{SPLIT_BILL.scanning.field}</label>
 					<p id="receipt-hint" class="mb-2 text-sm text-muted">{SPLIT_BILL.scanning.hint}</p>
 					<textarea
 						id="receipt-text"

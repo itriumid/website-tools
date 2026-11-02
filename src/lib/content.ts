@@ -56,6 +56,10 @@ export const SPLIT_BILL = {
 	},
 	scanning: {
 		open: 'Scan or paste a receipt',
+		photo: 'Photo of the receipt (optional)',
+		photoHint:
+			'Pick a photo to see it here, then press and hold its text to copy it. The photo stays on your device.',
+		photoAlt: 'The receipt photo you picked',
 		field: 'Receipt text',
 		hint: 'On an iPhone, tap the box and choose Scan Text to read the receipt with your camera. Or copy the text from a photo with Live Text or Google Lens, and paste it here. It stays in your browser.',
 		read: 'Read the receipt',

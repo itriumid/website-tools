@@ -9,7 +9,8 @@ They run in your browser. There's no account, no cookies, no analytics, and noth
 sent to a server, except a bill you share, and that only encrypted. A strict
 Content-Security-Policy (set in [`vite.config.ts`](vite.config.ts) and [`_headers`](_headers))
 allows scripts and files from the site itself and nothing else, and blocks every connection that
-isn't to the site.
+isn't to the site. The one exception is an image address inside the browser (`blob:`): a receipt
+photo you pick in Split bill is shown from it, on your device, and never uploaded.
 
 Split bill can read a receipt: you paste its text, or scan it with your phone's own text
 recognition (Scan Text on iPhone, Live Text, Google Lens), and

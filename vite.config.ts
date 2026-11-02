@@ -27,7 +27,10 @@ export default defineConfig({
 						'sha256-S8qMpvofolR8Mpjy4kQvEm7m1q8clzU4dfDH0AmvZjo='
 					],
 					'font-src': ['self'],
-					'img-src': ['self'],
+					// blob: is a photo the visitor picked on their own device, shown on the Split bill page
+					// so Live Text can read it. It's an address inside the browser: nothing is fetched,
+					// and the photo goes nowhere.
+					'img-src': ['self', 'blob:'],
 					'manifest-src': ['self'],
 					'connect-src': ['self'],
 					'base-uri': ['none'],
