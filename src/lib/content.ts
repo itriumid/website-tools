@@ -53,6 +53,15 @@ export const SPLIT_BILL = {
 		deleted: "Deleted. The link doesn't open this bill anymore.",
 		deleteFailed: "We couldn't delete it. Check your connection, then try again.",
 		deleteQuestion: 'Delete the shared copy? The link stops working for everyone.'
+	},
+	// Shown only when someone asks, behind an ⓘ next to the setting they explain.
+	explanations: {
+		taxIncluded:
+			"For prices marked nett, or 'tax included'. We note the tax but don't add it again. Service usually comes included too, so we tick that as well. Untick it if the receipt adds service on top.",
+		taxOnService:
+			"Some restaurants charge tax on the subtotal plus service, so the bill comes out a little higher. When prices already include tax, there's no tax left to charge on service, so this turns off when you tick 'Prices include tax'.",
+		adjustments:
+			'Discounts come off before tax and service. Rounding and anything else land on the total after them. Everyone shares them by what they ordered.'
 	}
 };
 

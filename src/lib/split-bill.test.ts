@@ -81,6 +81,59 @@ describe('share links', () => {
 		expect(wrong({ people: [], items: [], taxPercentage: 'lots' })?.taxPercentage).toBe(10);
 		expect(wrong({ people: [], items: [], servicePercentage: 500 })?.servicePercentage).toBe(5);
 	});
+
+	it('carries how tax and service are charged, and the adjustments, as they were', () => {
+		const state = bill({
+			items: [{ id: 'i', name: 'Nasi', price: 500000, assignedPersonIds: ['a'] }],
+			taxPercentage: 10,
+			servicePercentage: 5,
+			serviceIncluded: true,
+			taxOnService: true,
+			adjustments: [
+				{ id: 'd', kind: 'discount', name: 'PROMO GAJIAN', amount: -15000 },
+				{ id: 'r', kind: 'rounding', name: 'Pembulatan', amount: 500 }
+			]
+		});
+		expect(billFromHash(billToHash(state))).toEqual(state);
+	});
+
+	it('leaves out what says nothing, so a plain bill reads back with no new fields', () => {
+		const read = billFromHash(
+			'#data=' +
+				compress(
+					JSON.stringify({
+						...bill(),
+						taxIncluded: false,
+						serviceIncluded: 'yes',
+						adjustments: []
+					})
+				)
+		);
+		expect(read).toEqual(bill());
+		expect(read && Object.keys(read)).toEqual(Object.keys(bill()));
+	});
+
+	it('never keeps tax on service once tax is included', () => {
+		const read = billFromHash(
+			'#data=' + compress(JSON.stringify({ ...bill(), taxIncluded: true, taxOnService: true }))
+		);
+		expect(read?.taxIncluded).toBe(true);
+		expect(read?.taxOnService).toBeUndefined();
+	});
+
+	it('refuses adjustments that are the wrong shape', () => {
+		const withAdjustments = (adjustments: unknown) =>
+			billFromHash('#data=' + compress(JSON.stringify({ ...bill(), adjustments })));
+		const fine = { id: 'x', kind: 'rounding', name: 'Pembulatan', amount: -500 };
+		expect(withAdjustments([fine])?.adjustments).toEqual([fine]);
+		expect(withAdjustments('lots')).toBeUndefined();
+		expect(withAdjustments([{ ...fine, kind: 'tip' }])).toBeUndefined();
+		expect(withAdjustments([{ ...fine, amount: 'some' }])).toBeUndefined();
+		expect(withAdjustments([{ ...fine, amount: Infinity }])).toBeUndefined();
+		expect(withAdjustments([{ ...fine, name: 5 }])).toBeUndefined();
+		// A discount that adds to the bill isn't a discount.
+		expect(withAdjustments([{ ...fine, kind: 'discount', amount: 1000 }])).toBeUndefined();
+	});
 });
 
 import lzString from 'lz-string';
@@ -163,6 +216,126 @@ describe('calculateBill', () => {
 
 	it('handles an empty bill', () => {
 		const totals = calculateBill(bill());
+		expect(totals.grandTotal).toBe(0);
+		expect(totals.shares.map((share) => share.total)).toEqual([0, 0]);
+	});
+});
+
+describe('calculateBill, the ways a receipt charges tax and service', () => {
+	// The receipt-scanning plan's example: a 500.000 subtotal, service 5%, tax 10%.
+	const receipt = (overrides: Partial<BillState> = {}) =>
+		calculateBill(
+			bill({
+				items: [
+					{ id: '1', name: 'Gurame', price: 300000, assignedPersonIds: ['a'] },
+					{ id: '2', name: 'Kangkung', price: 200000, assignedPersonIds: ['b'] }
+				],
+				taxPercentage: 10,
+				servicePercentage: 5,
+				...overrides
+			})
+		);
+	const owed = (totals: ReturnType<typeof calculateBill>) =>
+		totals.shares.reduce((sum, share) => sum + share.total, 0);
+
+	it('charges both on the subtotal, as it always has', () => {
+		const totals = receipt();
+		expect(totals.grandTotal).toBe(575000);
+		expect(owed(totals)).toBe(575000);
+	});
+
+	it('charges tax on the subtotal plus service when asked', () => {
+		const totals = receipt({ taxOnService: true });
+		expect(totals.service).toBe(25000);
+		expect(totals.tax).toBe(52500);
+		expect(totals.grandTotal).toBe(577500);
+		expect(totals.shares.map((share) => share.total)).toEqual([346500, 231000]);
+	});
+
+	it('adds nothing for tax the prices already include', () => {
+		const totals = receipt({ taxIncluded: true });
+		expect(totals.tax).toBe(0);
+		expect(totals.grandTotal).toBe(525000);
+	});
+
+	it('adds nothing at all when the prices include tax and service', () => {
+		const totals = receipt({ taxIncluded: true, serviceIncluded: true });
+		expect(totals.grandTotal).toBe(500000);
+		expect(owed(totals)).toBe(500000);
+	});
+
+	it('ignores tax on service once tax is included, even if a bill says both', () => {
+		expect(receipt({ taxIncluded: true, taxOnService: true }).grandTotal).toBe(525000);
+	});
+
+	it('charges tax on prices that already include service', () => {
+		expect(receipt({ serviceIncluded: true }).grandTotal).toBe(550000);
+	});
+});
+
+describe('calculateBill, adjustments', () => {
+	const items = [
+		{ id: '1', name: 'Gurame', price: 300000, assignedPersonIds: ['a'] },
+		{ id: '2', name: 'Kangkung', price: 200000, assignedPersonIds: ['b'] }
+	];
+
+	it('takes a discount off before tax and service', () => {
+		const totals = calculateBill(
+			bill({
+				items,
+				taxPercentage: 10,
+				servicePercentage: 5,
+				adjustments: [{ id: 'd', kind: 'discount', name: 'PROMO', amount: -100000 }]
+			})
+		);
+		expect(totals.discounts).toBe(-100000);
+		expect(totals.service).toBe(20000);
+		expect(totals.tax).toBe(40000);
+		expect(totals.grandTotal).toBe(460000);
+		// Shared by what each person had: 60% and 40%.
+		expect(totals.shares.map((share) => share.total)).toEqual([276000, 184000]);
+	});
+
+	it('lands rounding after tax and service, and still adds up to the coin', () => {
+		const totals = calculateBill(
+			bill({
+				items,
+				taxPercentage: 10,
+				servicePercentage: 5,
+				taxOnService: true,
+				adjustments: [{ id: 'r', kind: 'rounding', name: 'Pembulatan', amount: -500 }]
+			})
+		);
+		expect(totals.lateAdjustments).toBe(-500);
+		expect(totals.grandTotal).toBe(577000);
+		expect(totals.shares.reduce((sum, share) => sum + share.total, 0)).toBe(577000);
+	});
+
+	it('keeps each adjustment apart while adding them up by when they apply', () => {
+		const totals = calculateBill(
+			bill({
+				items,
+				adjustments: [
+					{ id: '1', kind: 'discount', name: 'Diskon member', amount: -20000 },
+					{ id: '2', kind: 'discount', name: 'PROMO', amount: -30000 },
+					{ id: '3', kind: 'rounding', name: 'Pembulatan', amount: 300 },
+					{ id: '4', kind: 'other', name: 'Biaya kartu', amount: 2000 }
+				]
+			})
+		);
+		expect(totals.discounts).toBe(-50000);
+		expect(totals.lateAdjustments).toBe(2300);
+		expect(totals.grandTotal).toBe(452300);
+	});
+
+	it('never lets a discount take the bill below zero', () => {
+		const totals = calculateBill(
+			bill({
+				items,
+				taxPercentage: 10,
+				adjustments: [{ id: 'd', kind: 'discount', name: 'Free', amount: -900000 }]
+			})
+		);
 		expect(totals.grandTotal).toBe(0);
 		expect(totals.shares.map((share) => share.total)).toEqual([0, 0]);
 	});
