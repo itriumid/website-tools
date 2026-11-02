@@ -93,7 +93,7 @@ export const SPLIT_BILL = {
 		taxOnService:
 			"Some restaurants charge tax on the subtotal plus service, so the bill comes out a little higher. When prices already include tax, there's no tax left to charge on service, so this turns off when you tick 'Prices include tax'.",
 		adjustments:
-			'Discounts come off before tax and service. Rounding and anything else land on the total after them. Everyone shares them by what they ordered.'
+			"Discounts come off before tax and service. Rounding and anything else land on the total after them. Everyone shares them by what they ordered, unless one is just for some people: then it's split evenly among them."
 	}
 };
 

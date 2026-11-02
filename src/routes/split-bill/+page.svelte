@@ -121,6 +121,9 @@
 				item.counts = counts;
 			}
 		}
+		for (const adjustment of adjustments) {
+			if (adjustment.assignedPersonIds?.includes(id)) toggleAdjustmentTag(adjustment, id);
+		}
 	}
 
 	/* ─── Items ─── */
@@ -230,7 +233,32 @@
 
 	function removeAdjustment(id: string) {
 		adjustments = adjustments.filter((adjustment) => adjustment.id !== id);
+		choosing = choosing.filter((other) => other !== id);
 	}
+
+	// An adjustment is everyone's unless someone says otherwise. Which ones have their "who is it
+	// for" open, though nobody's picked yet: once someone is, the tags themselves keep it open.
+	let choosing: string[] = $state([]);
+
+	function toggleAdjustmentTag(adjustment: BillAdjustment, personId: string) {
+		const tagged = adjustment.assignedPersonIds ?? [];
+		const next = tagged.includes(personId)
+			? tagged.filter((id) => id !== personId)
+			: [...tagged, personId];
+		if (next.length) adjustment.assignedPersonIds = next;
+		else delete adjustment.assignedPersonIds;
+	}
+
+	function shareWithEveryone(adjustment: BillAdjustment) {
+		delete adjustment.assignedPersonIds;
+		choosing = choosing.filter((id) => id !== adjustment.id);
+	}
+
+	/** "Voucher", or "Voucher, for Andi" when it's only some people's. */
+	const adjustmentLabel = (adjustment: BillAdjustment) => {
+		const names = (adjustment.assignedPersonIds ?? []).map(nameOf).filter(Boolean);
+		return names.length ? `${adjustment.name}, for ${names.join(' and ')}` : adjustment.name;
+	};
 
 	const signed = (amount: number) => `${amount < 0 ? '−' : '+'}${money(Math.abs(amount))}`;
 	const discountsOf = (state: BillState) =>
@@ -479,6 +507,7 @@
 		serviceIncluded = false;
 		taxOnService = false;
 		adjustments = [];
+		choosing = [];
 		history.replaceState(null, '', location.pathname);
 		confirmingClear = false;
 		deletable = undefined;
@@ -1109,36 +1138,77 @@
 				{#if adjustments.length}
 					<ul class="mt-3 divide-y divide-border rounded-xl border border-border bg-bg">
 						{#each adjustments as adjustment (adjustment.id)}
-							<li class="flex items-center justify-between gap-3 py-2 pr-2 pl-4 text-sm">
-								<span class="min-w-0">
-									<span class="font-medium break-words">{adjustment.name}</span>
-									<span class="text-muted"> · {KIND_NAMES[adjustment.kind]}</span>
-								</span>
-								<span class="flex shrink-0 items-center gap-1">
-									{signed(adjustment.amount)}
+							{@const forSome =
+								(adjustment.assignedPersonIds?.length ?? 0) > 0 || choosing.includes(adjustment.id)}
+							<li class="py-2 pr-2 pl-4 text-sm">
+								<div class="flex items-center justify-between gap-3">
+									<span class="min-w-0">
+										<span class="font-medium break-words">{adjustment.name}</span>
+										<span class="text-muted"> · {KIND_NAMES[adjustment.kind]}</span>
+									</span>
+									<span class="flex shrink-0 items-center gap-1">
+										{signed(adjustment.amount)}
+										<button
+											type="button"
+											onclick={() => removeAdjustment(adjustment.id)}
+											aria-label="Remove {adjustment.name}"
+											class="inline-flex size-8 items-center justify-center rounded-full text-muted hover:bg-surface hover:text-text"
+										>
+											<svg
+												class="size-4"
+												xmlns="http://www.w3.org/2000/svg"
+												fill="none"
+												viewBox="0 0 24 24"
+												stroke="currentColor"
+												stroke-width="2"
+												aria-hidden="true"
+											>
+												<path
+													stroke-linecap="round"
+													stroke-linejoin="round"
+													d="M6 18L18 6M6 6l12 12"
+												/>
+											</svg>
+										</button>
+									</span>
+								</div>
+								{#if people.length && forSome}
+									<fieldset class="mt-2 mb-1">
+										<legend class="mb-2 text-muted">Who is it for?</legend>
+										<div class="flex flex-wrap gap-2">
+											{#each people as person (person.id)}
+												{@const isFor = adjustment.assignedPersonIds?.includes(person.id) ?? false}
+												<button
+													type="button"
+													aria-pressed={isFor}
+													onclick={() => toggleAdjustmentTag(adjustment, person.id)}
+													class="min-h-9 rounded-full border px-3.5 transition-colors {isFor
+														? 'border-accent-edge bg-accent font-medium text-on-accent'
+														: 'border-control-border hover:bg-surface'}"
+												>
+													{#if isFor}<span aria-hidden="true" class="mr-1">✓</span
+														>{/if}{person.name}
+												</button>
+											{/each}
+										</div>
+										{#if !adjustment.assignedPersonIds?.length}
+											<p class="mt-2 text-muted">Until you pick someone, it's everyone's.</p>
+										{/if}
+										<button
+											type="button"
+											onclick={() => shareWithEveryone(adjustment)}
+											class="mt-1 min-h-9 text-muted underline underline-offset-4 hover:text-text"
+											>Share with everyone again</button
+										>
+									</fieldset>
+								{:else if people.length}
 									<button
 										type="button"
-										onclick={() => removeAdjustment(adjustment.id)}
-										aria-label="Remove {adjustment.name}"
-										class="inline-flex size-8 items-center justify-center rounded-full text-muted hover:bg-surface hover:text-text"
+										onclick={() => (choosing = [...choosing, adjustment.id])}
+										class="min-h-9 text-muted underline underline-offset-4 hover:text-text"
+										>Just for some people</button
 									>
-										<svg
-											class="size-4"
-											xmlns="http://www.w3.org/2000/svg"
-											fill="none"
-											viewBox="0 0 24 24"
-											stroke="currentColor"
-											stroke-width="2"
-											aria-hidden="true"
-										>
-											<path
-												stroke-linecap="round"
-												stroke-linejoin="round"
-												d="M6 18L18 6M6 6l12 12"
-											/>
-										</svg>
-									</button>
-								</span>
+								{/if}
 							</li>
 						{/each}
 					</ul>
@@ -1247,7 +1317,7 @@
 					</div>
 					{#each discountsOf(bill) as adjustment (adjustment.id)}
 						<div class="flex justify-between gap-4 text-muted">
-							<dt class="break-words">{adjustment.name}</dt>
+							<dt class="break-words">{adjustmentLabel(adjustment)}</dt>
 							<dd class="shrink-0">{signed(adjustment.amount)}</dd>
 						</div>
 					{/each}
@@ -1265,7 +1335,7 @@
 					{/if}
 					{#each lateAdjustmentsOf(bill) as adjustment (adjustment.id)}
 						<div class="flex justify-between gap-4 text-muted">
-							<dt class="break-words">{adjustment.name}</dt>
+							<dt class="break-words">{adjustmentLabel(adjustment)}</dt>
 							<dd class="shrink-0">{signed(adjustment.amount)}</dd>
 						</div>
 					{/each}
