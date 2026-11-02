@@ -17,12 +17,39 @@ export interface BillItem {
 	assignedPersonIds: string[];
 }
 
+/**
+ * A change to the whole bill, kept as the receipt printed it rather than netted into one number.
+ * The kind decides when it applies: a discount comes off the subtotal before tax and service;
+ * rounding and anything else land on the total after them.
+ */
+export interface BillAdjustment {
+	id: string;
+	kind: AdjustmentKind;
+	/** As printed: "PROMO GAJIAN", "Pembulatan". */
+	name: string;
+	/** Signed: a discount is never above zero; rounding and other adjustments go either way. */
+	amount: number;
+}
+
+export const ADJUSTMENT_KINDS = ['discount', 'rounding', 'other'] as const;
+export type AdjustmentKind = (typeof ADJUSTMENT_KINDS)[number];
+
 export interface BillState {
 	people: BillPerson[];
 	items: BillItem[];
 	taxPercentage: number;
 	servicePercentage: number;
 	currencyCode: string;
+	// Everything below came after links were already shared, so each is optional and missing
+	// means what the tool did before: tax and service added on top of the subtotal, each on its
+	// own, and no adjustments. Old links open exactly as they were.
+	/** The prices already include tax: it's noted, not added. */
+	taxIncluded?: boolean;
+	/** The prices already include service: it's noted, not added. */
+	serviceIncluded?: boolean;
+	/** Tax is charged on the subtotal plus service. Meaningless once tax is included: ignored then. */
+	taxOnService?: boolean;
+	adjustments?: BillAdjustment[];
 }
 
 export const DEFAULT_TAX_PERCENTAGE = 10;
@@ -91,7 +118,30 @@ export function readBill(value: unknown): BillState | undefined {
 			assignedPersonIds: item.assignedPersonIds
 		});
 	}
-	return {
+	const adjustments: BillAdjustment[] = [];
+	if (value.adjustments !== undefined) {
+		if (!Array.isArray(value.adjustments)) return undefined;
+		for (const adjustment of value.adjustments) {
+			if (
+				!isRecord(adjustment) ||
+				typeof adjustment.id !== 'string' ||
+				typeof adjustment.name !== 'string' ||
+				!ADJUSTMENT_KINDS.includes(adjustment.kind as AdjustmentKind) ||
+				typeof adjustment.amount !== 'number' ||
+				!Number.isFinite(adjustment.amount) ||
+				(adjustment.kind === 'discount' && adjustment.amount > 0)
+			) {
+				return undefined;
+			}
+			adjustments.push({
+				id: adjustment.id,
+				kind: adjustment.kind as AdjustmentKind,
+				name: adjustment.name,
+				amount: adjustment.amount
+			});
+		}
+	}
+	const state: BillState = {
 		people,
 		items,
 		taxPercentage: isPercentage(value.taxPercentage) ? value.taxPercentage : DEFAULT_TAX_PERCENTAGE,
@@ -103,6 +153,12 @@ export function readBill(value: unknown): BillState | undefined {
 				? value.currencyCode
 				: DEFAULT_CURRENCY_CODE
 	};
+	// Only what says something is kept, so a bill without these reads back exactly as written.
+	if (value.taxIncluded === true) state.taxIncluded = true;
+	if (value.serviceIncluded === true) state.serviceIncluded = true;
+	if (value.taxOnService === true && !state.taxIncluded) state.taxOnService = true;
+	if (adjustments.length) state.adjustments = adjustments;
+	return state;
 }
 
 /* ─── Money ─── */
@@ -150,16 +206,22 @@ export function formatAmount(amount: number, currencyCode: string, locale?: stri
 
 export interface PersonShare {
 	personId: string;
-	/** What they had, before tax and service. */
+	/** What they had, before discounts, tax and service. */
 	base: number;
-	/** What they owe: their base with their part of tax and service, rounded to the coin. */
+	/** What they owe: their base with their part of everything else, rounded to the coin. */
 	total: number;
 }
 
 export interface BillTotals {
 	subtotal: number;
+	/** The discounts, together: zero or below. */
+	discounts: number;
+	/** Tax added on top: zero when the prices already include it. */
 	tax: number;
+	/** Service added on top: zero when the prices already include it. */
 	service: number;
+	/** Rounding and other adjustments, together: they land after tax and service. */
+	lateAdjustments: number;
 	grandTotal: number;
 	/** What the items nobody is tagged to add up to: left out of every share. */
 	unassigned: number;
@@ -167,18 +229,33 @@ export interface BillTotals {
 }
 
 /**
- * Divides a bill. Each item is split evenly among the people tagged to it, and tax and service
- * (each a percentage of the subtotal) are shared in proportion to what each person had.
+ * Divides a bill. Each item is split evenly among the people tagged to it, and everything else
+ * (discounts, tax, service, rounding) is shared in proportion to what each person had.
+ *
+ * In order: discounts come off the subtotal; service is a percentage of that; tax is a percentage
+ * of it too, or of it plus service when tax is charged on service; tax or service the prices
+ * already include adds nothing; rounding and other adjustments land last. The total never goes
+ * below zero.
  *
  * Shares are rounded to the currency's smallest coin so they add up to exactly what the tagged
- * items cost with tax and service: the coins left over after rounding go to the people whose
- * shares lost the most, rather than leaving the table a coin short.
+ * items cost with all of that: the coins left over after rounding go to the people whose shares
+ * lost the most, rather than leaving the table a coin short.
  */
 export function calculateBill(state: BillState): BillTotals {
 	const subtotal = state.items.reduce((sum, item) => sum + item.price, 0);
-	const tax = subtotal * (state.taxPercentage / 100);
-	const service = subtotal * (state.servicePercentage / 100);
-	const grandTotal = subtotal + tax + service;
+	const adjustments = state.adjustments ?? [];
+	const sumOf = (kinds: AdjustmentKind[]) =>
+		adjustments
+			.filter((adjustment) => kinds.includes(adjustment.kind))
+			.reduce((sum, adjustment) => sum + adjustment.amount, 0);
+	const discounts = sumOf(['discount']);
+	const lateAdjustments = sumOf(['rounding', 'other']);
+
+	const discounted = Math.max(0, subtotal + discounts);
+	const service = state.serviceIncluded ? 0 : discounted * (state.servicePercentage / 100);
+	const taxBase = state.taxOnService && !state.taxIncluded ? discounted + service : discounted;
+	const tax = state.taxIncluded ? 0 : taxBase * (state.taxPercentage / 100);
+	const grandTotal = Math.max(0, discounted + service + tax + lateAdjustments);
 	const multiplier = subtotal > 0 ? grandTotal / subtotal : 1;
 
 	const bases = new Map<string, number>(state.people.map((person) => [person.id, 0]));
@@ -209,8 +286,10 @@ export function calculateBill(state: BillState): BillTotals {
 
 	return {
 		subtotal,
+		discounts,
 		tax,
 		service,
+		lateAdjustments,
 		grandTotal,
 		unassigned,
 		shares: state.people.map((person, index) => ({
