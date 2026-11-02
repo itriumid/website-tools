@@ -445,3 +445,152 @@ describe('quantities and counts', () => {
 		expect(withItem({ quantity: 2, counts: { a: 'two' } })).toBeUndefined();
 	});
 });
+
+describe('adjustments for some people', () => {
+	const items = [
+		{ id: '1', name: 'Gurame', price: 100000, assignedPersonIds: ['a'] },
+		{ id: '2', name: 'Kangkung', price: 100000, assignedPersonIds: ['b'] }
+	];
+	const shares = (overrides: Partial<BillState>) =>
+		calculateBill(bill({ items, ...overrides })).shares.map((share) => share.total);
+
+	it("takes someone's own discount off their part, before tax", () => {
+		const totals = calculateBill(
+			bill({
+				items,
+				taxPercentage: 10,
+				adjustments: [
+					{ id: 'v', kind: 'discount', name: 'Voucher', amount: -20000, assignedPersonIds: ['a'] }
+				]
+			})
+		);
+		expect(totals.shares.map((share) => share.total)).toEqual([88000, 110000]);
+		expect(totals.grandTotal).toBe(198000);
+	});
+
+	it('splits one evenly among the people it is for', () => {
+		const people = ['a', 'b', 'c'].map((id) => ({ id, name: id }));
+		const totals = calculateBill(
+			bill({
+				people,
+				items: [...items, { id: '3', name: 'Tahu', price: 100000, assignedPersonIds: ['c'] }],
+				adjustments: [
+					{
+						id: 'v',
+						kind: 'discount',
+						name: 'Promo',
+						amount: -20000,
+						assignedPersonIds: ['a', 'b']
+					}
+				]
+			})
+		);
+		expect(totals.shares.map((share) => share.total)).toEqual([90000, 90000, 100000]);
+	});
+
+	it("shares everyone's discount by what's left after people's own", () => {
+		expect(
+			shares({
+				items: [
+					{ id: '1', name: 'Gurame', price: 30000, assignedPersonIds: ['a'] },
+					{ id: '2', name: 'Kangkung', price: 70000, assignedPersonIds: ['b'] }
+				],
+				adjustments: [
+					{ id: 'v', kind: 'discount', name: 'Voucher', amount: -30000, assignedPersonIds: ['a'] },
+					{ id: 'p', kind: 'discount', name: 'Promo', amount: -10000 }
+				]
+			})
+		).toEqual([0, 60000]);
+	});
+
+	it("gives everyone what's left of a discount bigger than someone's part", () => {
+		expect(
+			shares({
+				items: [
+					{ id: '1', name: 'Gurame', price: 30000, assignedPersonIds: ['a'] },
+					{ id: '2', name: 'Kangkung', price: 70000, assignedPersonIds: ['b'] }
+				],
+				adjustments: [
+					{ id: 'v', kind: 'discount', name: 'Voucher', amount: -50000, assignedPersonIds: ['a'] }
+				]
+			})
+		).toEqual([0, 50000]);
+	});
+
+	it("adds someone's own fee after tax, to them alone, and never takes a share below nothing", () => {
+		expect(
+			shares({
+				taxPercentage: 10,
+				adjustments: [
+					{ id: 'f', kind: 'other', name: 'Biaya kartu', amount: 2000, assignedPersonIds: ['b'] }
+				]
+			})
+		).toEqual([110000, 112000]);
+		expect(
+			shares({
+				adjustments: [
+					{ id: 'r', kind: 'other', name: 'Refund', amount: -150000, assignedPersonIds: ['a'] }
+				]
+			})
+		).toEqual([0, 100000]);
+	});
+
+	it('treats one tagged only to people no longer on the bill as everyone’s', () => {
+		expect(
+			shares({
+				adjustments: [
+					{
+						id: 'v',
+						kind: 'discount',
+						name: 'Voucher',
+						amount: -20000,
+						assignedPersonIds: ['gone']
+					}
+				]
+			})
+		).toEqual([90000, 90000]);
+	});
+
+	it('carries who an adjustment is for in links, only when someone is tagged', () => {
+		const state = bill({
+			items,
+			adjustments: [
+				{ id: 'v', kind: 'discount', name: 'Voucher', amount: -20000, assignedPersonIds: ['a'] }
+			]
+		});
+		expect(billFromHash(billToHash(state))).toEqual(state);
+		const read = billFromHash(
+			'#data=' +
+				compress(
+					JSON.stringify(
+						bill({
+							adjustments: [
+								{ id: 'p', kind: 'discount', name: 'Promo', amount: -1, assignedPersonIds: [] }
+							]
+						})
+					)
+				)
+		);
+		expect(read?.adjustments?.[0]).toEqual({
+			id: 'p',
+			kind: 'discount',
+			name: 'Promo',
+			amount: -1
+		});
+		const wrong = (assignedPersonIds: unknown) =>
+			billFromHash(
+				'#data=' +
+					compress(
+						JSON.stringify(
+							bill({
+								adjustments: [
+									{ id: 'p', kind: 'discount', name: 'P', amount: -1, assignedPersonIds }
+								] as never
+							})
+						)
+					)
+			);
+		expect(wrong('a')).toBeUndefined();
+		expect(wrong([1])).toBeUndefined();
+	});
+});
