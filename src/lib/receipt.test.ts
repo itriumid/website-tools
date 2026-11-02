@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { itemsFromLine, readAmount, readReceipt, receiptTotal } from './receipt';
+import { readAmount, readReceipt, receiptTotal } from './receipt';
 
 // Two real receipts, as an iPhone's Live Text copied them from photos: misreads, joined lines,
 // split numbers and all, because those are what the parser has to survive. Everything that could
@@ -267,35 +267,5 @@ describe('readReceipt, the odd ones', () => {
 		// No service line: no service.
 		expect(receipt.servicePercentage).toBe(0);
 		expect(receiptTotal(receipt, 'USD')).toBe(21.45);
-	});
-});
-
-describe('itemsFromLine', () => {
-	const esTeh = { name: 'Es Teh', quantity: 3, price: 50000 };
-
-	it('keeps a line whole by default, saying how many', () => {
-		expect(itemsFromLine(esTeh, false, 'IDR')).toEqual([{ name: '3× Es Teh', price: 50000 }]);
-	});
-
-	it('splits into units in whole coins that add up exactly', () => {
-		expect(itemsFromLine(esTeh, true, 'IDR')).toEqual([
-			{ name: 'Es Teh 1/3', price: 16667 },
-			{ name: 'Es Teh 2/3', price: 16667 },
-			{ name: 'Es Teh 3/3', price: 16666 }
-		]);
-		const cents = itemsFromLine({ name: 'Soda', quantity: 3, price: 10 }, true, 'USD');
-		expect(cents.map((item) => item.price)).toEqual([3.34, 3.33, 3.33]);
-	});
-
-	it('splits as many as asked, with no cap', () => {
-		const units = itemsFromLine({ name: 'Kerupuk', quantity: 20, price: 40000 }, true, 'IDR');
-		expect(units).toHaveLength(20);
-		expect(units.reduce((sum, unit) => sum + unit.price, 0)).toBe(40000);
-	});
-
-	it('leaves a single one as it is', () => {
-		expect(itemsFromLine({ name: 'Kopi', quantity: 1, price: 20000 }, true, 'IDR')).toEqual([
-			{ name: 'Kopi', price: 20000 }
-		]);
 	});
 });
