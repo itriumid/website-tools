@@ -13,9 +13,21 @@ export interface BillPerson {
 export interface BillItem {
 	id: string;
 	name: string;
+	/** For all of them, when there are several. */
 	price: number;
 	assignedPersonIds: string[];
+	// Both below came after links were already shared: optional, and missing means what the tool
+	// did before (one of it, split evenly among the people tagged to it).
+	/** How many there were: "3× Es Teh". Only kept when more than one. */
+	quantity?: number;
+	/**
+	 * How many each person had, by person: for when people had different numbers. Each pays for
+	 * their own; any not counted are in nobody's share yet. Only kept with a quantity.
+	 */
+	counts?: Record<string, number>;
 }
+
+export const MAX_QUANTITY = 999;
 
 /**
  * A change to the whole bill, kept as the receipt printed it rather than netted into one number.
@@ -82,6 +94,9 @@ export function billFromHash(hash: string): BillState | undefined {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
 	typeof value === 'object' && value !== null && !Array.isArray(value);
 
+const isCount = (value: unknown): value is number =>
+	typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= MAX_QUANTITY;
+
 const isPercentage = (value: unknown): value is number =>
 	typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 100;
 
@@ -111,12 +126,24 @@ export function readBill(value: unknown): BillState | undefined {
 		) {
 			return undefined;
 		}
-		items.push({
+		const read: BillItem = {
 			id: item.id,
 			name: item.name,
 			price: item.price,
 			assignedPersonIds: item.assignedPersonIds
-		});
+		};
+		if (item.quantity !== undefined) {
+			if (!isCount(item.quantity) || item.quantity < 1 || item.quantity > MAX_QUANTITY) {
+				return undefined;
+			}
+			if (item.quantity > 1) read.quantity = item.quantity;
+		}
+		if (item.counts !== undefined) {
+			if (!isRecord(item.counts) || !Object.values(item.counts).every(isCount)) return undefined;
+			const counts = Object.entries(item.counts as Record<string, number>).filter(([, n]) => n > 0);
+			if (read.quantity && counts.length) read.counts = Object.fromEntries(counts);
+		}
+		items.push(read);
 	}
 	const adjustments: BillAdjustment[] = [];
 	if (value.adjustments !== undefined) {
@@ -229,8 +256,9 @@ export interface BillTotals {
 }
 
 /**
- * Divides a bill. Each item is split evenly among the people tagged to it, and everything else
- * (discounts, tax, service, rounding) is shared in proportion to what each person had.
+ * Divides a bill. Each item is split evenly among the people tagged to it, or, when it says how
+ * many each had, by those counts; everything else (discounts, tax, service, rounding) is shared
+ * in proportion to what each person had.
  *
  * In order: discounts come off the subtotal; service is a percentage of that; tax is a percentage
  * of it too, or of it plus service when tax is charged on service; tax or service the prices
@@ -261,6 +289,18 @@ export function calculateBill(state: BillState): BillTotals {
 	const bases = new Map<string, number>(state.people.map((person) => [person.id, 0]));
 	let unassigned = 0;
 	for (const item of state.items) {
+		if (item.counts && (item.quantity ?? 1) > 1) {
+			// Each pays for as many as they had; any nobody's counted for are nobody's yet. Counted
+			// past the quantity, everyone's share shrinks to fit, so the item still costs its price.
+			const counted = Object.entries(item.counts).filter(([id, n]) => bases.has(id) && n > 0);
+			const total = counted.reduce((sum, [, n]) => sum + n, 0);
+			const units = Math.max(item.quantity ?? 1, total);
+			for (const [id, n] of counted) {
+				bases.set(id, (bases.get(id) ?? 0) + (item.price * n) / units);
+			}
+			unassigned += (item.price * (units - total)) / units;
+			continue;
+		}
 		const tagged = item.assignedPersonIds.filter((id) => bases.has(id));
 		if (tagged.length === 0) {
 			unassigned += item.price;

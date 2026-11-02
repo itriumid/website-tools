@@ -356,3 +356,92 @@ describe('money', () => {
 		expect(formatAmount(1234.5, 'USD', 'en-US')).toBe('1,234.50');
 	});
 });
+
+describe('quantities and counts', () => {
+	const people = ['a', 'b', 'c'].map((id) => ({ id, name: id }));
+	const esTeh = {
+		id: 'e',
+		name: 'Es Teh',
+		price: 30000,
+		assignedPersonIds: ['a', 'b'],
+		quantity: 3
+	};
+
+	it('splits an item with a quantity evenly, like any other, until counts are given', () => {
+		const totals = calculateBill(bill({ people, items: [esTeh] }));
+		expect(totals.shares.map((share) => share.total)).toEqual([15000, 15000, 0]);
+	});
+
+	it('charges each person for as many as they had', () => {
+		const totals = calculateBill(
+			bill({ people, items: [{ ...esTeh, counts: { a: 2, b: 1 } }], taxPercentage: 10 })
+		);
+		expect(totals.shares.map((share) => share.total)).toEqual([22000, 11000, 0]);
+		expect(totals.unassigned).toBe(0);
+	});
+
+	it("leaves the ones nobody's counted for out of every share, and says what they come to", () => {
+		const totals = calculateBill(bill({ people, items: [{ ...esTeh, counts: { a: 2 } }] }));
+		expect(totals.shares.map((share) => share.total)).toEqual([20000, 0, 0]);
+		expect(totals.unassigned).toBe(10000);
+	});
+
+	it('shrinks everyone to fit when more are counted than there were, so the item costs its price', () => {
+		const totals = calculateBill(bill({ people, items: [{ ...esTeh, counts: { a: 2, b: 2 } }] }));
+		expect(totals.shares.map((share) => share.total)).toEqual([15000, 15000, 0]);
+		expect(totals.unassigned).toBe(0);
+	});
+
+	it('ignores a count for someone no longer on the bill', () => {
+		const totals = calculateBill(
+			bill({ people, items: [{ ...esTeh, counts: { a: 1, gone: 2 } }] })
+		);
+		expect(totals.shares.map((share) => share.total)).toEqual([10000, 0, 0]);
+		expect(totals.unassigned).toBe(20000);
+	});
+
+	it('carries quantities and counts in links, and only when they say something', () => {
+		const counted = bill({ people, items: [{ ...esTeh, counts: { a: 2, b: 1 } }] });
+		expect(billFromHash(billToHash(counted))).toEqual(counted);
+
+		const read = billFromHash(
+			'#data=' +
+				compress(
+					JSON.stringify(
+						bill({
+							items: [
+								{ id: '1', name: 'One', price: 1, assignedPersonIds: [], quantity: 1 },
+								{ id: '2', name: 'Two', price: 2, assignedPersonIds: [], counts: { a: 1 } },
+								{ ...esTeh, counts: { a: 0 } }
+							]
+						})
+					)
+				)
+		);
+		expect(read?.items.map((item) => Object.keys(item).sort().join(','))).toEqual([
+			'assignedPersonIds,id,name,price',
+			'assignedPersonIds,id,name,price',
+			'assignedPersonIds,id,name,price,quantity'
+		]);
+	});
+
+	it('refuses quantities and counts that are the wrong shape', () => {
+		const withItem = (extra: object) =>
+			billFromHash(
+				'#data=' +
+					compress(
+						JSON.stringify(
+							bill({ items: [{ id: 'i', name: 'x', price: 1, assignedPersonIds: [], ...extra }] })
+						)
+					)
+			);
+		expect(withItem({ quantity: 2, counts: { a: 1 } })).toBeDefined();
+		expect(withItem({ quantity: 0 })).toBeUndefined();
+		expect(withItem({ quantity: 2.5 })).toBeUndefined();
+		expect(withItem({ quantity: 'lots' })).toBeUndefined();
+		expect(withItem({ quantity: 100000 })).toBeUndefined();
+		expect(withItem({ quantity: 2, counts: [1, 2] })).toBeUndefined();
+		expect(withItem({ quantity: 2, counts: { a: -1 } })).toBeUndefined();
+		expect(withItem({ quantity: 2, counts: { a: 'two' } })).toBeUndefined();
+	});
+});
