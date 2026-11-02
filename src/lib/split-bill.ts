@@ -41,6 +41,12 @@ export interface BillAdjustment {
 	name: string;
 	/** Signed: a discount is never above zero; rounding and other adjustments go either way. */
 	amount: number;
+	/**
+	 * Who it's for, when it isn't everyone: a member's voucher, a card fee for whoever paid by
+	 * card. Split evenly among them. Missing or empty means everyone, by what they had: what the
+	 * tool did before. Only kept when someone's tagged.
+	 */
+	assignedPersonIds?: string[];
 }
 
 export const ADJUSTMENT_KINDS = ['discount', 'rounding', 'other'] as const;
@@ -156,16 +162,22 @@ export function readBill(value: unknown): BillState | undefined {
 				!ADJUSTMENT_KINDS.includes(adjustment.kind as AdjustmentKind) ||
 				typeof adjustment.amount !== 'number' ||
 				!Number.isFinite(adjustment.amount) ||
-				(adjustment.kind === 'discount' && adjustment.amount > 0)
+				(adjustment.kind === 'discount' && adjustment.amount > 0) ||
+				(adjustment.assignedPersonIds !== undefined &&
+					(!Array.isArray(adjustment.assignedPersonIds) ||
+						!adjustment.assignedPersonIds.every((id) => typeof id === 'string')))
 			) {
 				return undefined;
 			}
-			adjustments.push({
+			const read: BillAdjustment = {
 				id: adjustment.id,
 				kind: adjustment.kind as AdjustmentKind,
 				name: adjustment.name,
 				amount: adjustment.amount
-			});
+			};
+			const tagged = adjustment.assignedPersonIds as string[] | undefined;
+			if (tagged?.length) read.assignedPersonIds = tagged;
+			adjustments.push(read);
 		}
 	}
 	const state: BillState = {
@@ -280,11 +292,14 @@ export function calculateBill(state: BillState): BillTotals {
 	const lateAdjustments = sumOf(['rounding', 'other']);
 
 	const discounted = Math.max(0, subtotal + discounts);
-	const service = state.serviceIncluded ? 0 : discounted * (state.servicePercentage / 100);
-	const taxBase = state.taxOnService && !state.taxIncluded ? discounted + service : discounted;
-	const tax = state.taxIncluded ? 0 : taxBase * (state.taxPercentage / 100);
+	const serviceRate = state.serviceIncluded ? 0 : state.servicePercentage / 100;
+	const taxRate = state.taxIncluded ? 0 : state.taxPercentage / 100;
+	const stacked = Boolean(state.taxOnService && !state.taxIncluded);
+	const service = discounted * serviceRate;
+	const tax = (stacked ? discounted + service : discounted) * taxRate;
 	const grandTotal = Math.max(0, discounted + service + tax + lateAdjustments);
-	const multiplier = subtotal > 0 ? grandTotal / subtotal : 1;
+	// Service and tax are percentages, so they grow every share by the same factor.
+	const charges = 1 + serviceRate + taxRate * (stacked ? 1 + serviceRate : 1);
 
 	const bases = new Map<string, number>(state.people.map((person) => [person.id, 0]));
 	let unassigned = 0;
@@ -309,8 +324,50 @@ export function calculateBill(state: BillState): BillTotals {
 		for (const id of tagged) bases.set(id, (bases.get(id) ?? 0) + item.price / tagged.length);
 	}
 
+	// Adjustments for some people split evenly among them; the rest are everyone's, by what they had.
+	const ids = state.people.map((person) => person.id);
+	const taggedOf = (adjustment: BillAdjustment) =>
+		(adjustment.assignedPersonIds ?? []).filter((id) => bases.has(id));
+	const perPerson = (kinds: AdjustmentKind[]) => {
+		const amounts = new Map<string, number>(ids.map((id) => [id, 0]));
+		let everyone = 0;
+		for (const adjustment of adjustments.filter((a) => kinds.includes(a.kind))) {
+			const tagged = taggedOf(adjustment);
+			if (!tagged.length) everyone += adjustment.amount;
+			for (const id of tagged)
+				amounts.set(id, amounts.get(id)! + adjustment.amount / tagged.length);
+		}
+		return { amounts, everyone };
+	};
+
+	// 1. Discounts. Someone's own comes off what they had, down to nothing; any left over is
+	// everyone's. Everyone's come off what's left, in proportion.
+	const discount = perPerson(['discount']);
+	let everyoneDiscount = discount.everyone;
+	const own = new Map<string, number>();
+	for (const id of ids) {
+		const left = (bases.get(id) ?? 0) + discount.amounts.get(id)!;
+		if (left < 0) everyoneDiscount += left;
+		own.set(id, Math.max(0, left));
+	}
+	const afterOwn = [...own.values()].reduce((sum, value) => sum + value, 0) + unassigned;
+	const shrink = afterOwn > 0 ? Math.max(0, afterOwn + everyoneDiscount) / afterOwn : 0;
+
+	// 2. Service and tax, the same factor for everyone. 3. Rounding and the rest, last: someone's
+	// own on them (never below nothing), everyone's in proportion to what each comes to by then.
+	const charged = new Map(ids.map((id) => [id, own.get(id)! * shrink * charges]));
+	const chargedUnassigned = unassigned * shrink * charges;
+	const late = perPerson(['rounding', 'other']);
+	const chargedTotal =
+		[...charged.values()].reduce((sum, value) => sum + value, 0) + chargedUnassigned;
+	const owed = ids.map((id) => {
+		const before = charged.get(id)!;
+		const everyone = chargedTotal > 0 ? (late.everyone * before) / chargedTotal : 0;
+		return Math.max(0, before + late.amounts.get(id)! + everyone);
+	});
+
 	const coins = 10 ** decimalPlaces(state.currencyCode);
-	const exact = state.people.map((person) => (bases.get(person.id) ?? 0) * multiplier * coins);
+	const exact = owed.map((value) => value * coins);
 	const rounded = exact.map(Math.floor);
 	// Rounding to a millionth of a coin first keeps 0.1 + 0.2 style noise from costing a coin.
 	const target = Math.round(Math.round(exact.reduce((sum, value) => sum + value, 0) * 1e6) / 1e6);
