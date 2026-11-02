@@ -68,7 +68,8 @@ export const SPLIT_BILL = {
 		nothing:
 			"We couldn't find any items in that text. Check it's the whole receipt, or add the items by hand.",
 		check: 'Check this',
-		splitInto: (count: number) => `Split into ${count}`,
+		quantity: (count: number) =>
+			`${count} of these on the receipt: count who had how many once it's in the bill.`,
 		rates: (service: number, tax: number, onService: boolean) =>
 			`Service ${service}% and tax ${tax}%${onService ? ', charged on service too' : ''}.`,
 		noRates:
@@ -83,8 +84,8 @@ export const SPLIT_BILL = {
 	},
 	// Shown only when someone asks, behind an ⓘ next to the setting they explain.
 	explanations: {
-		splitInto:
-			'Off, it stays one item you can tag to several people, who share it evenly. On, each one becomes its own item, for when people had different numbers of them.',
+		counting:
+			"Tagging people shares an item evenly. Counting is for when people had different numbers of it: each pays for their own, and any nobody's counted for show up as not in anyone's share.",
 		unsure:
 			"Text recognition sometimes misreads a number, or puts a price next to the wrong item. We mark what we couldn't check against the receipt's own totals.",
 		taxIncluded:

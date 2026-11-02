@@ -5,7 +5,6 @@
 	import Seo from '#lib/Seo.svelte';
 	import Toggletip from '#lib/Toggletip.svelte';
 	import {
-		itemsFromLine,
 		readReceipt,
 		receiptTotal,
 		type ScannedAdjustment,
@@ -17,6 +16,7 @@
 		DEFAULT_CURRENCY_CODE,
 		DEFAULT_SERVICE_PERCENTAGE,
 		DEFAULT_TAX_PERCENTAGE,
+		MAX_QUANTITY,
 		billFromHash,
 		billToHash,
 		calculateBill,
@@ -115,19 +115,62 @@
 		people = people.filter((person) => person.id !== id);
 		for (const item of items) {
 			item.assignedPersonIds = item.assignedPersonIds.filter((tagged) => tagged !== id);
+			if (item.counts && id in item.counts) {
+				const counts = { ...item.counts };
+				delete counts[id];
+				item.counts = counts;
+			}
 		}
 	}
 
 	/* ─── Items ─── */
 	let newItem = $state('');
 	let newPrice: number | null = $state(null);
+	let newQuantity: number | null = $state(1);
+	const quantityOf = (value: number | null) =>
+		typeof value === 'number' && Number.isFinite(value)
+			? Math.min(MAX_QUANTITY, Math.max(1, Math.round(value)))
+			: 1;
 	const canAddItem = $derived(newItem.trim() !== '' && newPrice !== null && newPrice > 0);
 
 	function addItem() {
 		if (!canAddItem || newPrice === null) return;
-		items.push({ id: newId(), name: newItem.trim(), price: newPrice, assignedPersonIds: [] });
+		// People know a menu's price for one, so the form asks for that; the bill keeps the line's.
+		const quantity = quantityOf(newQuantity);
+		items.push({
+			id: newId(),
+			name: newItem.trim(),
+			price: newPrice * quantity,
+			assignedPersonIds: [],
+			...(quantity > 1 ? { quantity } : {})
+		});
 		newItem = '';
 		newPrice = null;
+		newQuantity = 1;
+	}
+
+	const nameWithQuantity = (item: BillItem) =>
+		(item.quantity ?? 1) > 1 ? `${item.quantity}× ${item.name}` : item.name;
+	const countedOf = (item: BillItem) =>
+		Object.values(item.counts ?? {}).reduce((sum, count) => sum + count, 0);
+
+	// Counting is the advanced way to tag: for an item there were several of, when people had
+	// different numbers of them. It starts from whoever is tagged, one each.
+	function startCounting(item: BillItem) {
+		item.counts = Object.fromEntries(item.assignedPersonIds.map((id) => [id, 1]));
+	}
+
+	function stopCounting(item: BillItem) {
+		delete item.counts;
+	}
+
+	function changeCount(item: BillItem, personId: string, change: number) {
+		const counts = { ...item.counts };
+		const count = Math.min(MAX_QUANTITY, (counts[personId] ?? 0) + change);
+		if (count > 0) counts[personId] = count;
+		else delete counts[personId];
+		item.counts = counts;
+		item.assignedPersonIds = Object.keys(counts);
 	}
 
 	function removeItem(id: string) {
@@ -204,7 +247,6 @@
 		name: string;
 		price: number | null;
 		quantity: number;
-		split: boolean;
 		unsure: boolean;
 	}
 	interface ReviewAdjustment extends ScannedAdjustment {
@@ -231,7 +273,6 @@
 			name: item.name,
 			price: item.price ?? null,
 			quantity: item.quantity,
-			split: false,
 			unsure: item.unsure
 		}));
 		reviewAdjustments = scanned.adjustments.map((adjustment) => ({ ...adjustment, id: newId() }));
@@ -283,12 +324,13 @@
 	function addScan() {
 		if (!scanned || pricesMissing) return;
 		for (const line of reviewLines) {
-			const units = itemsFromLine(
-				{ name: line.name.trim() || 'Item', quantity: line.quantity, price: line.price ?? 0 },
-				line.split,
-				currencyCode
-			);
-			for (const unit of units) items.push({ id: newId(), ...unit, assignedPersonIds: [] });
+			items.push({
+				id: newId(),
+				name: line.name.trim() || 'Item',
+				price: line.price ?? 0,
+				assignedPersonIds: [],
+				...(line.quantity > 1 ? { quantity: Math.min(MAX_QUANTITY, line.quantity) } : {})
+			});
 		}
 		for (const { kind, name, amount } of reviewAdjustments) {
 			adjustments.push({ id: newId(), kind, name, amount });
@@ -629,16 +671,9 @@
 										</button>
 									</div>
 									{#if line.quantity > 1}
-										<div class="mt-1 flex flex-wrap items-center gap-x-1">
-											<label class={checkRow}>
-												<input type="checkbox" bind:checked={line.split} class={checkbox} />
-												{SPLIT_BILL.scanning.splitInto(line.quantity)}
-											</label>
-											<Toggletip
-												label="About splitting {line.name}"
-												text={SPLIT_BILL.explanations.splitInto}
-											/>
-										</div>
+										<p class="mt-2 text-sm text-muted">
+											{SPLIT_BILL.scanning.quantity(line.quantity)}
+										</p>
 									{/if}
 								</li>
 							{/each}
@@ -814,18 +849,34 @@
 				Items {#if items.length}<span class="font-normal text-muted">({items.length})</span>{/if}
 			</h2>
 			<form
-				class="grid gap-3 sm:grid-cols-[1fr_9rem_auto] sm:items-end"
+				class="grid grid-cols-[6rem_1fr] gap-3 sm:grid-cols-[1fr_6rem_9rem_auto] sm:items-end"
 				onsubmit={(event) => {
 					event.preventDefault();
 					addItem();
 				}}
 			>
-				<div>
+				<div class="col-span-2 sm:col-span-1">
 					<label for="item" class={label}>Item</label>
 					<input id="item" type="text" autocomplete="off" bind:value={newItem} class={field} />
 				</div>
 				<div>
-					<label for="price" class={label}>Price</label>
+					<label for="quantity" class={label}>Quantity</label>
+					<input
+						id="quantity"
+						type="number"
+						inputmode="numeric"
+						min="1"
+						max={MAX_QUANTITY}
+						step="1"
+						bind:value={newQuantity}
+						class={field}
+					/>
+				</div>
+				<div>
+					<!-- People know a menu's price for one, so with several it asks for that. -->
+					<label for="price" class={label}
+						>{quantityOf(newQuantity) > 1 ? 'Price each' : 'Price'}</label
+					>
 					<input
 						id="price"
 						type="number"
@@ -836,8 +887,10 @@
 						class={field}
 					/>
 				</div>
-				<button type="submit" disabled={!canAddItem} class={`${smallButton} ${besideField}`}
-					>Add item</button
+				<button
+					type="submit"
+					disabled={!canAddItem}
+					class="{smallButton} {besideField} col-span-2 sm:col-span-1">Add item</button
 				>
 			</form>
 
@@ -847,8 +900,12 @@
 						<li class="rounded-xl border border-border bg-bg p-4">
 							<div class="flex items-start justify-between gap-3">
 								<div class="min-w-0">
-									<p class="font-medium break-words">{item.name}</p>
-									<p class="text-sm text-muted">{money(item.price)}</p>
+									<p class="font-medium break-words">{nameWithQuantity(item)}</p>
+									<p class="text-sm text-muted">
+										{money(item.price)}{(item.quantity ?? 1) > 1
+											? ` · ${money(item.price / (item.quantity ?? 1))} each`
+											: ''}
+									</p>
 								</div>
 								<button
 									type="button"
@@ -870,7 +927,60 @@
 								</button>
 							</div>
 
-							{#if people.length}
+							{#if people.length && item.counts}
+								{@const quantity = item.quantity ?? 1}
+								{@const counted = countedOf(item)}
+								<fieldset class="mt-3">
+									<legend class="mb-2 text-sm text-muted">How many each had</legend>
+									<div class="flex flex-wrap gap-2">
+										{#each people as person (person.id)}
+											{@const count = item.counts[person.id] ?? 0}
+											{#if count > 0}
+												<span
+													role="group"
+													aria-label={person.name}
+													class="inline-flex min-h-9 items-center gap-0.5 rounded-full border border-accent-edge bg-accent py-0.5 pr-0.5 pl-3.5 text-sm font-medium text-on-accent"
+												>
+													{person.name}
+													<button
+														type="button"
+														onclick={() => changeCount(item, person.id, -1)}
+														aria-label="One fewer for {person.name}"
+														class="ml-1.5 inline-flex size-8 items-center justify-center rounded-full text-base hover:bg-on-accent/10"
+														>−</button
+													>
+													<span class="min-w-5 text-center tabular-nums">{count}</span>
+													<button
+														type="button"
+														onclick={() => changeCount(item, person.id, 1)}
+														aria-label="One more for {person.name}"
+														class="inline-flex size-8 items-center justify-center rounded-full text-base hover:bg-on-accent/10"
+														>+</button
+													>
+												</span>
+											{:else}
+												<button
+													type="button"
+													onclick={() => changeCount(item, person.id, 1)}
+													class="min-h-9 rounded-full border border-control-border px-3.5 text-sm transition-colors hover:bg-surface"
+													>{person.name}</button
+												>
+											{/if}
+										{/each}
+									</div>
+									<p class="mt-2 text-sm" role="status">
+										{counted} of {quantity} counted{#if counted < quantity}: {quantity - counted} not
+											in anyone's share yet.{:else if counted > quantity}, more than there were:
+											each share is made smaller to fit.{:else}.{/if}
+									</p>
+									<button
+										type="button"
+										onclick={() => stopCounting(item)}
+										class="mt-1 min-h-9 text-sm text-muted underline underline-offset-4 hover:text-text"
+										>Share evenly instead</button
+									>
+								</fieldset>
+							{:else if people.length}
 								<fieldset class="mt-3">
 									<legend class="mb-2 text-sm text-muted">Who had this?</legend>
 									<div class="flex flex-wrap gap-2">
@@ -895,6 +1005,20 @@
 											{everyoneHasIt(item) ? 'Nobody' : 'Everyone'}
 										</button>
 									</div>
+									{#if (item.quantity ?? 1) > 1}
+										<div class="mt-1 flex flex-wrap items-center gap-x-1">
+											<button
+												type="button"
+												onclick={() => startCounting(item)}
+												class="min-h-9 text-sm text-muted underline underline-offset-4 hover:text-text"
+												>Count who had how many</button
+											>
+											<Toggletip
+												label="About counting who had how many"
+												text={SPLIT_BILL.explanations.counting}
+											/>
+										</div>
+									{/if}
 								</fieldset>
 							{:else}
 								<p class="mt-3 text-sm text-muted">Add people first, then tag who had this.</p>
@@ -1156,7 +1280,7 @@
 				{#if totals.unassigned > 0}
 					<p class="mt-4 rounded-lg border-l-4 border-accent-edge bg-bg p-3 text-sm">
 						<strong>Not in anyone's share:</strong> items worth {money(totals.unassigned)} aren't tagged
-						to anyone, so they're left out of the split below.
+						or counted for anyone, so they're left out of the split below.
 					</p>
 				{/if}
 

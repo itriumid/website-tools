@@ -507,29 +507,6 @@ export function readReceipt(text: string, currencyCode: string): ScannedReceipt 
 	};
 }
 
-/**
- * A line for several of something, as items for the bill. Kept whole, it's one item ("3× Es Teh")
- * that people tagged to it share evenly. Split, each one is its own item ("Es Teh 1/3"), priced in
- * whole coins that add up exactly: the coins left over go to the first ones.
- */
-export function itemsFromLine(
-	line: { name: string; quantity: number; price: number },
-	split: boolean,
-	currencyCode: string
-): { name: string; price: number }[] {
-	const { name, quantity, price } = line;
-	if (quantity <= 1) return [{ name, price }];
-	if (!split) return [{ name: `${quantity}× ${name}`, price }];
-	const coins = 10 ** decimalPlaces(currencyCode);
-	const total = Math.round(price * coins);
-	const each = Math.floor(total / quantity);
-	const left = total - each * quantity;
-	return Array.from({ length: quantity }, (_, index) => ({
-		name: `${name} ${index + 1}/${quantity}`,
-		price: (each + (index < left ? 1 : 0)) / coins
-	}));
-}
-
 /** What the receipt's items, adjustments and rates come to, the way the bill will add them up. */
 export function receiptTotal(receipt: ScannedReceipt, currencyCode: string): number {
 	const state: BillState = {
