@@ -66,9 +66,15 @@ ships.**
   Content-Security-Policy in `vite.config.ts` (a `<meta>` tag on each page, with script hashes
   SvelteKit adds) and `_headers` (`frame-ancestors`) keeps every connection on the site itself,
   and the footer's promise has to stay true. Don't add another connection, and don't loosen the
-  policy to make something work.
+  policy to make something work. `img-src` allows `blob:` for one thing, approved by the owner: a
+  receipt photo picked in Split bill, shown on the device so Live Text can read it.
 - **Never a native `<select>`.** WebKit's own styling for it breaks `style-src 'self'` (a policy
   refusal in the console on every page that has one). Use `SearchableSelect` or radio buttons.
+- **Receipts are read in the browser** by `src/lib/receipt.ts`, from text the phone's own text
+  recognition gives. That text comes in lines or in columns (all names, then all numbers) and
+  misreads, so prices pair with names only when they add up to a printed total, and rates are
+  found by arithmetic, not position. The tests hold two real receipts' text as recognized, made
+  anonymous: keep them that way, and keep their misreads.
 - **Shared bills wait in their own Worker** (`share/`, `itrium-backend-tools`): a Durable Object
   per bill, holding only encrypted bytes, deleted after thirty days (`LIFETIME`) or sooner by
   whoever shared it (a token whose hash is kept; `DELETE` needs the token), at most 64 KB

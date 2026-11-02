@@ -54,8 +54,39 @@ export const SPLIT_BILL = {
 		deleteFailed: "We couldn't delete it. Check your connection, then try again.",
 		deleteQuestion: 'Delete the shared copy? The link stops working for everyone.'
 	},
+	scanning: {
+		open: 'Scan or paste a receipt',
+		photo: 'Photo of the receipt (optional)',
+		photoHint:
+			'Pick a photo to see it here, then press and hold its text to copy it. The photo stays on your device.',
+		photoAlt: 'The receipt photo you picked',
+		field: 'Receipt text',
+		hint: 'On an iPhone, tap the box and choose Scan Text to read the receipt with your camera. Or copy the text from a photo with Live Text or Google Lens, and paste it here. It stays in your browser.',
+		read: 'Read the receipt',
+		cancel: 'Cancel',
+		review: 'Check what we read',
+		nothing:
+			"We couldn't find any items in that text. Check it's the whole receipt, or add the items by hand.",
+		check: 'Check this',
+		splitInto: (count: number) => `Split into ${count}`,
+		rates: (service: number, tax: number, onService: boolean) =>
+			`Service ${service}% and tax ${tax}%${onService ? ', charged on service too' : ''}.`,
+		noRates:
+			"We couldn't work out tax and service from this receipt, so your settings stay as they are.",
+		matches: "The items match the receipt's subtotal.",
+		itemsOff: (difference: string, less: boolean) =>
+			`The items add up to ${difference} ${less ? 'less' : 'more'} than the receipt's subtotal. Check the marked prices.`,
+		totalOff: (ours: string, theirs: string) =>
+			`This comes to ${ours}, but the receipt says ${theirs}.`,
+		missingPrice: 'Fill in every price first.',
+		add: 'Add to the bill'
+	},
 	// Shown only when someone asks, behind an ⓘ next to the setting they explain.
 	explanations: {
+		splitInto:
+			'Off, it stays one item you can tag to several people, who share it evenly. On, each one becomes its own item, for when people had different numbers of them.',
+		unsure:
+			"Text recognition sometimes misreads a number, or puts a price next to the wrong item. We mark what we couldn't check against the receipt's own totals.",
 		taxIncluded:
 			"For prices marked nett, or 'tax included'. We note the tax but don't add it again. Service usually comes included too, so we tick that as well. Untick it if the receipt adds service on top.",
 		taxOnService:

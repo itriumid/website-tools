@@ -4,6 +4,13 @@
 	import SearchableSelect, { type Choice } from '#lib/SearchableSelect.svelte';
 	import Seo from '#lib/Seo.svelte';
 	import Toggletip from '#lib/Toggletip.svelte';
+	import {
+		itemsFromLine,
+		readReceipt,
+		receiptTotal,
+		type ScannedAdjustment,
+		type ScannedReceipt
+	} from '#lib/receipt.js';
 	import { SPLIT_BILL } from '#lib/content.js';
 	import { CURRENCIES } from '#lib/countries.js';
 	import {
@@ -13,6 +20,7 @@
 		billFromHash,
 		billToHash,
 		calculateBill,
+		decimalPlaces,
 		formatAmount,
 		ADJUSTMENT_KINDS,
 		type AdjustmentKind,
@@ -186,6 +194,115 @@
 		(state.adjustments ?? []).filter((adjustment) => adjustment.kind === 'discount');
 	const lateAdjustmentsOf = (state: BillState) =>
 		(state.adjustments ?? []).filter((adjustment) => adjustment.kind !== 'discount');
+
+	/* ─── Scanning a receipt ─── */
+
+	// The text is read here, in the browser, by src/lib/receipt.ts. What it found waits in a
+	// review list, every line editable, until the person adds it to the bill.
+	interface ReviewLine {
+		id: string;
+		name: string;
+		price: number | null;
+		quantity: number;
+		split: boolean;
+		unsure: boolean;
+	}
+	interface ReviewAdjustment extends ScannedAdjustment {
+		id: string;
+	}
+	let scanning = $state(false);
+	let receiptText = $state('');
+	// A photo the person picked, shown from an address inside the browser (blob:) so Live Text can
+	// read it. It's never uploaded or kept, and the address is let go once it isn't shown.
+	let photoUrl: string | undefined = $state();
+
+	function showPhoto(file: File | undefined) {
+		if (photoUrl) URL.revokeObjectURL(photoUrl);
+		photoUrl = file ? URL.createObjectURL(file) : undefined;
+	}
+	let scanned: ScannedReceipt | undefined = $state();
+	let reviewLines: ReviewLine[] = $state([]);
+	let reviewAdjustments: ReviewAdjustment[] = $state([]);
+
+	function readScan() {
+		scanned = readReceipt(receiptText, currencyCode);
+		reviewLines = scanned.items.map((item) => ({
+			id: newId(),
+			name: item.name,
+			price: item.price ?? null,
+			quantity: item.quantity,
+			split: false,
+			unsure: item.unsure
+		}));
+		reviewAdjustments = scanned.adjustments.map((adjustment) => ({ ...adjustment, id: newId() }));
+	}
+
+	function closeScan() {
+		showPhoto(undefined);
+		scanning = false;
+		scanned = undefined;
+		receiptText = '';
+		reviewLines = [];
+		reviewAdjustments = [];
+	}
+
+	// The receipt as it stands after the person's edits, to check against what it printed.
+	const reviewed: ScannedReceipt | undefined = $derived(
+		scanned && {
+			...scanned,
+			items: reviewLines.map((line) => ({
+				name: line.name,
+				quantity: line.quantity,
+				price: line.price ?? 0,
+				unsure: line.unsure
+			})),
+			adjustments: reviewAdjustments
+		}
+	);
+	const coin = $derived(10 ** -decimalPlaces(currencyCode));
+	/** Items and discounts minus the printed subtotal, as edited. */
+	const reviewGap = $derived.by(() => {
+		if (!reviewed || reviewed.subtotal === undefined) return undefined;
+		const items = reviewed.items.reduce((sum, item) => sum + (item.price ?? 0), 0);
+		const discounts = reviewed.adjustments
+			.filter((adjustment) => adjustment.kind === 'discount')
+			.reduce((sum, adjustment) => sum + adjustment.amount, 0);
+		return items + discounts - reviewed.subtotal;
+	});
+	const reviewTotal = $derived(reviewed && receiptTotal(reviewed, currencyCode));
+	const totalDiffers = $derived(
+		reviewed?.total !== undefined &&
+			reviewed.servicePercentage !== undefined &&
+			reviewTotal !== undefined &&
+			Math.abs(reviewTotal - reviewed.total) >= coin / 2
+	);
+	const pricesMissing = $derived(
+		reviewLines.some((line) => line.price === null || !(line.price > 0))
+	);
+
+	function addScan() {
+		if (!scanned || pricesMissing) return;
+		for (const line of reviewLines) {
+			const units = itemsFromLine(
+				{ name: line.name.trim() || 'Item', quantity: line.quantity, price: line.price ?? 0 },
+				line.split,
+				currencyCode
+			);
+			for (const unit of units) items.push({ id: newId(), ...unit, assignedPersonIds: [] });
+		}
+		for (const { kind, name, amount } of reviewAdjustments) {
+			adjustments.push({ id: newId(), kind, name, amount });
+		}
+		// The receipt's own rates replace the settings, when it gave them.
+		if (scanned.servicePercentage !== undefined && scanned.taxPercentage !== undefined) {
+			serviceInput = scanned.servicePercentage;
+			taxInput = scanned.taxPercentage;
+			taxIncluded = false;
+			serviceIncluded = false;
+			taxOnService = scanned.taxOnService;
+		}
+		closeScan();
+	}
 
 	/* ─── Sharing ─── */
 	type Status =
@@ -372,6 +489,269 @@
 				onchange={(value) => (currencyCode = value)}
 				placeholder="Type a currency or a country"
 			/>
+
+			{#if !scanning}
+				<button
+					type="button"
+					onclick={() => (scanning = true)}
+					class="{secondaryButton} mt-4 w-full">{SPLIT_BILL.scanning.open}</button
+				>
+			{:else if !scanned}
+				<form
+					class="mt-5 border-t border-border pt-5"
+					onsubmit={(event) => {
+						event.preventDefault();
+						readScan();
+					}}
+				>
+					<label for="receipt-photo" class={label}>{SPLIT_BILL.scanning.photo}</label>
+					<p id="receipt-photo-hint" class="mb-2 text-sm text-muted">
+						{SPLIT_BILL.scanning.photoHint}
+					</p>
+					<input
+						id="receipt-photo"
+						type="file"
+						accept="image/*"
+						aria-describedby="receipt-photo-hint"
+						onchange={(event) => showPhoto(event.currentTarget.files?.[0])}
+						class="block w-full text-sm text-muted file:mr-3 file:min-h-9 file:cursor-pointer file:rounded-full file:border file:border-control-border file:bg-transparent file:px-4 file:text-sm file:font-medium file:text-text hover:file:bg-bg"
+					/>
+					{#if photoUrl}
+						<img
+							src={photoUrl}
+							alt={SPLIT_BILL.scanning.photoAlt}
+							class="mt-3 max-h-[70vh] w-full rounded-xl border border-border object-contain"
+						/>
+					{/if}
+
+					<label for="receipt-text" class="{label} mt-5">{SPLIT_BILL.scanning.field}</label>
+					<p id="receipt-hint" class="mb-2 text-sm text-muted">{SPLIT_BILL.scanning.hint}</p>
+					<textarea
+						id="receipt-text"
+						rows="8"
+						aria-describedby="receipt-hint"
+						bind:value={receiptText}
+						class={field}></textarea>
+					<div class="mt-3 flex flex-wrap gap-3">
+						<button type="submit" disabled={!receiptText.trim()} class={smallButton}
+							>{SPLIT_BILL.scanning.read}</button
+						>
+						<button type="button" onclick={closeScan} class={smallButton}
+							>{SPLIT_BILL.scanning.cancel}</button
+						>
+					</div>
+				</form>
+			{:else}
+				<div class="mt-5 border-t border-border pt-5">
+					<div class="flex flex-wrap items-center gap-x-1">
+						<h3 class="text-base font-semibold">{SPLIT_BILL.scanning.review}</h3>
+						<Toggletip label="About what to check" text={SPLIT_BILL.explanations.unsure} />
+					</div>
+
+					{#if reviewLines.length === 0}
+						<p class="mt-2 text-sm">{SPLIT_BILL.scanning.nothing}</p>
+					{:else}
+						<ul class="mt-3 space-y-3">
+							{#each reviewLines as line, index (line.id)}
+								<li
+									class="rounded-xl border bg-bg p-3 {line.unsure
+										? 'border-accent-edge'
+										: 'border-border'}"
+								>
+									{#if line.unsure}
+										<p class="mb-2 flex items-center gap-1.5 text-sm font-medium">
+											<svg
+												class="size-4 shrink-0"
+												xmlns="http://www.w3.org/2000/svg"
+												fill="none"
+												viewBox="0 0 24 24"
+												stroke="currentColor"
+												stroke-width="2"
+												aria-hidden="true"
+											>
+												<path
+													stroke-linecap="round"
+													stroke-linejoin="round"
+													d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"
+												/>
+											</svg>
+											{SPLIT_BILL.scanning.check}
+										</p>
+									{/if}
+									<!-- On a phone the name takes a row of its own: next to the price, it's cut off. -->
+									<div
+										class="grid grid-cols-[1fr_auto] items-center gap-2 sm:grid-cols-[1fr_7.5rem_auto]"
+									>
+										<label for="review-name-{line.id}" class="sr-only">Item {index + 1}</label>
+										<input
+											id="review-name-{line.id}"
+											type="text"
+											autocomplete="off"
+											bind:value={line.name}
+											oninput={() => (line.unsure = false)}
+											class="{field} col-span-2 sm:col-span-1"
+										/>
+										<label for="review-price-{line.id}" class="sr-only"
+											>Price of item {index + 1}</label
+										>
+										<input
+											id="review-price-{line.id}"
+											type="number"
+											inputmode="decimal"
+											min="0"
+											step="any"
+											bind:value={line.price}
+											oninput={() => (line.unsure = false)}
+											class={field}
+										/>
+										<button
+											type="button"
+											onclick={() =>
+												(reviewLines = reviewLines.filter((other) => other.id !== line.id))}
+											aria-label="Remove {line.name || `item ${index + 1}`}"
+											class="inline-flex size-8 items-center justify-center rounded-full text-muted hover:bg-surface hover:text-text"
+										>
+											<svg
+												class="size-4"
+												xmlns="http://www.w3.org/2000/svg"
+												fill="none"
+												viewBox="0 0 24 24"
+												stroke="currentColor"
+												stroke-width="2"
+												aria-hidden="true"
+											>
+												<path
+													stroke-linecap="round"
+													stroke-linejoin="round"
+													d="M6 18L18 6M6 6l12 12"
+												/>
+											</svg>
+										</button>
+									</div>
+									{#if line.quantity > 1}
+										<div class="mt-1 flex flex-wrap items-center gap-x-1">
+											<label class={checkRow}>
+												<input type="checkbox" bind:checked={line.split} class={checkbox} />
+												{SPLIT_BILL.scanning.splitInto(line.quantity)}
+											</label>
+											<Toggletip
+												label="About splitting {line.name}"
+												text={SPLIT_BILL.explanations.splitInto}
+											/>
+										</div>
+									{/if}
+								</li>
+							{/each}
+						</ul>
+					{/if}
+
+					{#if reviewAdjustments.length}
+						<ul class="mt-3 divide-y divide-border rounded-xl border border-border bg-bg">
+							{#each reviewAdjustments as adjustment (adjustment.id)}
+								<li class="flex items-center justify-between gap-3 py-2 pr-2 pl-4 text-sm">
+									<span class="min-w-0">
+										<span class="font-medium break-words">{adjustment.name}</span>
+										<span class="text-muted"> · {KIND_NAMES[adjustment.kind]}</span>
+										{#if adjustment.unsure}
+											<span class="mt-0.5 flex items-center gap-1.5 font-medium">
+												<svg
+													class="size-4 shrink-0"
+													xmlns="http://www.w3.org/2000/svg"
+													fill="none"
+													viewBox="0 0 24 24"
+													stroke="currentColor"
+													stroke-width="2"
+													aria-hidden="true"
+												>
+													<path
+														stroke-linecap="round"
+														stroke-linejoin="round"
+														d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"
+													/>
+												</svg>
+												{SPLIT_BILL.scanning.check}
+											</span>
+										{/if}
+									</span>
+									<span class="flex shrink-0 items-center gap-1">
+										{signed(adjustment.amount)}
+										<button
+											type="button"
+											onclick={() =>
+												(reviewAdjustments = reviewAdjustments.filter(
+													(other) => other.id !== adjustment.id
+												))}
+											aria-label="Remove {adjustment.name}"
+											class="inline-flex size-8 items-center justify-center rounded-full text-muted hover:bg-surface hover:text-text"
+										>
+											<svg
+												class="size-4"
+												xmlns="http://www.w3.org/2000/svg"
+												fill="none"
+												viewBox="0 0 24 24"
+												stroke="currentColor"
+												stroke-width="2"
+												aria-hidden="true"
+											>
+												<path
+													stroke-linecap="round"
+													stroke-linejoin="round"
+													d="M6 18L18 6M6 6l12 12"
+												/>
+											</svg>
+										</button>
+									</span>
+								</li>
+							{/each}
+						</ul>
+					{/if}
+
+					<div class="mt-4 space-y-2 text-sm" role="status">
+						{#if reviewLines.length && scanned.servicePercentage !== undefined && scanned.taxPercentage !== undefined}
+							<p>
+								{SPLIT_BILL.scanning.rates(
+									scanned.servicePercentage,
+									scanned.taxPercentage,
+									scanned.taxOnService
+								)}
+							</p>
+						{:else if reviewLines.length}
+							<p>{SPLIT_BILL.scanning.noRates}</p>
+						{/if}
+						{#if reviewGap !== undefined && reviewLines.length}
+							{#if Math.abs(reviewGap) < coin / 2}
+								<p>
+									<span aria-hidden="true" class="mr-1">✓</span>{SPLIT_BILL.scanning.matches}
+								</p>
+							{:else}
+								<p class="rounded-lg border-l-4 border-accent-edge bg-bg p-3">
+									{SPLIT_BILL.scanning.itemsOff(money(Math.abs(reviewGap)), reviewGap < 0)}
+								</p>
+							{/if}
+						{/if}
+						{#if totalDiffers && reviewed?.total !== undefined && reviewTotal !== undefined}
+							<p class="rounded-lg border-l-4 border-accent-edge bg-bg p-3">
+								{SPLIT_BILL.scanning.totalOff(money(reviewTotal), money(reviewed.total))}
+							</p>
+						{/if}
+						{#if pricesMissing && reviewLines.length}
+							<p>{SPLIT_BILL.scanning.missingPrice}</p>
+						{/if}
+					</div>
+
+					<div class="mt-4 flex flex-wrap gap-3">
+						<button
+							type="button"
+							onclick={addScan}
+							disabled={pricesMissing || reviewLines.length === 0}
+							class={primaryButton}>{SPLIT_BILL.scanning.add}</button
+						>
+						<button type="button" onclick={closeScan} class={secondaryButton}
+							>{SPLIT_BILL.scanning.cancel}</button
+						>
+					</div>
+				</div>
+			{/if}
 		</section>
 
 		<!-- People -->
