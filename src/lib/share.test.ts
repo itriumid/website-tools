@@ -1,3 +1,4 @@
+import lzString from 'lz-string';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { server } from '../../share/testing';
 import {
@@ -10,6 +11,7 @@ import {
 	shareBill,
 	sharedHere,
 	SHORT_PREFIX,
+	updateBill,
 	type Shared
 } from './share';
 import type { BillState } from './split-bill';
@@ -25,8 +27,8 @@ const bill: BillState = {
 	currencyCode: 'IDR'
 };
 
-async function shared(send: ReturnType<typeof server>): Promise<Shared> {
-	const result = await shareBill(bill, send);
+async function shared(send: ReturnType<typeof server>, now?: number): Promise<Shared> {
+	const result = await shareBill(bill, send, now);
 	if ('problem' in result) throw new Error(result.problem);
 	return result;
 }
@@ -34,11 +36,12 @@ async function shared(send: ReturnType<typeof server>): Promise<Shared> {
 describe('short links', () => {
 	it('carry a bill in sixteen characters, and anyone with the code opens it', async () => {
 		const send = server();
-		const { code } = await shared(send);
+		const { code } = await shared(send, 1_000);
 		expect(code).toMatch(/^[0-9A-HJKMNP-TV-Z]{16}$/);
 		expect(codeFromHash(`${SHORT_PREFIX}${code}`)).toBe(code);
-		expect(await openBill(code, send)).toEqual(bill);
-		expect(await openBill(code, send)).toEqual(bill);
+		const opened = { bill, version: { updatedAt: 1_000 } };
+		expect(await openBill(code, send)).toEqual(opened);
+		expect(await openBill(code, send)).toEqual(opened);
 	});
 
 	it('send the server neither the code nor the bill', async () => {
@@ -58,7 +61,7 @@ describe('short links', () => {
 		const send = server();
 		const mine = await shared(send);
 		expect(await deleteBill({ ...mine, token: 'x'.repeat(43) }, send)).toBe('not-yours');
-		expect(await openBill(mine.code, send)).toEqual(bill);
+		expect(await openBill(mine.code, send)).toMatchObject({ bill });
 		expect(await deleteBill(mine, send)).toBeUndefined();
 		expect(await openBill(mine.code, send)).toEqual({ problem: 'gone' });
 		// Deleting again finds nothing, which is what was asked for.
@@ -96,6 +99,96 @@ describe('short links', () => {
 		};
 		expect(await shareBill(huge, send)).toEqual({ problem: 'too-large' });
 		expect(send).not.toHaveBeenCalled();
+	});
+
+	it('open the latest version once whoever shared them changes the bill', async () => {
+		const send = server();
+		const mine = await shared(send, 1_000);
+		const changed: BillState = { ...bill, taxPercentage: 11 };
+		expect(await updateBill(mine, changed, send, 2_000)).toBeUndefined();
+		expect(await openBill(mine.code, send)).toEqual({
+			bill: changed,
+			version: { updatedAt: 2_000, updated: true }
+		});
+	});
+
+	it("can't be changed by anyone else", async () => {
+		const send = server();
+		const mine = await shared(send);
+		const theirs = { ...mine, token: 'x'.repeat(43) };
+		expect(await updateBill(theirs, { ...bill, taxPercentage: 0 }, send)).toBe('not-yours');
+		expect(await openBill(mine.code, send)).toMatchObject({ bill });
+	});
+
+	it('send the server neither the bill nor when it changed', async () => {
+		const seen: string[] = [];
+		const send = server();
+		const spy = async (input: string, init?: RequestInit) => {
+			if (init?.body) seen.push(new TextDecoder().decode(init.body as Uint8Array));
+			return send(input, init);
+		};
+		const mine = await shared(spy, 1_700_000_000_000);
+		await updateBill(mine, bill, spy, 1_700_000_000_001);
+		const all = seen.join(' ');
+		expect(all).not.toContain('1700000000');
+		expect(all).not.toContain('updated');
+		expect(all).not.toContain('Nasi goreng');
+	});
+
+	it('are sealed with a new nonce every time, under the same key', async () => {
+		const bodies: Uint8Array[] = [];
+		const send = server();
+		const spy = async (input: string, init?: RequestInit) => {
+			if (init?.body) bodies.push(new Uint8Array(init.body as Uint8Array));
+			return send(input, init);
+		};
+		const mine = await shared(spy, 1_000);
+		await updateBill(mine, bill, spy, 1_000);
+		await updateBill(mine, bill, spy, 1_000);
+		const nonces = bodies.map((body) => [...body.slice(0, 12)].join());
+		expect(new Set(nonces).size).toBe(3);
+		expect(await openBill(mine.code, send)).toMatchObject({ bill });
+	});
+
+	it('still open bills shared before they said when', async () => {
+		// A bill sealed the way the page did before versions: the bill's fields and nothing else.
+		const send = server();
+		const mine = await shared(send);
+		const sealedBefore = await (async () => {
+			const material = await crypto.subtle.importKey(
+				'raw',
+				new TextEncoder().encode(mine.code),
+				'HKDF',
+				false,
+				['deriveKey']
+			);
+			const key = await crypto.subtle.deriveKey(
+				{
+					name: 'HKDF',
+					hash: 'SHA-256',
+					salt: new TextEncoder().encode('tools.itrium.id split bill'),
+					info: new TextEncoder().encode('bill key')
+				},
+				material,
+				{ name: 'AES-GCM', length: 256 },
+				false,
+				['encrypt']
+			);
+			const iv = crypto.getRandomValues(new Uint8Array(12));
+			const data = new Uint8Array(
+				await crypto.subtle.encrypt(
+					{ name: 'AES-GCM', iv },
+					key,
+					new Uint8Array(lzString.compressToUint8Array(JSON.stringify(bill)))
+				)
+			);
+			return new Uint8Array([...iv, ...data]);
+		})();
+		const old = async (input: string, init?: RequestInit) => {
+			const response = await send(input, init);
+			return response.status === 200 ? new Response(sealedBefore) : response;
+		};
+		expect(await openBill(mine.code, old)).toEqual({ bill });
 	});
 
 	it('only take codes that could be codes', () => {

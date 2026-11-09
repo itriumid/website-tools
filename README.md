@@ -21,15 +21,25 @@ No photo or text is sent anywhere.
 
 1. The page makes a random 16-character code. From it, it derives two things: a name for the
    bill and an encryption key. The code itself never leaves the browser.
-2. The bill is compressed, encrypted with that key (AES-GCM), and left on our server under the
-   name, in a Worker of its own ([`share/`](share)). The link is the page's address plus
-   `#bill=` and the code, and the part after the `#` is never sent to a server.
-3. Whoever opens the link derives the same name and key, fetches the bill, and decrypts it.
-4. The server deletes the bill after 30 days. Whoever shared it can delete it sooner from the
-   same browser, which keeps a token for it; the server keeps only a hash of that token.
+2. The bill is compressed, encrypted with that key (AES-GCM, with a fresh random nonce every
+   time), and left on our server under the name, in a Worker of its own ([`share/`](share)). The
+   time it was shared goes inside the encrypted bill, so the server never sees it. The link is
+   the page's address plus `#bill=` and the code, and the part after the `#` is never sent to a
+   server.
+3. Whoever opens the link derives the same name and key, fetches the bill, decrypts it, and sees
+   when it was shared or last updated.
+4. The browser that shared the bill keeps a token for it; the server keeps only a hash of that
+   token. When that browser shares the bill again after a change, it encrypts the new version
+   under the same code and replaces the old one, so the link people already have opens the
+   latest version. Only that token can replace or delete the bill. A browser that opened someone
+   else's link and changed the bill shares it under a new code instead, and the old link keeps
+   showing the bill as it was.
+5. The server deletes a bill 30 days after it was last shared or updated. Whoever shared it can
+   delete it sooner from the same browser.
 
 If the server can't be reached, the page copies a long link instead, holding the whole bill
-after the `#` like the links from before short links existed. Those keep opening.
+after the `#` like the links from before short links existed. Those keep opening, and so do
+short links shared before bills carried the time they were shared.
 
 ## Stack
 

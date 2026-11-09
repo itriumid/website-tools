@@ -45,13 +45,21 @@ export const SPLIT_BILL = {
 	introduction:
 		'Add the people and the items, tag each item to the people who had it, and we work out a fair share for each person, tax and service included.',
 	privacy:
-		"A shared bill waits on our server for 30 days, encrypted with a key that is only in the link, so we can't read it. Whoever shared it can delete it sooner, on the same device.",
+		"A shared bill waits on our server for 30 days after it was last shared, encrypted with a key that is only in the link, so we can't read it. Whoever shared it can update it or delete it, on the same device.",
 	sharing: {
 		opening: 'Opening the shared bill…',
 		gone: "This shared bill isn't here anymore. Shared bills are kept for 30 days, and whoever shared one can delete it sooner.",
+		opened: 'Bill opened.',
+		sharedAt: (when: string) => `Shared ${when}`,
+		updatedAt: (when: string) => `Updated ${when}`,
 		unreachable:
-			"We couldn't reach our server to open this bill. Check your connection, then reload the page.",
-		copied: 'Link copied. Anyone with it can open this bill for 30 days after it was first shared.',
+			"We couldn't reach our server to open this bill. Check your connection, then try again.",
+		retry: 'Try again',
+		startNew: 'Start a new bill',
+		copied: 'Link copied. Anyone with it can open this bill for 30 days.',
+		copiedUpdated:
+			"Link copied. It's the same link as before, and it now opens this version for 30 days.",
+		copiedNew: "Link copied. It's a new link: the one from before still shows the bill as it was.",
 		copiedLong:
 			"We couldn't reach our server, so we copied a long link that holds the whole bill. Make sure it's pasted in full.",
 		copyFailed: "We couldn't copy it. The link is in your address bar now: copy it from there.",

@@ -1,7 +1,8 @@
 // Where a shared bill waits for the people it was shared with. The page leaves the bill here,
 // encrypted with a key that's only in the link, so nothing here can read it; anyone with the link
 // can open it as often as they like, for thirty days; then it's deleted, or sooner, by whoever
-// shared it.
+// shared it. Whoever shared it can also change it, so the link opens the latest version: each
+// change starts its thirty days again.
 //
 // These are the rules alone, apart from Cloudflare, so they can be tested anywhere. The Durable
 // Object in `index.ts` gives them storage and a clock.
@@ -26,6 +27,7 @@ export interface Storage {
 }
 
 interface Contents {
+	/** When it was last shared or changed: it's kept for `LIFETIME` from then. */
 	sharedAt: number;
 	bill: ArrayBuffer;
 	/** A hash of the token of whoever shared it. The token itself isn't kept. */
@@ -70,13 +72,15 @@ export async function handle(request: Request, storage: Storage, now: number): P
 	if (request.method === 'PUT') {
 		const token = tokenOf(request);
 		if (!token) return empty(401);
-		// A bill never changes once shared: a changed bill is shared again, under a new code.
-		if (contents) return empty(409);
+		// Only whoever shared a bill can change it, with the token it was shared with.
+		const owner = await hash(token);
+		if (contents && owner !== contents.owner) return empty(403);
 		const bill = await body(request);
 		if (bill instanceof Response) return bill;
-		await storage.put(KEY, { sharedAt: now, bill, owner: await hash(token) } satisfies Contents);
+		await storage.put(KEY, { sharedAt: now, bill, owner } satisfies Contents);
 		await storage.setAlarm(now + LIFETIME);
-		return empty(201);
+		// 201 for a bill shared for the first time, 200 for one replaced by a newer version.
+		return empty(contents ? 200 : 201);
 	}
 
 	if (request.method === 'DELETE') {

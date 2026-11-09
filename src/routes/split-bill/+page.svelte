@@ -40,7 +40,9 @@
 		remember,
 		shareBill,
 		sharedHere,
-		type Shared
+		updateBill,
+		type Shared,
+		type Version
 	} from '#lib/share.js';
 	import {
 		besideField,
@@ -426,9 +428,12 @@
 	/* ─── Sharing ─── */
 	type Status =
 		| { kind: 'opening' }
+		| { kind: 'opened'; version?: Version }
 		| { kind: 'gone' }
 		| { kind: 'unreachable' }
 		| { kind: 'copied' }
+		| { kind: 'copied-updated' }
+		| { kind: 'copied-new' }
 		| { kind: 'copied-long' }
 		| { kind: 'copy-failed' }
 		| { kind: 'deleted' }
@@ -455,53 +460,92 @@
 
 	// A link opens the bill it holds, now or if the address changes later: a short link fetches
 	// it, and a long one (the only kind before short links) carries it whole.
+	// Once a short link is opening, the line that says so keeps its height after the bill arrives,
+	// so the bill doesn't jump up the page as it fills in.
+	let openedFromLink = $state(false);
+	const opening = $derived(status?.kind === 'opening');
+
+	async function readLink() {
+		const code = codeFromHash(location.hash);
+		if (!code) {
+			const shared = billFromHash(location.hash);
+			if (shared) open(shared);
+			return;
+		}
+		openedFromLink = true;
+		status = { kind: 'opening' };
+		const result = await openBill(code);
+		if (codeFromHash(location.hash) !== code) return;
+		if ('problem' in result) {
+			status = { kind: result.problem === 'gone' ? 'gone' : 'unreachable' };
+			return;
+		}
+		open(result.bill);
+		lastShared = { json: JSON.stringify(bill), code };
+		deletable = sharedHere(code);
+		status = { kind: 'opened', version: result.version };
+	}
+
+	/** When a shared bill was shared or last changed, the way the reader writes dates: "9 Nov, 14:05". */
+	const when = (time: number) =>
+		new Intl.DateTimeFormat(undefined, {
+			day: 'numeric',
+			month: 'short',
+			hour: '2-digit',
+			minute: '2-digit'
+		}).format(time);
+
 	onMount(() => {
-		const read = async () => {
-			const code = codeFromHash(location.hash);
-			if (!code) {
-				const shared = billFromHash(location.hash);
-				if (shared) open(shared);
-				return;
-			}
-			status = { kind: 'opening' };
-			const result = await openBill(code);
-			if (codeFromHash(location.hash) !== code) return;
-			if ('problem' in result) {
-				status = { kind: result.problem === 'gone' ? 'gone' : 'unreachable' };
-				return;
-			}
-			open(result);
-			lastShared = { json: JSON.stringify(bill), code };
-			deletable = sharedHere(code);
-			status = undefined;
-		};
-		void read();
-		addEventListener('hashchange', read);
-		return () => removeEventListener('hashchange', read);
+		void readLink();
+		addEventListener('hashchange', readLink);
+		return () => removeEventListener('hashchange', readLink);
 	});
 
 	/** The short link to the bill as it is, sharing it if it changed; the long one if that fails. */
-	async function linkToBill(): Promise<{ url: string; long: boolean }> {
+	type Copied = 'copied' | 'copied-updated' | 'copied-new' | 'copied-long';
+
+	/**
+	 * The short link to the bill as it is, and what became of it. A bill shared from this device is
+	 * changed in place, so the link people already have opens the latest version. Anyone else's,
+	 * opened from their link, can't be: it's shared under a new code. The long link if both fail.
+	 */
+	async function linkToBill(): Promise<{ url: string; copied: Copied }> {
 		const json = JSON.stringify(bill);
-		let hash: string;
-		let long = false;
+		let code: string | undefined;
+		let copied: Copied = 'copied';
 		if (lastShared?.json === json) {
-			hash = `${SHORT_PREFIX}${lastShared.code}`;
+			code = lastShared.code;
 		} else {
-			const result = await shareBill(bill);
-			if ('problem' in result) {
-				hash = billToHash(bill);
-				long = true;
-			} else {
-				remember(result);
-				lastShared = { json, code: result.code };
-				deletable = result;
-				hash = `${SHORT_PREFIX}${result.code}`;
+			if (deletable) {
+				const mine = deletable;
+				const problem = await updateBill(mine, bill);
+				if (!problem) {
+					remember(mine);
+					code = mine.code;
+					copied = 'copied-updated';
+				} else if (problem === 'not-yours') {
+					forget(mine.code);
+					deletable = undefined;
+				}
 			}
+			if (!code) {
+				// Changing a bill opened from a link that can't be changed from here: a new one.
+				const replacing = codeFromHash(location.hash) !== undefined;
+				const result = await shareBill(bill);
+				if (!('problem' in result)) {
+					remember(result);
+					deletable = result;
+					code = result.code;
+					copied = replacing ? 'copied-new' : 'copied';
+				}
+			}
+			if (code) lastShared = { json, code };
 		}
+		const hash = code ? `${SHORT_PREFIX}${code}` : billToHash(bill);
+		if (!code) copied = 'copied-long';
 		// The address bar now holds the link too, so copying it from there works as well.
 		history.replaceState(null, '', hash);
-		return { url: `${location.origin}${location.pathname}${hash}`, long };
+		return { url: `${location.origin}${location.pathname}${hash}`, copied };
 	}
 
 	async function copyLink() {
@@ -518,7 +562,7 @@
 			} else {
 				await navigator.clipboard.writeText((await link).url);
 			}
-			status = { kind: (await link).long ? 'copied-long' : 'copied' };
+			status = { kind: (await link).copied };
 		} catch {
 			await link;
 			status = { kind: 'copy-failed' };
@@ -591,13 +635,55 @@
 	</p>
 	<h1 class="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">{SPLIT_BILL.name}</h1>
 	<p class="mt-3 text-muted">{SPLIT_BILL.introduction}</p>
-	<p class="mt-4 empty:hidden" role="status">
-		{#if status?.kind === 'opening'}{SPLIT_BILL.sharing
-				.opening}{:else if status?.kind === 'gone'}{SPLIT_BILL.sharing
-				.gone}{:else if status?.kind === 'unreachable'}{SPLIT_BILL.sharing.unreachable}{/if}
-	</p>
+	<div class="mt-4 {openedFromLink ? 'min-h-6' : 'empty:mt-0'}" role="status">
+		{#if status?.kind === 'opening'}
+			<p class="flex items-center gap-2">
+				<svg
+					class="size-5 shrink-0 motion-safe:animate-spin"
+					xmlns="http://www.w3.org/2000/svg"
+					fill="none"
+					viewBox="0 0 24 24"
+					stroke="currentColor"
+					stroke-width="2.5"
+					aria-hidden="true"
+				>
+					<circle cx="12" cy="12" r="9" class="opacity-25" />
+					<path stroke-linecap="round" d="M21 12a9 9 0 0 0-9-9" />
+				</svg>
+				{SPLIT_BILL.sharing.opening}
+			</p>
+		{:else if status?.kind === 'opened'}
+			<p class="text-sm text-muted">
+				<span class="sr-only">{SPLIT_BILL.sharing.opened}</span>
+				{#if status.version}{(status.version.updated
+						? SPLIT_BILL.sharing.updatedAt
+						: SPLIT_BILL.sharing.sharedAt)(when(status.version.updatedAt))}{/if}
+			</p>
+		{:else if status?.kind === 'gone'}
+			<p>{SPLIT_BILL.sharing.gone}</p>
+		{:else if status?.kind === 'unreachable'}
+			<p>{SPLIT_BILL.sharing.unreachable}</p>
+		{/if}
+	</div>
+	{#if status?.kind === 'gone' || status?.kind === 'unreachable'}
+		<div class="mt-3 flex flex-wrap gap-3">
+			{#if status.kind === 'unreachable'}
+				<button type="button" onclick={readLink} class={smallButton}
+					>{SPLIT_BILL.sharing.retry}</button
+				>
+			{/if}
+			<button type="button" onclick={clearEverything} class={smallButton}
+				>{SPLIT_BILL.sharing.startNew}</button
+			>
+		</div>
+	{/if}
 
-	<div class="mt-8 space-y-6">
+	<!-- While a shared bill opens, the empty one under it can't be changed: it's about to be replaced. -->
+	<div
+		class="mt-8 space-y-6 motion-safe:transition-opacity {opening ? 'opacity-50' : ''}"
+		aria-busy={opening}
+		inert={opening}
+	>
 		<!-- The bill: what's decided before any price is typed -->
 		<section class={card} aria-labelledby="bill-heading">
 			<h2 id="bill-heading" class={cardHeading}>The bill</h2>
@@ -1496,7 +1582,9 @@
 				</div>
 				<p class="mt-3 min-h-5 text-sm" role="status">
 					{#if status?.kind === 'copied'}{SPLIT_BILL.sharing
-							.copied}{:else if status?.kind === 'copied-long'}{SPLIT_BILL.sharing
+							.copied}{:else if status?.kind === 'copied-updated'}{SPLIT_BILL.sharing
+							.copiedUpdated}{:else if status?.kind === 'copied-new'}{SPLIT_BILL.sharing
+							.copiedNew}{:else if status?.kind === 'copied-long'}{SPLIT_BILL.sharing
 							.copiedLong}{:else if status?.kind === 'copy-failed'}{SPLIT_BILL.sharing
 							.copyFailed}{:else if status?.kind === 'deleted'}{SPLIT_BILL.sharing
 							.deleted}{:else if status?.kind === 'delete-failed'}{SPLIT_BILL.sharing
