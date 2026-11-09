@@ -5,7 +5,8 @@
 // The code is the only secret. A hash of it names the bill on the server and another hash of it
 // is the key, so the server sees neither the code nor the key, only encrypted bytes under a name
 // it can't turn back into the code. Whoever shared a bill also gets a token, kept on their device,
-// that lets them delete it before its thirty days are up.
+// that lets them change it, so the same link opens the latest version, and delete it before its
+// thirty days are up.
 
 import lzString from 'lz-string';
 import { LIFETIME, LIMIT } from '../../share/bills';
@@ -85,9 +86,33 @@ async function placeFor(code: string): Promise<Place> {
 	return { name: toBase64Url(name), key };
 }
 
-/** The bill, compressed and encrypted: 12 bytes of nonce, then the encrypted bytes. */
-async function seal(place: Place, bill: BillState): Promise<Uint8Array<ArrayBuffer>> {
-	const plain = new Uint8Array(compressToUint8Array(JSON.stringify(bill)));
+/**
+ * When the bill was shared, and whether that was a change to one shared before. It goes inside the
+ * encrypted bill, beside its fields, so the server never sees it. Bills shared before it existed
+ * have neither.
+ */
+export interface Version {
+	updatedAt: number;
+	updated?: true;
+}
+
+/** A shared bill as it opens: the bill, and when it was shared, if it says. */
+export interface Opened {
+	bill: BillState;
+	version?: Version;
+}
+
+/**
+ * The bill, compressed and encrypted: 12 bytes of nonce, then the encrypted bytes. The nonce is
+ * random every time, so a bill changed and sealed again under the same code and key never reuses
+ * one.
+ */
+async function seal(
+	place: Place,
+	bill: BillState,
+	version: Version
+): Promise<Uint8Array<ArrayBuffer>> {
+	const plain = new Uint8Array(compressToUint8Array(JSON.stringify({ ...bill, ...version })));
 	const iv = crypto.getRandomValues(new Uint8Array(12));
 	const data = new Uint8Array(
 		await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, place.key, plain)
@@ -98,7 +123,7 @@ async function seal(place: Place, bill: BillState): Promise<Uint8Array<ArrayBuff
 	return sealed;
 }
 
-async function unseal(place: Place, sealed: Uint8Array): Promise<BillState | undefined> {
+async function unseal(place: Place, sealed: Uint8Array): Promise<Opened | undefined> {
 	try {
 		const plain = await crypto.subtle.decrypt(
 			{ name: 'AES-GCM', iv: sealed.slice(0, 12) },
@@ -106,7 +131,14 @@ async function unseal(place: Place, sealed: Uint8Array): Promise<BillState | und
 			sealed.slice(12)
 		);
 		const json = decompressFromUint8Array(new Uint8Array(plain));
-		return json ? readBill(JSON.parse(json)) : undefined;
+		if (!json) return undefined;
+		const value: unknown = JSON.parse(json);
+		const bill = readBill(value);
+		if (!bill) return undefined;
+		// readBill keeps only the bill's own fields; the version sits beside them.
+		const { updatedAt, updated } = value as Record<string, unknown>;
+		if (typeof updatedAt !== 'number' || !Number.isFinite(updatedAt)) return { bill };
+		return { bill, version: updated === true ? { updatedAt, updated } : { updatedAt } };
 	} catch {
 		// AES-GCM checks what it decrypts: anything changed on the way fails here.
 		return undefined;
@@ -120,36 +152,67 @@ const authorization = (token: string) => ({ authorization: `Bearer ${token}` });
 
 export interface Shared {
 	code: string;
-	/** Lets whoever shared the bill delete it. */
+	/** Lets whoever shared the bill change it and delete it. */
 	token: string;
 }
 
-/** Leaves the bill on the server under a new code. */
-export async function shareBill(
+/** Seals the bill for `code` and leaves it on the server: the status it answered, or a problem. */
+async function put(
+	{ code, token }: Shared,
 	bill: BillState,
-	send: Send = fetch
-): Promise<Shared | { problem: Problem }> {
-	const code = random(LENGTH);
-	const token = toBase64Url(crypto.getRandomValues(new Uint8Array(32)));
+	version: Version,
+	send: Send
+): Promise<number | Problem> {
 	const place = await placeFor(code);
-	const body = await seal(place, bill);
-	if (body.length > LIMIT) return { problem: 'too-large' };
+	const body = await seal(place, bill, version);
+	if (body.length > LIMIT) return 'too-large';
 	const response = await send(address(place), {
 		method: 'PUT',
 		headers: authorization(token),
 		body
 	}).catch(() => undefined);
-	if (!response) return { problem: 'offline' };
-	if (response.status === 201) return { code, token };
-	if (response.status === 413) return { problem: 'too-large' };
-	return { problem: 'server' };
+	if (!response) return 'offline';
+	if (response.status === 413) return 'too-large';
+	if (response.status === 403) return 'not-yours';
+	return response.status;
 }
 
-/** The bill a short link's code points to. */
+/** Leaves the bill on the server under a new code. */
+export async function shareBill(
+	bill: BillState,
+	send: Send = fetch,
+	now = Date.now()
+): Promise<Shared | { problem: Problem }> {
+	const shared = {
+		code: random(LENGTH),
+		token: toBase64Url(crypto.getRandomValues(new Uint8Array(32)))
+	};
+	const result = await put(shared, bill, { updatedAt: now }, send);
+	if (result === 201) return shared;
+	return { problem: typeof result === 'string' ? result : 'server' };
+}
+
+/**
+ * Replaces a bill this device shared with a newer version, under the same code, so the link
+ * people already have opens it. Its thirty days start again. Undefined when it's done.
+ */
+export async function updateBill(
+	shared: Shared,
+	bill: BillState,
+	send: Send = fetch,
+	now = Date.now()
+): Promise<Problem | undefined> {
+	const result = await put(shared, bill, { updatedAt: now, updated: true }, send);
+	// 201: it had been deleted, by time or by hand, and is back under the same code.
+	if (result === 200 || result === 201) return undefined;
+	return typeof result === 'string' ? result : 'server';
+}
+
+/** The bill a short link's code points to, and when it was shared. */
 export async function openBill(
 	code: string,
 	send: Send = fetch
-): Promise<BillState | { problem: Problem }> {
+): Promise<Opened | { problem: Problem }> {
 	const place = await placeFor(code);
 	const response = await send(address(place)).catch(() => undefined);
 	if (!response) return { problem: 'offline' };

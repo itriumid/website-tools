@@ -27,13 +27,61 @@ describe('a shared bill', () => {
 		}
 	});
 
-	it('is shared once and never changed', async () => {
+	it('is changed by whoever shared it, under the same name', async () => {
 		const { storage } = memory();
 		await send(storage, 'PUT', { body: 'first', token: OWNER });
 		expect(await send(storage, 'PUT', { body: 'again', token: OWNER })).toMatchObject({
-			status: 409
+			status: 200
 		});
+		expect(await send(storage, 'GET')).toEqual({ status: 200, text: 'again' });
+	});
+
+	it('is changed by nobody else', async () => {
+		const { storage } = memory();
+		await send(storage, 'PUT', { body: 'first', token: OWNER });
+		expect(await send(storage, 'PUT', { body: 'theirs', token: SOMEONE_ELSE })).toMatchObject({
+			status: 403
+		});
+		expect(await send(storage, 'PUT', { body: 'theirs' })).toMatchObject({ status: 401 });
 		expect(await send(storage, 'GET')).toMatchObject({ text: 'first' });
+		// The owner stays the owner: their token still deletes it, nobody else's does.
+		expect(await send(storage, 'DELETE', { token: SOMEONE_ELSE })).toMatchObject({ status: 403 });
+		expect(await send(storage, 'DELETE', { token: OWNER })).toMatchObject({ status: 204 });
+	});
+
+	it('starts its thirty days again when it changes', async () => {
+		const { storage, alarm } = memory();
+		await send(storage, 'PUT', { body: 'first', token: OWNER, now: 1_000 });
+		const later = 1_000 + LIFETIME - 10;
+		await send(storage, 'PUT', { body: 'changed', token: OWNER, now: later });
+		expect(alarm()).toBe(later + LIFETIME);
+		expect(await send(storage, 'GET', { now: 1_000 + LIFETIME })).toEqual({
+			status: 200,
+			text: 'changed'
+		});
+		expect(await send(storage, 'GET', { now: later + LIFETIME })).toMatchObject({ status: 404 });
+	});
+
+	it("isn't changed by a wrong token or a bad body, and keeps its time", async () => {
+		const { storage, alarm } = memory();
+		await send(storage, 'PUT', { body: 'first', token: OWNER, now: 1_000 });
+		await send(storage, 'PUT', { body: 'theirs', token: SOMEONE_ELSE, now: 5_000 });
+		expect(await send(storage, 'PUT', { body: '', token: OWNER, now: 5_000 })).toMatchObject({
+			status: 400
+		});
+		expect(
+			await send(storage, 'PUT', { body: new Uint8Array(LIMIT + 1), token: OWNER, now: 5_000 })
+		).toMatchObject({ status: 413 });
+		expect(alarm()).toBe(1_000 + LIFETIME);
+		expect(await send(storage, 'GET')).toMatchObject({ text: 'first' });
+	});
+
+	it('is shared afresh once its time is up', async () => {
+		const { storage } = memory();
+		await send(storage, 'PUT', { body: 'old', token: OWNER, now: 1_000 });
+		expect(
+			await send(storage, 'PUT', { body: 'new', token: SOMEONE_ELSE, now: 1_000 + LIFETIME })
+		).toMatchObject({ status: 201 });
 	});
 
 	it('needs a token to be shared', async () => {
