@@ -1,8 +1,11 @@
 // The WhatsApp click-to-chat tool's rules, kept apart from the page so they can be tested.
 
-/** Only the digits of what was typed or pasted: spaces, dashes and brackets go. */
+import { COUNTRIES } from './countries';
+import { asciiDigits } from './digits';
+
+/** Only the digits of what was typed or pasted, as 0 to 9: spaces, dashes and brackets go. */
 export function digitsOnly(text: string): string {
-	return text.replace(/\D/g, '');
+	return asciiDigits(text).replace(/\D/g, '');
 }
 
 export interface ChatTarget {
@@ -15,27 +18,159 @@ export interface ChatTarget {
 }
 
 /**
- * The chat to open for a number typed or pasted into the box, in the country chosen.
+ * Why there's no chat to open: the number is too short or too long to be a phone number, or it's
+ * a seven-digit North American number without its area code.
+ */
+export type ChatProblem = 'too-short' | 'too-long' | 'area-code';
+
+/** A full number, country code included, has 8 to 15 digits (E.164 allows at most 15). */
+export const SHORTEST_NUMBER = 8;
+export const LONGEST_NUMBER = 15;
+
+// What people dial before a number inside their own country (the trunk prefix), by country code,
+// where it isn't 0: the 0 of "0811 …" in Indonesia is the 8 of "8 912 …" in Russia and
+// Kazakhstan, and the 06 of "06 30 …" in Hungary. Belarus dials "8 0", and Lithuania has dialed
+// both 8 and 0, so both work there. Italy has none: its leading 0 is part of the number ("+39 06 …"
+// is Rome). North America's is 1, the same as its code, so a number dialed with it already reads
+// as one with its code. Other countries with none (Spain, Singapore) keep 0 here: none of their
+// numbers start with 0, so it never drops a digit that's part of one.
+const TRUNK_PREFIXES: Record<string, string[]> = {
+	'1': [],
+	'7': ['8'],
+	'36': ['06'],
+	'39': [],
+	'370': ['8', '0'],
+	'375': ['80', '8']
+};
+const trunkPrefixes = (code: string) => TRUNK_PREFIXES[code] ?? ['0'];
+
+// How many digits a number has after the country code, by country code, for the countries where
+// people most often paste a number with its code but without the "+". Countries not listed here
+// take anything from 7 digits up to what E.164 leaves after the code.
+const NATIONAL_LENGTHS: Record<string, [shortest: number, longest: number]> = {
+	'1': [10, 10],
+	'7': [10, 10],
+	'20': [9, 10],
+	'27': [9, 9],
+	'33': [9, 9],
+	'36': [8, 9],
+	'44': [9, 10],
+	'60': [9, 10],
+	'61': [9, 9],
+	'62': [9, 12],
+	'63': [8, 10],
+	'65': [8, 8],
+	'66': [8, 9],
+	'81': [9, 10],
+	'82': [9, 10],
+	'84': [9, 10],
+	'86': [10, 11],
+	'91': [10, 10],
+	'92': [10, 10],
+	'234': [8, 10],
+	'370': [8, 8],
+	'375': [9, 9],
+	'852': [8, 8],
+	'880': [10, 10],
+	'966': [9, 9],
+	'971': [8, 9]
+};
+
+const nationalLengths = (code: string): [number, number] =>
+	NATIONAL_LENGTHS[code] ?? [7, LONGEST_NUMBER - code.length];
+
+// Country codes are made so none starts with another; longest first all the same, to be safe.
+const CODES = [...new Set(COUNTRIES.map((country) => country.phoneCode))].sort(
+	(a, b) => b.length - a.length
+);
+
+const fits = (code: string, national: string) => {
+	const [shortest, longest] = nationalLengths(code);
+	return national.length >= shortest && national.length <= longest;
+};
+
+/**
+ * The number after the country code, without the trunk prefix dialed before it at home. Where the
+ * prefix starts with 0, it always goes: no number there starts with 0. Where it doesn't (Russia's
+ * 8), it goes only when the number is too long with it and the right length without it, since
+ * numbers there can start with the same digit: "8 912 345 67 89" is "+7 912 …", but
+ * "812 345 67 89" is St Petersburg, "+7 812 …".
+ */
+function withoutTrunkPrefix(code: string, national: string): string {
+	if (!code) return national;
+	for (const prefix of trunkPrefixes(code)) {
+		if (!national.startsWith(prefix)) continue;
+		const rest = national.slice(prefix.length);
+		if (prefix.startsWith('0') || (fits(code, rest) && !fits(code, national))) return rest;
+	}
+	return national;
+}
+
+/**
+ * The chat to open for a number typed or pasted into the box, in the country chosen; a problem
+ * when it can't be a phone number; undefined until there's a digit to go on.
  *
- * A number that starts with "+" already has its country code, so it's used as it is. Any other
- * is a local number: a leading 0, the "trunk prefix" many countries dial first, is dropped, and
- * the chosen country's code goes in front. Undefined until there's a digit to go on.
+ * - A number that starts with "+" or "00" (how most countries dial abroad) already has its
+ *   country code, so the chosen country doesn't matter. A trunk prefix typed after the code goes:
+ *   "+62 0811 …" is "+62 811 …".
+ * - A number that starts with the chosen country's trunk prefix (0 in most countries, 8 in Russia)
+ *   is a local one: the prefix goes and the country's code goes in front, so "0811 …" in
+ *   Indonesia is "+62 811 …". So is one typed with a "+" in front of that prefix, "+0811 …".
+ * - A number that starts with the chosen country's code was most likely pasted without its "+",
+ *   so the code isn't added again: "628119710096" is "+62 8119710096". Some countries' own
+ *   numbers start with the digits of their code, though (Indian mobiles can start with 91), so it
+ *   counts as pasted with its code only when what follows the code is as long as a number there.
+ *   "9198765432" in India is ten digits, a whole Indian number, and the eight after its 91 aren't,
+ *   so it gets +91 in front. In Indonesia a number has 9 to 12 digits after the 62, and none of
+ *   its own numbers that long start with 62 (mobiles start with 8).
+ * - Anything else is local, with the chosen country's code put in front.
+ * - North America (the United States, Canada, the Dominican Republic, Jamaica and the rest) shares
+ *   country code 1, and every number there is ten digits after it, area code first: seven digits
+ *   on their own are missing it.
  */
 export function chatTarget(
 	countryCode: string,
 	typed: string,
 	message: string
-): ChatTarget | undefined {
+): ChatTarget | { problem: ChatProblem } | undefined {
 	const digits = digitsOnly(typed);
 	if (!digits) return undefined;
-	const international = typed.trim().startsWith('+');
-	const local = digits.replace(/^0/, '');
-	const number = international ? digits : `${countryCode}${local}`;
-	if (!local && !international) return undefined;
+	let international = asciiDigits(typed).trim().startsWith('+') || digits.startsWith('00');
+	let code = countryCode;
+	let national: string;
+	const full = international ? digits.replace(/^00/, '') : digits;
+	const known = CODES.find((candidate) => full.startsWith(candidate));
+	// A "+" before the chosen country's trunk prefix, and no country code, is a local number typed
+	// with a "+" out of habit: "+0811 …" (no country code starts with 0), or "+8 912 …" in Russia.
+	if (
+		international &&
+		!known &&
+		trunkPrefixes(countryCode).some((prefix) => full.startsWith(prefix))
+	) {
+		international = false;
+	}
+	if (international) {
+		code = known ?? '';
+		national = withoutTrunkPrefix(code, full.slice(code.length));
+	} else {
+		const afterCode = withoutTrunkPrefix(countryCode, full.slice(countryCode.length));
+		const pasted = full.startsWith(countryCode) && fits(countryCode, afterCode);
+		national = pasted ? afterCode : withoutTrunkPrefix(countryCode, full);
+	}
+	if (!national) return undefined;
+	// North American numbers are always ten digits after the 1: a three-digit area code first.
+	if (code === '1' && national.length === 7) return { problem: 'area-code' };
+	const number = `${code}${national}`;
+	if (number.length < SHORTEST_NUMBER || (code === '1' && national.length < 10)) {
+		return { problem: 'too-short' };
+	}
+	if (number.length > LONGEST_NUMBER || (code === '1' && national.length > 10)) {
+		return { problem: 'too-long' };
+	}
 	const text = message.trim();
 	return {
 		number,
-		display: international ? `+${digits}` : `+${countryCode} ${local}`,
+		display: international ? `+${number}` : `+${code} ${national}`,
 		link: `https://wa.me/${number}${text ? `?text=${encodeURIComponent(text)}` : ''}`
 	};
 }

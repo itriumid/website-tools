@@ -1,6 +1,12 @@
 export interface Country {
 	name: string;
 	phoneCode: string;
+	/**
+	 * For countries in the North American Numbering Plan other than the United States and Canada:
+	 * their country code is 1, like theirs, and these area codes, the first digits of every number
+	 * there, tell them apart. They're part of the number, so they're only shown in the picker.
+	 */
+	areaCodes?: string[];
 	currencyCode: string;
 	currencySymbol: string;
 }
@@ -46,7 +52,8 @@ export const COUNTRIES: Country[] = [
 	{ name: 'Denmark', phoneCode: '45', currencyCode: 'DKK', currencySymbol: 'kr' },
 	{
 		name: 'Dominican Republic',
-		phoneCode: '1809',
+		phoneCode: '1',
+		areaCodes: ['809', '829', '849'],
 		currencyCode: 'DOP',
 		currencySymbol: 'RD$'
 	},
@@ -71,7 +78,13 @@ export const COUNTRIES: Country[] = [
 	{ name: 'Ireland', phoneCode: '353', currencyCode: 'EUR', currencySymbol: '€' },
 	{ name: 'Israel', phoneCode: '972', currencyCode: 'ILS', currencySymbol: '₪' },
 	{ name: 'Italy', phoneCode: '39', currencyCode: 'EUR', currencySymbol: '€' },
-	{ name: 'Jamaica', phoneCode: '1876', currencyCode: 'JMD', currencySymbol: 'J$' },
+	{
+		name: 'Jamaica',
+		phoneCode: '1',
+		areaCodes: ['876', '658'],
+		currencyCode: 'JMD',
+		currencySymbol: 'J$'
+	},
 	{ name: 'Japan', phoneCode: '81', currencyCode: 'JPY', currencySymbol: '¥' },
 	{ name: 'Jordan', phoneCode: '962', currencyCode: 'JOD', currencySymbol: 'د.ا' },
 	{ name: 'Kazakhstan', phoneCode: '7', currencyCode: 'KZT', currencySymbol: '₸' },

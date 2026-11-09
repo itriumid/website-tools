@@ -27,7 +27,12 @@ export const WHATSAPP = {
 	description:
 		'Make a WhatsApp click-to-chat link from any phone number, with a message already typed if you like. Spaces and symbols are removed for you.',
 	introduction:
-		'Enter a phone number and we build the link that opens a chat with it. Spaces, dashes and brackets are taken out, so you can paste a number as it is.'
+		'Enter a phone number and we build the link that opens a chat with it. Spaces, dashes and brackets are taken out, so you can paste a number as it is.',
+	problems: {
+		'too-short': "That's too short for a phone number. Check you have every digit.",
+		'too-long': "That's too long for a phone number. Check the country code isn't in it twice.",
+		'area-code': 'Add the area code too.'
+	}
 };
 
 export const SPLIT_BILL = {
