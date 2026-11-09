@@ -2,6 +2,8 @@
 // is shared as a link, and how it's divided.
 
 import lzString from 'lz-string';
+import { CURRENCIES } from './countries';
+import { asciiDigits } from './digits';
 
 const { compressToEncodedURIComponent, decompressFromEncodedURIComponent } = lzString;
 
@@ -232,13 +234,190 @@ export function decimalPlaces(currencyCode: string): number {
 	return THOUSANDTHS_CURRENCIES.has(currencyCode) ? 3 : 2;
 }
 
-/** An amount written the way the visitor's language writes numbers, to the currency's decimals. */
-export function formatAmount(amount: number, currencyCode: string, locale?: string): string {
+// How each currency's own people write it, by currency: rupiah as Indonesians do ("146.000"),
+// dollars as Americans do ("1,234.50"), yen as the Japanese do ("1,200"), and the euro the way
+// Germany writes it ("1.234,50"), as most of the euro countries do. Currencies of countries whose
+// language has its own digits (Arabic, Persian, Burmese) keep 0 to 9 ("-u-nu-latn"), as receipts
+// there mostly print them; a few use English where the country's own language does that too.
+// A currency missing here is written the way the reader's browser writes numbers (its
+// navigator.language). Every amount on the page is written through this, the "= Rp 45.000" under
+// a field as well, so what's typed and what's shown agree. It's only for showing: bills are
+// shared and kept as numbers, never as these strings.
+const CURRENCY_LOCALES: Record<string, string> = {
+	IDR: 'id-ID',
+	USD: 'en-US',
+	EUR: 'de-DE',
+	JPY: 'ja-JP',
+	GBP: 'en-GB',
+	SGD: 'en-SG',
+	MYR: 'ms-MY',
+	THB: 'th-TH',
+	VND: 'vi-VN',
+	PHP: 'en-PH',
+	BND: 'ms-BN',
+	KHR: 'km-KH',
+	LAK: 'lo-LA',
+	MMK: 'my-MM-u-nu-latn',
+	AUD: 'en-AU',
+	NZD: 'en-NZ',
+	CAD: 'en-CA',
+	CNY: 'zh-CN',
+	HKD: 'zh-HK',
+	MOP: 'zh-MO',
+	TWD: 'zh-TW',
+	KRW: 'ko-KR',
+	KPW: 'ko-KP',
+	MNT: 'mn-MN',
+	INR: 'en-IN',
+	PKR: 'en-PK',
+	BDT: 'en-BD',
+	LKR: 'en-LK',
+	NPR: 'en-NP',
+	MVR: 'en-MV',
+	AFN: 'fa-AF-u-nu-latn',
+	IRR: 'fa-IR-u-nu-latn',
+	AED: 'ar-AE-u-nu-latn',
+	SAR: 'ar-SA-u-nu-latn',
+	QAR: 'ar-QA-u-nu-latn',
+	KWD: 'ar-KW-u-nu-latn',
+	BHD: 'ar-BH-u-nu-latn',
+	OMR: 'ar-OM-u-nu-latn',
+	JOD: 'ar-JO-u-nu-latn',
+	IQD: 'ar-IQ-u-nu-latn',
+	LBP: 'ar-LB-u-nu-latn',
+	YER: 'ar-YE-u-nu-latn',
+	EGP: 'ar-EG-u-nu-latn',
+	LYD: 'ar-LY-u-nu-latn',
+	DZD: 'ar-DZ-u-nu-latn',
+	MAD: 'ar-MA-u-nu-latn',
+	ILS: 'he-IL',
+	TRY: 'tr-TR',
+	CHF: 'de-CH',
+	SEK: 'sv-SE',
+	NOK: 'nb-NO',
+	DKK: 'da-DK',
+	ISK: 'is-IS',
+	PLN: 'pl-PL',
+	CZK: 'cs-CZ',
+	HUF: 'hu-HU',
+	RON: 'ro-RO',
+	BGN: 'bg-BG',
+	RSD: 'sr-RS',
+	BAM: 'bs-BA',
+	ALL: 'sq-AL',
+	RUB: 'ru-RU',
+	UAH: 'uk-UA',
+	BYN: 'be-BY',
+	KZT: 'kk-KZ',
+	UZS: 'uz-UZ',
+	GEL: 'ka-GE',
+	AMD: 'hy-AM',
+	AZN: 'az-AZ',
+	BRL: 'pt-BR',
+	MXN: 'es-MX',
+	ARS: 'es-AR',
+	CLP: 'es-CL',
+	COP: 'es-CO',
+	PEN: 'es-PE',
+	UYU: 'es-UY',
+	PYG: 'es-PY',
+	BOB: 'es-BO',
+	VES: 'es-VE',
+	CRC: 'es-CR',
+	GTQ: 'es-GT',
+	PAB: 'es-PA',
+	DOP: 'es-DO',
+	CUP: 'es-CU',
+	JMD: 'en-JM',
+	ZAR: 'en-ZA',
+	NGN: 'en-NG',
+	KES: 'en-KE',
+	GHS: 'en-GH',
+	TZS: 'en-TZ',
+	UGX: 'en-UG',
+	ETB: 'en-ET',
+	ZWL: 'en-ZW'
+};
+
+/**
+ * An amount written the way the currency's own people write it, to the currency's decimals: see
+ * `CURRENCY_LOCALES`. `locale` overrides that, for tests.
+ */
+export function formatAmount(
+	amount: number,
+	currencyCode: string,
+	locale: string | undefined = CURRENCY_LOCALES[currencyCode]
+): string {
 	const places = decimalPlaces(currencyCode);
 	return new Intl.NumberFormat(locale, {
 		minimumFractionDigits: places,
 		maximumFractionDigits: places
 	}).format(amount);
+}
+
+export type AmountProblem = 'unreadable' | 'negative' | 'no-cents';
+
+/**
+ * An amount typed into a field, read the way people in the currency's countries write it, or what
+ * stops it being read. Empty text is neither: there's nothing to say yet.
+ *
+ * Dots and commas both work, for grouping and for the decimal mark, so "45.000", "45,000",
+ * "1,234.56" and "1.234,56" all read as meant:
+ *
+ * - The last dot or comma is the decimal mark when it's followed by at most as many digits as the
+ *   currency has decimals (one or two for most, up to three for the dinars) and the same mark
+ *   isn't used earlier too. Every other dot and comma groups thousands and is dropped.
+ * - So in a currency without cents, like rupiah, every dot and comma groups: "45.000" and
+ *   "45,000" are both 45000. The one exception is cents that are all zeros after both marks
+ *   ("45.000,00", as banking apps show it), which are dropped; any other cents are a problem.
+ * - Spaces and apostrophes group too ("45 000", "1'234.50"), and the currency's symbol or code
+ *   may come first or last ("Rp 45.000"). A minus sign makes it negative, which is a problem.
+ * - Arabic, Persian and full-width digits read as 0 to 9, and the Arabic decimal and thousands
+ *   marks as a dot and a comma: "٤٥٫٥٠" is 45.50.
+ */
+export function parseAmount(
+	text: string,
+	currencyCode: string
+): { amount: number } | { problem: AmountProblem } | undefined {
+	const symbol = CURRENCIES.find((currency) => currency.code === currencyCode)?.symbol;
+	let token = asciiDigits(text).replace(/[\s'’]/g, '');
+	for (const name of [currencyCode, symbol]) {
+		if (!name) continue;
+		const lower = token.toLowerCase();
+		const mark = name.toLowerCase().replace(/\s/g, '');
+		if (lower.startsWith(mark)) token = token.slice(mark.length);
+		else if (lower.endsWith(mark)) token = token.slice(0, -mark.length);
+	}
+	if (!token) return undefined;
+	const negative = /^[-−]/.test(token);
+	if (negative) token = token.slice(1);
+	if (!/^[\d.,]*\d[\d.,]*$/.test(token)) return { problem: 'unreadable' };
+	if (negative) return { problem: 'negative' };
+
+	const places = decimalPlaces(currencyCode);
+	const last = Math.max(token.lastIndexOf('.'), token.lastIndexOf(','));
+	let whole = token;
+	let fraction = '';
+	if (last >= 0) {
+		const mark = token[last];
+		const other = mark === '.' ? ',' : '.';
+		const after = token.length - last - 1;
+		const alone = token.indexOf(mark) === last;
+		const cents = token.slice(last + 1);
+		if (places === 0) {
+			// Without cents, a mark is a decimal one only after the other mark: "45.000,00".
+			if (alone && after >= 1 && after <= 2 && token.slice(0, last).includes(other)) {
+				if (!/^0+$/.test(cents)) return { problem: 'no-cents' };
+				whole = token.slice(0, last);
+			}
+		} else if (alone && after >= 1 && after <= places) {
+			whole = token.slice(0, last);
+			fraction = cents;
+		}
+	}
+	whole = whole.replace(/[.,]/g, '');
+	const amount = Number(`${whole || '0'}.${fraction || '0'}`);
+	return Number.isFinite(amount) ? { amount } : { problem: 'unreadable' };
 }
 
 /* ─── Dividing ─── */

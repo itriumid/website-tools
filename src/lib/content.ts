@@ -59,6 +59,16 @@ export const SPLIT_BILL = {
 		deleteFailed: "We couldn't delete it. Check your connection, then try again.",
 		deleteQuestion: 'Delete the shared copy? The link stops working for everyone.'
 	},
+	// What an amount field says under it as it's typed: what we read, or why we can't.
+	amounts: {
+		reads: (amount: string) => `= ${amount}`,
+		unreadable: "We can't read this amount. Use digits, with dots or commas if you like.",
+		noCents: 'This currency has no cents. Leave them off.',
+		zero: 'Enter an amount above zero.',
+		negativePrice: "A price can't be below zero.",
+		negativeDiscount: 'Leave out the minus. A discount always comes off.',
+		negativeAdjustment: 'Leave out the minus, and choose below whether it takes off or adds.'
+	},
 	scanning: {
 		open: 'Scan or paste a receipt',
 		photo: 'Photo of the receipt (optional)',

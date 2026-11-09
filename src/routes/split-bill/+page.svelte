@@ -22,8 +22,10 @@
 		calculateBill,
 		decimalPlaces,
 		formatAmount,
+		parseAmount,
 		ADJUSTMENT_KINDS,
 		type AdjustmentKind,
+		type AmountProblem,
 		type BillAdjustment,
 		type BillItem,
 		type BillPerson,
@@ -98,6 +100,35 @@
 	const money = (amount: number) => `${symbol} ${formatAmount(amount, currencyCode)}`;
 	const nameOf = (id: string) => people.find((person) => person.id === id)?.name ?? '';
 
+	/* ─── Amounts as typed ─── */
+	// Amount fields are text, not numbers: "45.000" is forty-five thousand rupiah, which a number
+	// field reads as 45. src/lib/split-bill.ts reads them the way the currency is written.
+	type AmountRead = ReturnType<typeof parseAmount>;
+	const readTypedAmount = (text: string): AmountRead => parseAmount(text, currencyCode);
+	const amountOf = (read: AmountRead) => (read && 'amount' in read ? read.amount : null);
+	// A phone's keypad for whole amounts has no dots or commas, and rupiah need neither.
+	const amountKeypad = $derived(decimalPlaces(currencyCode) > 0 ? 'decimal' : 'numeric');
+	const PROBLEMS: Record<Exclude<AmountProblem, 'negative'>, string> = {
+		unreadable: SPLIT_BILL.amounts.unreadable,
+		'no-cents': SPLIT_BILL.amounts.noCents
+	};
+	/** What to say under an amount field: what it reads as, or what's wrong with it. */
+	function amountNote(
+		read: AmountRead,
+		negative: string,
+		zeroIsProblem = true
+	): { text: string; problem: boolean } | undefined {
+		if (!read) return undefined;
+		if ('problem' in read) {
+			return {
+				text: read.problem === 'negative' ? negative : PROBLEMS[read.problem],
+				problem: true
+			};
+		}
+		if (read.amount === 0 && zeroIsProblem) return { text: SPLIT_BILL.amounts.zero, problem: true };
+		return { text: SPLIT_BILL.amounts.reads(money(read.amount)), problem: false };
+	}
+
 	/* ─── People ─── */
 	let newPerson = $state('');
 
@@ -128,7 +159,10 @@
 
 	/* ─── Items ─── */
 	let newItem = $state('');
-	let newPrice: number | null = $state(null);
+	let newPriceText = $state('');
+	const newPriceRead = $derived(readTypedAmount(newPriceText));
+	const newPrice = $derived(amountOf(newPriceRead));
+	const newPriceNote = $derived(amountNote(newPriceRead, SPLIT_BILL.amounts.negativePrice));
 	let newQuantity: number | null = $state(1);
 	const quantityOf = (value: number | null) =>
 		typeof value === 'number' && Number.isFinite(value)
@@ -148,7 +182,7 @@
 			...(quantity > 1 ? { quantity } : {})
 		});
 		newItem = '';
-		newPrice = null;
+		newPriceText = '';
 		newQuantity = 1;
 	}
 
@@ -212,9 +246,19 @@
 	};
 	let newAdjustmentKind: AdjustmentKind = $state('discount');
 	let newAdjustmentName = $state('');
-	let newAdjustmentAmount: number | null = $state(null);
+	let newAdjustmentText = $state('');
+	const newAdjustmentRead = $derived(readTypedAmount(newAdjustmentText));
+	const newAdjustmentAmount = $derived(amountOf(newAdjustmentRead));
 	// A discount always takes off; rounding and other adjustments go whichever way the receipt says.
 	let newAdjustmentAdds = $state(false);
+	const newAdjustmentNote = $derived(
+		amountNote(
+			newAdjustmentRead,
+			newAdjustmentKind === 'discount'
+				? SPLIT_BILL.amounts.negativeDiscount
+				: SPLIT_BILL.amounts.negativeAdjustment
+		)
+	);
 	const canAddAdjustment = $derived(newAdjustmentAmount !== null && newAdjustmentAmount > 0);
 
 	function addAdjustment() {
@@ -227,7 +271,7 @@
 			amount: adds ? newAdjustmentAmount : -newAdjustmentAmount
 		});
 		newAdjustmentName = '';
-		newAdjustmentAmount = null;
+		newAdjustmentText = '';
 		newAdjustmentAdds = false;
 	}
 
@@ -273,10 +317,12 @@
 	interface ReviewLine {
 		id: string;
 		name: string;
-		price: number | null;
+		/** As typed: read with the bill's currency, like every amount field. */
+		priceText: string;
 		quantity: number;
 		unsure: boolean;
 	}
+	const priceOf = (line: ReviewLine) => amountOf(readTypedAmount(line.priceText));
 	interface ReviewAdjustment extends ScannedAdjustment {
 		id: string;
 	}
@@ -299,7 +345,7 @@
 		reviewLines = scanned.items.map((item) => ({
 			id: newId(),
 			name: item.name,
-			price: item.price ?? null,
+			priceText: item.price === undefined ? '' : String(item.price),
 			quantity: item.quantity,
 			unsure: item.unsure
 		}));
@@ -322,7 +368,7 @@
 			items: reviewLines.map((line) => ({
 				name: line.name,
 				quantity: line.quantity,
-				price: line.price ?? 0,
+				price: priceOf(line) ?? 0,
 				unsure: line.unsure
 			})),
 			adjustments: reviewAdjustments
@@ -346,7 +392,10 @@
 			Math.abs(reviewTotal - reviewed.total) >= coin / 2
 	);
 	const pricesMissing = $derived(
-		reviewLines.some((line) => line.price === null || !(line.price > 0))
+		reviewLines.some((line) => {
+			const price = priceOf(line);
+			return price === null || !(price > 0);
+		})
 	);
 
 	function addScan() {
@@ -355,7 +404,7 @@
 			items.push({
 				id: newId(),
 				name: line.name.trim() || 'Item',
-				price: line.price ?? 0,
+				price: priceOf(line) ?? 0,
 				assignedPersonIds: [],
 				...(line.quantity > 1 ? { quantity: Math.min(MAX_QUANTITY, line.quantity) } : {})
 			});
@@ -624,6 +673,11 @@
 					{:else}
 						<ul class="mt-3 space-y-3">
 							{#each reviewLines as line, index (line.id)}
+								{@const lineNote = amountNote(
+									readTypedAmount(line.priceText),
+									SPLIT_BILL.amounts.negativePrice,
+									false
+								)}
 								<li
 									class="rounded-xl border bg-bg p-3 {line.unsure
 										? 'border-accent-edge'
@@ -667,12 +721,13 @@
 										>
 										<input
 											id="review-price-{line.id}"
-											type="number"
-											inputmode="decimal"
-											min="0"
-											step="any"
-											bind:value={line.price}
+											type="text"
+											inputmode={amountKeypad}
+											autocomplete="off"
+											bind:value={line.priceText}
 											oninput={() => (line.unsure = false)}
+											aria-describedby="review-price-note-{line.id}"
+											aria-invalid={lineNote?.problem ? true : undefined}
 											class={field}
 										/>
 										<button
@@ -699,6 +754,15 @@
 											</svg>
 										</button>
 									</div>
+									<p
+										id="review-price-note-{line.id}"
+										role="status"
+										class="mt-2 text-sm empty:mt-0 {lineNote?.problem
+											? 'font-medium'
+											: 'text-muted'}"
+									>
+										{#if lineNote}{lineNote.text}{/if}
+									</p>
 									{#if line.quantity > 1}
 										<p class="mt-2 text-sm text-muted">
 											{SPLIT_BILL.scanning.quantity(line.quantity)}
@@ -908,11 +972,12 @@
 					>
 					<input
 						id="price"
-						type="number"
-						inputmode="decimal"
-						min="0"
-						step="any"
-						bind:value={newPrice}
+						type="text"
+						inputmode={amountKeypad}
+						autocomplete="off"
+						bind:value={newPriceText}
+						aria-describedby="price-note"
+						aria-invalid={newPriceNote?.problem ? true : undefined}
 						class={field}
 					/>
 				</div>
@@ -922,6 +987,13 @@
 					class="{smallButton} {besideField} col-span-2 sm:col-span-1">Add item</button
 				>
 			</form>
+			<p
+				id="price-note"
+				role="status"
+				class="mt-2 text-sm empty:mt-0 {newPriceNote?.problem ? 'font-medium' : 'text-muted'}"
+			>
+				{#if newPriceNote}{newPriceNote.text}{/if}
+			</p>
 
 			{#if items.length}
 				<ul class="mt-5 space-y-3">
@@ -1244,30 +1316,42 @@
 							{/each}
 						</div>
 					</fieldset>
-					<div class="grid gap-3 sm:grid-cols-[1fr_9rem]">
-						<div>
-							<label for="adjustment-name" class={label}>Name on the receipt</label>
-							<input
-								id="adjustment-name"
-								type="text"
-								autocomplete="off"
-								placeholder={KIND_NAMES[newAdjustmentKind]}
-								bind:value={newAdjustmentName}
-								class={field}
-							/>
+					<div>
+						<div class="grid gap-3 sm:grid-cols-[1fr_9rem]">
+							<div>
+								<label for="adjustment-name" class={label}>Name on the receipt</label>
+								<input
+									id="adjustment-name"
+									type="text"
+									autocomplete="off"
+									placeholder={KIND_NAMES[newAdjustmentKind]}
+									bind:value={newAdjustmentName}
+									class={field}
+								/>
+							</div>
+							<div>
+								<label for="adjustment-amount" class={label}>Amount</label>
+								<input
+									id="adjustment-amount"
+									type="text"
+									inputmode={amountKeypad}
+									autocomplete="off"
+									bind:value={newAdjustmentText}
+									aria-describedby="adjustment-amount-note"
+									aria-invalid={newAdjustmentNote?.problem ? true : undefined}
+									class={field}
+								/>
+							</div>
 						</div>
-						<div>
-							<label for="adjustment-amount" class={label}>Amount</label>
-							<input
-								id="adjustment-amount"
-								type="number"
-								inputmode="decimal"
-								min="0"
-								step="any"
-								bind:value={newAdjustmentAmount}
-								class={field}
-							/>
-						</div>
+						<p
+							id="adjustment-amount-note"
+							role="status"
+							class="mt-2 text-sm empty:mt-0 {newAdjustmentNote?.problem
+								? 'font-medium'
+								: 'text-muted'}"
+						>
+							{#if newAdjustmentNote}{newAdjustmentNote.text}{/if}
+						</p>
 					</div>
 					<div class="flex flex-wrap items-center justify-between gap-3">
 						{#if newAdjustmentKind === 'discount'}
