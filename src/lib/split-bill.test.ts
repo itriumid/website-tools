@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import { CURRENCIES } from './countries';
 import {
 	billFromHash,
 	billToHash,
 	calculateBill,
 	decimalPlaces,
 	formatAmount,
+	parseAmount,
 	type BillState
 } from './split-bill';
 
@@ -354,6 +356,172 @@ describe('money', () => {
 		expect(formatAmount(12500, 'IDR', 'id-ID')).toBe('12.500');
 		expect(formatAmount(12.5, 'USD', 'en-US')).toBe('12.50');
 		expect(formatAmount(1234.5, 'USD', 'en-US')).toBe('1,234.50');
+	});
+});
+
+describe('formatAmount, the way each currency is written where it is used', () => {
+	it('writes rupiah the Indonesian way, whatever the reader’s language', () => {
+		expect(formatAmount(146000, 'IDR')).toBe('146.000');
+		expect(formatAmount(7300, 'IDR')).toBe('7.300');
+		expect(formatAmount(1250000, 'IDR')).toBe('1.250.000');
+		expect(formatAmount(45000.4, 'IDR')).toBe('45.000');
+	});
+
+	it('writes dollars the American way and euros the German way', () => {
+		expect(formatAmount(1234.5, 'USD')).toBe('1,234.50');
+		expect(formatAmount(7, 'USD')).toBe('7.00');
+		expect(formatAmount(1234.5, 'EUR')).toBe('1.234,50');
+	});
+
+	it('writes yen the Japanese way, without decimals', () => {
+		expect(formatAmount(1200, 'JPY')).toBe('1,200');
+		expect(formatAmount(1234567, 'JPY')).toBe('1,234,567');
+	});
+
+	it('keeps 0 to 9 for currencies of countries with digits of their own', () => {
+		expect(formatAmount(1234.5, 'SAR')).toMatch(/^1.234.50$/);
+		expect(formatAmount(1.25, 'KWD')).toMatch(/^1.250$/);
+	});
+
+	it('writes a currency it has no locale for the way the reader does', () => {
+		expect(formatAmount(1234.5, 'XYZ')).toBe(
+			new Intl.NumberFormat(undefined, {
+				minimumFractionDigits: 2,
+				maximumFractionDigits: 2
+			}).format(1234.5)
+		);
+	});
+
+	it('writes what the parser reads back as the same amount', () => {
+		for (const [amount, currency] of [
+			[146000, 'IDR'],
+			[1234.5, 'USD'],
+			[1234.5, 'EUR'],
+			[1200, 'JPY'],
+			[1234.567, 'KWD'],
+			[123456.78, 'INR'],
+			[1234.5, 'CHF'],
+			[1234.5, 'SAR']
+		] as const) {
+			expect(parseAmount(formatAmount(amount, currency), currency)).toEqual({ amount });
+		}
+	});
+
+	it('writes every currency on the list in 0 to 9, and reads it back', () => {
+		for (const { code } of CURRENCIES) {
+			const amount = decimalPlaces(code) ? 1234567.5 : 1234567;
+			const written = formatAmount(amount, code);
+			expect(written, code).toMatch(/^[\d.,\s'’]+$/);
+			expect(parseAmount(written, code), `${code}: ${written}`).toEqual({ amount });
+		}
+	});
+});
+
+describe('parseAmount', () => {
+	const read = (text: string, currencyCode = 'IDR') => parseAmount(text, currencyCode);
+	const amount = (value: number) => ({ amount: value });
+
+	it('has nothing to say about an empty field', () => {
+		expect(read('')).toBeUndefined();
+		expect(read('   ')).toBeUndefined();
+		expect(read('Rp')).toBeUndefined();
+	});
+
+	it('reads rupiah grouped with dots or commas, or not at all', () => {
+		expect(read('45.000')).toEqual(amount(45000));
+		expect(read('45,000')).toEqual(amount(45000));
+		expect(read('45000')).toEqual(amount(45000));
+		expect(read('1.250.000')).toEqual(amount(1250000));
+		expect(read('1,250,000')).toEqual(amount(1250000));
+		expect(read('45 000')).toEqual(amount(45000));
+	});
+
+	it('reads rupiah while it is still being typed', () => {
+		expect(read('45.')).toEqual(amount(45));
+		expect(read('45.0')).toEqual(amount(450));
+		expect(read('45.00')).toEqual(amount(4500));
+		expect(read('45.5')).toEqual(amount(455));
+	});
+
+	it('drops rupiah cents that are all zeros, as banking apps show them', () => {
+		expect(read('45.000,00')).toEqual(amount(45000));
+		expect(read('45,000.00')).toEqual(amount(45000));
+		expect(read('1.250.000,0')).toEqual(amount(1250000));
+	});
+
+	it('says rupiah has no cents when there are some', () => {
+		expect(read('45.000,50')).toEqual({ problem: 'no-cents' });
+		expect(read('45,000.5')).toEqual({ problem: 'no-cents' });
+	});
+
+	it('takes the currency symbol or code before or after', () => {
+		expect(read('Rp 45.000')).toEqual(amount(45000));
+		expect(read('Rp45.000')).toEqual(amount(45000));
+		expect(read('IDR 45.000')).toEqual(amount(45000));
+		expect(read('45.000 idr')).toEqual(amount(45000));
+		expect(read('$12.50', 'USD')).toEqual(amount(12.5));
+		expect(read('12,50 €', 'EUR')).toEqual(amount(12.5));
+	});
+
+	it('reads both ways of writing a two-decimal currency', () => {
+		expect(read('1,234.56', 'USD')).toEqual(amount(1234.56));
+		expect(read('1.234,56', 'EUR')).toEqual(amount(1234.56));
+		expect(read('1234.56', 'USD')).toEqual(amount(1234.56));
+		expect(read('1234,56', 'EUR')).toEqual(amount(1234.56));
+		expect(read('12.5', 'USD')).toEqual(amount(12.5));
+		expect(read('12,5', 'EUR')).toEqual(amount(12.5));
+		expect(read('.5', 'USD')).toEqual(amount(0.5));
+		expect(read("1'234.50", 'CHF')).toEqual(amount(1234.5));
+	});
+
+	it('takes three digits after the last mark as thousands in a two-decimal currency', () => {
+		expect(read('1,234', 'USD')).toEqual(amount(1234));
+		expect(read('1.234', 'EUR')).toEqual(amount(1234));
+		expect(read('1.234.567', 'EUR')).toEqual(amount(1234567));
+		expect(read('1,234,567.89', 'USD')).toEqual(amount(1234567.89));
+	});
+
+	it("doesn't take a mark used more than once as the decimal mark", () => {
+		expect(read('1.234.56', 'USD')).toEqual(amount(123456));
+	});
+
+	it('takes up to three decimals in the dinars', () => {
+		expect(read('1.250', 'KWD')).toEqual(amount(1.25));
+		expect(read('1,250', 'KWD')).toEqual(amount(1.25));
+		expect(read('1,234.567', 'KWD')).toEqual(amount(1234.567));
+		expect(read('1.234.567', 'KWD')).toEqual(amount(1234567));
+	});
+
+	it('reads whole amounts in other currencies without cents', () => {
+		expect(read('1,200', 'JPY')).toEqual(amount(1200));
+		expect(read('1.200', 'JPY')).toEqual(amount(1200));
+		expect(read('120', 'USD')).toEqual(amount(120));
+		expect(read('0', 'USD')).toEqual(amount(0));
+	});
+
+	it('reads Arabic, Persian and full-width digits', () => {
+		expect(read('٤٥٫٠٠٠')).toEqual(amount(45000));
+		expect(read('۴۵.۰۰۰')).toEqual(amount(45000));
+		expect(read('٤٥٫٥٠', 'USD')).toEqual(amount(45.5));
+		expect(read('١٬٢٣٤٫٥٦', 'SAR')).toEqual(amount(1234.56));
+		expect(read('４５，０００')).toEqual(amount(45000));
+		expect(read('－５', 'JPY')).toEqual({ problem: 'negative' });
+	});
+
+	it('says an amount is below zero', () => {
+		expect(read('-5.000')).toEqual({ problem: 'negative' });
+		expect(read('−5.000')).toEqual({ problem: 'negative' });
+		expect(read('-12.50', 'USD')).toEqual({ problem: 'negative' });
+	});
+
+	it("says when it can't read the amount at all", () => {
+		expect(read('abc')).toEqual({ problem: 'unreadable' });
+		expect(read('45rb')).toEqual({ problem: 'unreadable' });
+		expect(read('12.50 USD', 'EUR')).toEqual({ problem: 'unreadable' });
+		expect(read('.')).toEqual({ problem: 'unreadable' });
+		expect(read('-')).toEqual({ problem: 'unreadable' });
+		expect(read('1e5')).toEqual({ problem: 'unreadable' });
+		expect(read('--5')).toEqual({ problem: 'unreadable' });
 	});
 });
 

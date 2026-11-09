@@ -27,7 +27,12 @@ export const WHATSAPP = {
 	description:
 		'Make a WhatsApp click-to-chat link from any phone number, with a message already typed if you like. Spaces and symbols are removed for you.',
 	introduction:
-		'Enter a phone number and we build the link that opens a chat with it. Spaces, dashes and brackets are taken out, so you can paste a number as it is.'
+		'Enter a phone number and we build the link that opens a chat with it. Spaces, dashes and brackets are taken out, so you can paste a number as it is.',
+	problems: {
+		'too-short': "That's too short for a phone number. Check you have every digit.",
+		'too-long': "That's too long for a phone number. Check the country code isn't in it twice.",
+		'area-code': 'Add the area code too.'
+	}
 };
 
 export const SPLIT_BILL = {
@@ -53,6 +58,16 @@ export const SPLIT_BILL = {
 		deleted: "Deleted. The link doesn't open this bill anymore.",
 		deleteFailed: "We couldn't delete it. Check your connection, then try again.",
 		deleteQuestion: 'Delete the shared copy? The link stops working for everyone.'
+	},
+	// What an amount field says under it as it's typed: what we read, or why we can't.
+	amounts: {
+		reads: (amount: string) => `= ${amount}`,
+		unreadable: "We can't read this amount. Use digits, with dots or commas if you like.",
+		noCents: 'This currency has no cents. Leave them off.',
+		zero: 'Enter an amount above zero.',
+		negativePrice: "A price can't be below zero.",
+		negativeDiscount: 'Leave out the minus. A discount always comes off.',
+		negativeAdjustment: 'Leave out the minus, and choose below whether it takes off or adds.'
 	},
 	scanning: {
 		open: 'Scan or paste a receipt',

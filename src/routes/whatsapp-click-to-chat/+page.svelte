@@ -11,7 +11,7 @@
 	// people look for their country, not its code.
 	const choices: Choice[] = COUNTRIES.map((country) => ({
 		value: country.name,
-		label: `+${country.phoneCode} ${country.name}`,
+		label: `+${country.phoneCode}${country.areaCodes ? ` ${country.areaCodes.join('/')}` : ''} ${country.name}`,
 		searchTerms: country.name
 	}));
 
@@ -24,7 +24,9 @@
 	let copied: 'yes' | 'failed' | undefined = $state();
 	let copiedTimer: ReturnType<typeof setTimeout> | undefined;
 
-	const target = $derived(chatTarget(countryCode, typed, message));
+	const result = $derived(chatTarget(countryCode, typed, message));
+	const target = $derived(result && 'link' in result ? result : undefined);
+	const problem = $derived(result && 'problem' in result ? result.problem : undefined);
 
 	async function copyLink() {
 		if (!target) return;
@@ -87,12 +89,16 @@
 				autocomplete="off"
 				bind:value={typed}
 				placeholder="811 9710 096"
-				aria-describedby="number-hint"
+				aria-describedby="number-hint number-problem"
+				aria-invalid={problem ? true : undefined}
 				class={field}
 			/>
 			<p id="number-hint" class="mt-1.5 text-xs text-muted">
-				A number that starts with + already has its country, so we use it as it is.
+				A number that starts with + or 00 already has its country, so we use it as it is.
 				{#if target}Chatting with <strong class="text-text">{target.display}</strong>.{/if}
+			</p>
+			<p id="number-problem" class="mt-1.5 text-sm font-medium empty:mt-0" role="status">
+				{#if problem}{WHATSAPP.problems[problem]}{/if}
 			</p>
 		</div>
 
