@@ -6,7 +6,9 @@
 - **Split bill**: split a bill fairly, with tax and service, and share it as a short link.
 
 They run in your browser. There's no account, no cookies, no analytics, and nothing you type is
-sent to a server, except a bill you share, and that only encrypted. A strict
+sent to a server, except a bill you share, and that only encrypted. Split bill keeps a draft of
+the bill you're making in `sessionStorage`, so it's still there after you switch to the camera and
+back: it stays on your device, is cleared when the tab closes, and is never sent anywhere. A strict
 Content-Security-Policy (set in [`vite.config.ts`](vite.config.ts) and [`_headers`](_headers))
 allows scripts and files from the site itself and nothing else, and blocks every connection that
 isn't to the site. The one exception is an image address inside the browser (`blob:`): a receipt

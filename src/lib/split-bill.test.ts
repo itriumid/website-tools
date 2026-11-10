@@ -1,12 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { CURRENCIES } from './countries';
 import {
+	billAsText,
 	billFromHash,
 	billToHash,
 	calculateBill,
+	changeItem,
 	decimalPlaces,
 	formatAmount,
+	formatMoney,
+	missingForItem,
 	parseAmount,
+	taxOnServiceByDefault,
+	type BillItem,
 	type BillState
 } from './split-bill';
 
@@ -694,13 +700,15 @@ describe('adjustments for some people', () => {
 				]
 			})
 		).toEqual([110000, 112000]);
+		// What's left of a refund bigger than someone's share comes off everyone else's, so the
+		// shares still add up to the 50.000 total.
 		expect(
 			shares({
 				adjustments: [
 					{ id: 'r', kind: 'other', name: 'Refund', amount: -150000, assignedPersonIds: ['a'] }
 				]
 			})
-		).toEqual([0, 100000]);
+		).toEqual([0, 50000]);
 	});
 
 	it('treats one tagged only to people no longer on the bill as everyone’s', () => {
@@ -760,5 +768,238 @@ describe('adjustments for some people', () => {
 			);
 		expect(wrong('a')).toBeUndefined();
 		expect(wrong([1])).toBeUndefined();
+	});
+});
+
+describe('calculateBill, shares always add up to the total', () => {
+	const owed = (totals: ReturnType<typeof calculateBill>) =>
+		totals.shares.reduce((sum, share) => sum + share.total, 0);
+
+	it("passes what's left of someone's own adjustment on, down to a total of nothing", () => {
+		// −5.000 for Ayu, whose share is 1.000: the bill comes to nothing, and so do the shares.
+		const totals = calculateBill(
+			bill({
+				items: [
+					{ id: '1', name: 'Kerupuk', price: 1000, assignedPersonIds: ['a'] },
+					{ id: '2', name: 'Air', price: 1000, assignedPersonIds: ['b'] }
+				],
+				adjustments: [
+					{ id: 'o', kind: 'other', name: 'Refund', amount: -5000, assignedPersonIds: ['a'] }
+				]
+			})
+		);
+		expect(totals.grandTotal).toBe(0);
+		expect(totals.shares.map((share) => share.total)).toEqual([0, 0]);
+		expect(totals.unshared).toBe(0);
+	});
+
+	it('splits something added to a bill that came to nothing evenly', () => {
+		const totals = calculateBill(
+			bill({
+				items: [{ id: '1', name: 'Promo', price: 10000, assignedPersonIds: ['a'] }],
+				adjustments: [
+					{ id: 'd', kind: 'discount', name: 'Voucher', amount: -10000 },
+					{ id: 'f', kind: 'other', name: 'Biaya aplikasi', amount: 2000 }
+				]
+			})
+		);
+		expect(totals.grandTotal).toBe(2000);
+		expect(totals.shares.map((share) => share.total)).toEqual([1000, 1000]);
+		expect(totals.unshared).toBe(0);
+	});
+
+	it('says what the untagged items come to with everything else, apart from the shares', () => {
+		const totals = calculateBill(
+			bill({
+				items: [
+					{ id: '1', name: 'Rice', price: 10000, assignedPersonIds: ['a'] },
+					{ id: '2', name: 'Mystery', price: 10000, assignedPersonIds: [] }
+				],
+				taxPercentage: 10,
+				servicePercentage: 5
+			})
+		);
+		expect(totals.unassigned).toBe(10000);
+		expect(totals.unshared).toBe(11500);
+		expect(owed(totals) + totals.unshared).toBe(totals.grandTotal);
+	});
+
+	it('leaves the whole total unshared when there is nobody to share it', () => {
+		const totals = calculateBill(
+			bill({ people: [], items: [{ id: '1', name: 'Rice', price: 10000, assignedPersonIds: [] }] })
+		);
+		expect(totals.unshared).toBe(10000);
+	});
+
+	it('adds up, to the coin, whatever the bill', () => {
+		// A fixed pseudo-random sequence, so a failure can be repeated.
+		let seed = 7;
+		const random = () => {
+			seed = (seed * 16807) % 2147483647;
+			return seed / 2147483647;
+		};
+		const pick = <T>(choices: readonly T[]) => choices[Math.floor(random() * choices.length)];
+		const people = ['a', 'b', 'c'].map((id) => ({ id, name: id }));
+		for (let round = 0; round < 500; round += 1) {
+			const currencyCode = pick(['IDR', 'USD', 'KWD']);
+			const coins = 10 ** decimalPlaces(currencyCode);
+			const items = Array.from({ length: 1 + Math.floor(random() * 4) }, (_, index) => ({
+				id: `i${index}`,
+				name: 'Item',
+				price: Math.round(random() * 100000 * coins) / coins,
+				assignedPersonIds: people.filter(() => random() < 0.5).map((person) => person.id)
+			}));
+			const adjustments = Array.from({ length: Math.floor(random() * 3) }, (_, index) => {
+				const kind = pick(['discount', 'rounding', 'other'] as const);
+				const size = Math.round(random() * 80000 * coins) / coins;
+				return {
+					id: `a${index}`,
+					kind,
+					name: kind,
+					amount: kind === 'discount' || random() < 0.5 ? -size : size,
+					...(random() < 0.5 ? { assignedPersonIds: [pick(people).id] } : {})
+				};
+			});
+			const totals = calculateBill(
+				bill({
+					people,
+					items,
+					adjustments,
+					currencyCode,
+					taxPercentage: pick([0, 10, 11]),
+					servicePercentage: pick([0, 5, 7.5]),
+					taxOnService: random() < 0.5
+				})
+			);
+			const total = totals.grandTotal * coins;
+			expect(Number.isInteger(Math.round(total * 1e6) / 1e6)).toBe(true);
+			const shared = Math.round(owed(totals) * coins);
+			expect(shared + Math.round(totals.unshared * coins)).toBe(Math.round(total));
+			expect(totals.shares.every((share) => share.total >= 0)).toBe(true);
+			if (items.every((item) => item.assignedPersonIds.length)) expect(totals.unshared).toBe(0);
+		}
+	});
+});
+
+describe('tax on service, by currency', () => {
+	it('starts on for rupiah and off for everything else', () => {
+		expect(taxOnServiceByDefault('IDR')).toBe(true);
+		expect(taxOnServiceByDefault('USD')).toBe(false);
+		expect(taxOnServiceByDefault('SGD')).toBe(false);
+	});
+
+	it('charges 10% tax on 100.000 plus 5% service as 115.500 when on, 115.000 when off', () => {
+		const receipt = (taxOnService: boolean) =>
+			calculateBill(
+				bill({
+					items: [{ id: '1', name: 'Nasi', price: 100000, assignedPersonIds: ['a', 'b'] }],
+					taxPercentage: 10,
+					servicePercentage: 5,
+					taxOnService
+				})
+			);
+		const on = receipt(true);
+		expect(on.service).toBe(5000);
+		expect(on.tax).toBe(10500);
+		expect(on.grandTotal).toBe(115500);
+		expect(on.shares.map((share) => share.total)).toEqual([57750, 57750]);
+		expect(receipt(false).grandTotal).toBe(115000);
+	});
+});
+
+describe('changing an item', () => {
+	const item: BillItem = {
+		id: 'e',
+		name: 'Es Teh',
+		price: 10000,
+		assignedPersonIds: ['a', 'b'],
+		quantity: 3,
+		counts: { a: 2, b: 1 }
+	};
+
+	it('keeps who had it, and how many each had', () => {
+		const changed = changeItem(item, { name: ' Es Teh Manis ', quantity: 3 });
+		expect(changed).toEqual({ ...item, name: 'Es Teh Manis' });
+		expect(changed.assignedPersonIds).not.toBe(item.assignedPersonIds);
+	});
+
+	it('keeps the line price exactly when the price is left alone', () => {
+		// 10.000 for three isn't a whole number of rupiah each: an edit to the name mustn't round it.
+		expect(changeItem(item, { name: 'Es Teh', quantity: 3 }).price).toBe(10000);
+	});
+
+	it('takes a new price for one, and a new quantity, the way the form asks', () => {
+		expect(changeItem(item, { name: 'Es Teh', quantity: 4, priceEach: 5000 }).price).toBe(20000);
+		expect(
+			changeItem(
+				{ id: 'n', name: 'Nasi', price: 20000, assignedPersonIds: ['a'] },
+				{ name: 'Nasi', quantity: 2 }
+			)
+		).toEqual({ id: 'n', name: 'Nasi', price: 40000, assignedPersonIds: ['a'], quantity: 2 });
+	});
+
+	it('drops the quantity and the counts at one, as a link does', () => {
+		expect(changeItem(item, { name: 'Es Teh', quantity: 1, priceEach: 4000 })).toEqual({
+			id: 'e',
+			name: 'Es Teh',
+			price: 4000,
+			assignedPersonIds: ['a', 'b']
+		});
+	});
+
+	it('keeps the old name when the new one is blank, and the quantity in range', () => {
+		expect(changeItem(item, { name: '  ', quantity: 0 }).name).toBe('Es Teh');
+		expect(changeItem(item, { name: 'x', quantity: 0 }).quantity).toBeUndefined();
+		expect(changeItem(item, { name: 'x', quantity: 5000 }).quantity).toBe(999);
+		expect(changeItem(item, { name: 'x', quantity: Number.NaN }).quantity).toBeUndefined();
+	});
+});
+
+describe('why an item cannot be added yet', () => {
+	it('says what is missing', () => {
+		expect(missingForItem('', null)).toBe('name-and-price');
+		expect(missingForItem(' ', 0)).toBe('name-and-price');
+		expect(missingForItem('', 5000)).toBe('name');
+		expect(missingForItem('Nasi', null)).toBe('price');
+		expect(missingForItem('Nasi', 0)).toBe('price');
+		expect(missingForItem('Nasi', 5000)).toBeUndefined();
+	});
+});
+
+describe('the split as text', () => {
+	const state = bill({
+		items: [{ id: '1', name: 'Nasi', price: 100000, assignedPersonIds: ['a', 'b'] }],
+		taxPercentage: 10,
+		servicePercentage: 5,
+		taxOnService: true
+	});
+
+	it('writes money with the symbol, the way the currency is written', () => {
+		expect(formatMoney(115500, 'IDR')).toBe('Rp 115.500');
+		expect(formatMoney(12.5, 'USD')).toBe('$ 12.50');
+	});
+
+	it('gives a line per person, then the total', () => {
+		expect(billAsText(state)).toBe('Ayu: Rp 57.750\nBudi: Rp 57.750\nTotal: Rp 115.500');
+	});
+
+	it('ends with the link when there is one', () => {
+		expect(billAsText(state, 'https://tools.itrium.id/split-bill#bill=X').split('\n').at(-1)).toBe(
+			'https://tools.itrium.id/split-bill#bill=X'
+		);
+	});
+
+	it("says what's in nobody's share, so the lines add up to the total", () => {
+		const text = billAsText(
+			bill({
+				items: [
+					{ id: '1', name: 'Nasi', price: 30000, assignedPersonIds: ['a'] },
+					{ id: '2', name: 'Teh', price: 5000, assignedPersonIds: [] }
+				]
+			})
+		);
+		expect(text).toBe(
+			"Ayu: Rp 30.000\nBudi: Rp 0\nNot in anyone's share: Rp 5.000\nTotal: Rp 35.000"
+		);
 	});
 });

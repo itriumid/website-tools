@@ -2,6 +2,7 @@
 // is shared as a link, and how it's divided.
 
 import lzString from 'lz-string';
+import { SPLIT_BILL } from './content';
 import { CURRENCIES } from './countries';
 import { asciiDigits } from './digits';
 
@@ -75,6 +76,16 @@ export interface BillState {
 export const DEFAULT_TAX_PERCENTAGE = 10;
 export const DEFAULT_SERVICE_PERCENTAGE = 5;
 export const DEFAULT_CURRENCY_CODE = 'IDR';
+
+/**
+ * Whether a new bill in this currency charges tax on service too. Indonesian receipts usually
+ * charge PB1, the restaurant tax, on the subtotal plus service, so a rupiah bill starts with it on;
+ * every other currency starts with tax and service each on the subtotal. Only for new bills: a
+ * bill from a link or a draft keeps what it says.
+ */
+export function taxOnServiceByDefault(currencyCode: string): boolean {
+	return currencyCode === 'IDR';
+}
 
 /* ─── Sharing ─── */
 
@@ -355,6 +366,12 @@ export function formatAmount(
 	}).format(amount);
 }
 
+/** An amount with the currency's symbol before it: "Rp 45.000", "$ 12.50". */
+export function formatMoney(amount: number, currencyCode: string): string {
+	const symbol = CURRENCIES.find((currency) => currency.code === currencyCode)?.symbol;
+	return `${symbol ?? currencyCode} ${formatAmount(amount, currencyCode)}`;
+}
+
 export type AmountProblem = 'unreadable' | 'negative' | 'no-cents';
 
 /**
@@ -440,9 +457,16 @@ export interface BillTotals {
 	service: number;
 	/** Rounding and other adjustments, together: they land after tax and service. */
 	lateAdjustments: number;
+	/** Rounded to the currency's smallest coin, like the shares. */
 	grandTotal: number;
 	/** What the items nobody is tagged to add up to: left out of every share. */
 	unassigned: number;
+	/**
+	 * What the shares leave out of the total, to the coin: the untagged items with their part of
+	 * everything else, or the whole total when there's nobody to share it. The shares and this
+	 * always add up to the total.
+	 */
+	unshared: number;
 	shares: PersonShare[];
 }
 
@@ -532,17 +556,23 @@ export function calculateBill(state: BillState): BillTotals {
 	const afterOwn = [...own.values()].reduce((sum, value) => sum + value, 0) + unassigned;
 	const shrink = afterOwn > 0 ? Math.max(0, afterOwn + everyoneDiscount) / afterOwn : 0;
 
-	// 2. Service and tax, the same factor for everyone. 3. Rounding and the rest, last: someone's
-	// own on them (never below nothing), everyone's in proportion to what each comes to by then.
-	const charged = new Map(ids.map((id) => [id, own.get(id)! * shrink * charges]));
-	const chargedUnassigned = unassigned * shrink * charges;
+	// 2. Service and tax, the same factor for everyone. 3. Rounding and the rest, last, the way
+	// discounts go: someone's own on them, down to nothing, and any left over is everyone's;
+	// everyone's in proportion to what each comes to by then. So a refund bigger than someone's
+	// share comes off everyone else's, and the shares still add up to the total.
 	const late = perPerson(['rounding', 'other']);
-	const chargedTotal =
-		[...charged.values()].reduce((sum, value) => sum + value, 0) + chargedUnassigned;
-	const owed = ids.map((id) => {
-		const before = charged.get(id)!;
-		const everyone = chargedTotal > 0 ? (late.everyone * before) / chargedTotal : 0;
-		return Math.max(0, before + late.amounts.get(id)! + everyone);
+	let everyoneLate = late.everyone;
+	const afterLate = ids.map((id) => {
+		const value = own.get(id)! * shrink * charges + late.amounts.get(id)!;
+		if (value < 0) everyoneLate += value;
+		return Math.max(0, value);
+	});
+	const chargedUnassigned = unassigned * shrink * charges;
+	const lateBase = afterLate.reduce((sum, value) => sum + value, 0) + chargedUnassigned;
+	const owed = afterLate.map((value) => {
+		if (lateBase > 0) return Math.max(0, value + (everyoneLate * value) / lateBase);
+		// Nothing to go by (everything came to nothing): something added on top is split evenly.
+		return everyoneLate > 0 ? everyoneLate / ids.length : 0;
 	});
 
 	const coins = 10 ** decimalPlaces(state.currencyCode);
@@ -560,18 +590,83 @@ export function calculateBill(state: BillState): BillTotals {
 		leftover -= 1;
 	}
 
+	// The total to the coin too, rounded the same way, so the shares and what they leave out add
+	// up to exactly the total shown.
+	const totalCoins = Math.round(Math.round(grandTotal * coins * 1e6) / 1e6);
+	const sharedCoins = rounded.reduce((sum, value) => sum + value, 0);
+
 	return {
 		subtotal,
 		discounts,
 		tax,
 		service,
 		lateAdjustments,
-		grandTotal,
+		grandTotal: totalCoins / coins,
 		unassigned,
+		unshared: Math.max(0, totalCoins - sharedCoins) / coins,
 		shares: state.people.map((person, index) => ({
 			personId: person.id,
 			base: bases.get(person.id) ?? 0,
 			total: rounded[index] / coins
 		}))
 	};
+}
+
+/* ─── Changing what's on the bill ─── */
+
+/**
+ * An item with its name, quantity or price changed, still tagged to the same people. `priceEach`
+ * is the price for one, the way the form asks for it; left out, the price for one stays as it was,
+ * exactly, so a line price that doesn't divide evenly isn't rounded by an edit that didn't touch it.
+ * Counts go with a quantity of one, as they do in a link.
+ */
+export function changeItem(
+	item: BillItem,
+	change: { name: string; quantity: number; priceEach?: number }
+): BillItem {
+	const quantity = Number.isFinite(change.quantity)
+		? Math.min(MAX_QUANTITY, Math.max(1, Math.round(change.quantity)))
+		: 1;
+	const priceEach = change.priceEach ?? item.price / (item.quantity ?? 1);
+	const changed: BillItem = {
+		id: item.id,
+		name: change.name.trim() || item.name,
+		price: priceEach * quantity,
+		assignedPersonIds: [...item.assignedPersonIds]
+	};
+	if (quantity > 1) {
+		changed.quantity = quantity;
+		if (item.counts) changed.counts = { ...item.counts };
+	}
+	return changed;
+}
+
+/** Why an item can't be added yet, or undefined when it can. */
+export function missingForItem(
+	name: string,
+	price: number | null
+): 'name-and-price' | 'name' | 'price' | undefined {
+	const noName = name.trim() === '';
+	const noPrice = price === null || !(price > 0);
+	if (noName && noPrice) return 'name-and-price';
+	if (noName) return 'name';
+	return noPrice ? 'price' : undefined;
+}
+
+/* ─── The split as text ─── */
+
+/**
+ * The split as plain text for a group chat: one line per person with what they owe, what's in
+ * nobody's share when there's some, the total, and the link when there is one.
+ */
+export function billAsText(state: BillState, link?: string): string {
+	const totals = calculateBill(state);
+	const money = (amount: number) => formatMoney(amount, state.currencyCode);
+	const lines = state.people.map(
+		(person, index) => `${person.name}: ${money(totals.shares[index].total)}`
+	);
+	if (totals.unshared > 0) lines.push(`${SPLIT_BILL.text.unshared}: ${money(totals.unshared)}`);
+	lines.push(`${SPLIT_BILL.text.total}: ${money(totals.grandTotal)}`);
+	if (link) lines.push(link);
+	return lines.join('\n');
 }

@@ -12,8 +12,12 @@ export const field = `w-full rounded-lg border border-control-border bg-bg px-3 
 /** A button beside a field, as tall as the field: taller on touch screens, like its text. */
 export const besideField = 'h-[42px] pointer-coarse:h-[46px]';
 export const label = 'mb-1.5 block text-sm font-medium';
-/** A checkbox or radio button with its words beside it: the whole row takes the press. */
-export const checkRow = 'inline-flex min-h-9 cursor-pointer items-center gap-2.5 text-sm';
+/**
+ * A checkbox or radio button with its words beside it: the whole row takes the press, and on touch
+ * screens it's 44px tall, though the box itself stays its size.
+ */
+export const checkRow =
+	'inline-flex min-h-9 cursor-pointer items-center gap-2.5 text-sm pointer-coarse:min-h-11';
 /** Deep rose when checked on light backgrounds, per the brand: pastel pink is too faint there. */
 export const checkbox = 'size-5 shrink-0 accent-accent-edge disabled:cursor-not-allowed';
 export const card = 'rounded-2xl border border-border bg-surface p-5 sm:p-6';

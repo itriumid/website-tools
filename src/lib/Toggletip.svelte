@@ -42,7 +42,7 @@
 	aria-expanded={open}
 	aria-controls={id}
 	onclick={() => (open = !open)}
-	class="inline-flex size-8 shrink-0 items-center justify-center rounded-full text-muted hover:bg-bg hover:text-text {open
+	class="inline-flex size-8 shrink-0 items-center justify-center rounded-full text-muted hover:bg-bg hover:text-text pointer-coarse:size-11 {open
 		? 'text-text'
 		: ''}"
 >

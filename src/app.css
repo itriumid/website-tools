@@ -75,6 +75,14 @@ html {
 	border-radius: 4px;
 }
 
+/* Split bill's running total stays at the bottom of a phone's screen: whatever has focus scrolls
+   clear of it, not under it. */
+@media (width < 40rem) {
+	html:has([data-running-total]) {
+		scroll-padding-bottom: 6rem;
+	}
+}
+
 @media (prefers-reduced-motion: reduce) {
 	html {
 		scroll-behavior: auto;

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { resolve } from '$app/paths';
 	import SearchableSelect, { type Choice } from '#lib/SearchableSelect.svelte';
 	import Seo from '#lib/Seo.svelte';
@@ -17,12 +17,17 @@
 		DEFAULT_SERVICE_PERCENTAGE,
 		DEFAULT_TAX_PERCENTAGE,
 		MAX_QUANTITY,
+		billAsText,
 		billFromHash,
 		billToHash,
 		calculateBill,
+		changeItem,
 		decimalPlaces,
 		formatAmount,
+		formatMoney,
+		missingForItem,
 		parseAmount,
+		taxOnServiceByDefault,
 		ADJUSTMENT_KINDS,
 		type AdjustmentKind,
 		type AmountProblem,
@@ -44,6 +49,7 @@
 		type Shared,
 		type Version
 	} from '#lib/share.js';
+	import { clearDraft, draftToOpen, loadDraft, saveDraft } from '#lib/draft.js';
 	import {
 		besideField,
 		card,
@@ -75,7 +81,9 @@
 	let currencyCode = $state(DEFAULT_CURRENCY_CODE);
 	let taxIncluded = $state(false);
 	let serviceIncluded = $state(false);
-	let taxOnService = $state(false);
+	let taxOnService = $state(taxOnServiceByDefault(DEFAULT_CURRENCY_CODE));
+	// Until someone sets tax on service themselves, it follows the currency's usual way.
+	let taxOnServiceChosen = $state(false);
 	let adjustments: BillAdjustment[] = $state([]);
 
 	const percentage = (value: number | null) =>
@@ -98,8 +106,7 @@
 		return state;
 	});
 	const totals = $derived(calculateBill(bill));
-	const symbol = $derived(CURRENCIES.find((c) => c.code === currencyCode)?.symbol ?? currencyCode);
-	const money = (amount: number) => `${symbol} ${formatAmount(amount, currencyCode)}`;
+	const money = (amount: number) => formatMoney(amount, currencyCode);
 	const nameOf = (id: string) => people.find((person) => person.id === id)?.name ?? '';
 
 	/* ─── Amounts as typed ─── */
@@ -142,6 +149,26 @@
 		if (!name) return;
 		people.push({ id: newId(), name });
 		newPerson = '';
+	}
+
+	// Renaming someone keeps everything they're tagged to: it's the same person.
+	let renaming: { id: string; name: string } | undefined = $state();
+
+	async function startRenaming(person: BillPerson) {
+		renaming = { id: person.id, name: person.name };
+		await tick();
+		document.getElementById('rename-person')?.focus();
+	}
+
+	async function stopRenaming(save: boolean) {
+		if (!renaming) return;
+		const { id, name } = renaming;
+		if (save && !name.trim()) return;
+		const person = people.find((other) => other.id === id);
+		if (save && person) person.name = name.trim();
+		renaming = undefined;
+		await tick();
+		document.getElementById(`rename-${id}`)?.focus();
 	}
 
 	function removePerson(id: string) {
@@ -212,6 +239,70 @@
 		item.assignedPersonIds = Object.keys(counts);
 	}
 
+	/** Why "Add item" can't be pressed yet. A price that can't be read says why under it already. */
+	const addItemReason = $derived.by(() => {
+		if (newPriceNote?.problem) return undefined;
+		const missing = missingForItem(newItem, newPrice);
+		if (missing === 'name-and-price') return SPLIT_BILL.missing.itemNameAndPrice;
+		if (missing === 'name') return SPLIT_BILL.missing.itemName;
+		return missing === 'price' ? SPLIT_BILL.missing.itemPrice : undefined;
+	});
+
+	// Changing an item in place keeps who had it. One at a time, with its own fields.
+	interface ItemEdit {
+		id: string;
+		name: string;
+		quantity: number | null;
+		priceText: string;
+		/** The price for one as the field first showed it: left alone, the price stays exact. */
+		shownPriceText: string;
+	}
+	let editing: ItemEdit | undefined = $state();
+	const editPriceRead = $derived(editing && readTypedAmount(editing.priceText));
+	const editPriceNote = $derived(
+		editing && amountNote(editPriceRead, SPLIT_BILL.amounts.negativePrice)
+	);
+	const editReason = $derived.by(() => {
+		if (!editing || editPriceNote?.problem) return undefined;
+		const priceUnchanged = editing.priceText === editing.shownPriceText;
+		const missing = missingForItem(editing.name, priceUnchanged ? 1 : amountOf(editPriceRead));
+		if (missing === 'name-and-price') return SPLIT_BILL.missing.itemNameAndPrice;
+		if (missing === 'name') return SPLIT_BILL.missing.itemName;
+		return missing === 'price' ? SPLIT_BILL.missing.itemPrice : undefined;
+	});
+	const canSaveEdit = $derived(Boolean(editing) && !editReason && !editPriceNote?.problem);
+
+	async function startEditing(item: BillItem) {
+		const quantity = item.quantity ?? 1;
+		const shown = formatAmount(item.price / quantity, currencyCode);
+		editing = { id: item.id, name: item.name, quantity, priceText: shown, shownPriceText: shown };
+		await tick();
+		document.getElementById('edit-item-name')?.focus();
+	}
+
+	async function stopEditing(save: boolean) {
+		if (!editing) return;
+		const edit = editing;
+		if (save) {
+			if (!canSaveEdit) return;
+			const index = items.findIndex((item) => item.id === edit.id);
+			if (index >= 0) {
+				const priceEach =
+					edit.priceText === edit.shownPriceText
+						? undefined
+						: (amountOf(editPriceRead) ?? undefined);
+				items[index] = changeItem($state.snapshot(items[index]), {
+					name: edit.name,
+					quantity: quantityOf(edit.quantity),
+					priceEach
+				});
+			}
+		}
+		editing = undefined;
+		await tick();
+		document.getElementById(`edit-${edit.id}`)?.focus();
+	}
+
 	function removeItem(id: string) {
 		items = items.filter((item) => item.id !== id);
 	}
@@ -230,6 +321,16 @@
 	}
 
 	/* ─── Charges and adjustments ─── */
+
+	function setTaxOnService(on: boolean) {
+		taxOnService = on;
+		taxOnServiceChosen = true;
+	}
+
+	function changeCurrency(code: string) {
+		if (!taxOnServiceChosen) taxOnService = taxOnServiceByDefault(code);
+		currencyCode = code;
+	}
 
 	// Prices that include tax nearly always include service too, and tax can't be charged on
 	// service once it's in the price: ticking one sets the others, so the odd mix needs a choice.
@@ -421,6 +522,7 @@
 			taxIncluded = false;
 			serviceIncluded = false;
 			taxOnService = scanned.taxOnService;
+			taxOnServiceChosen = true;
 		}
 		closeScan();
 	}
@@ -437,7 +539,10 @@
 		| { kind: 'copied-long' }
 		| { kind: 'copy-failed' }
 		| { kind: 'deleted' }
-		| { kind: 'delete-failed' };
+		| { kind: 'delete-failed' }
+		| { kind: 'text-copied' }
+		| { kind: 'text-copy-failed'; text: string }
+		| { kind: 'share-failed' };
 	let status: Status | undefined = $state();
 	let sharing = $state(false);
 	// The bill as it was last shared from here, so sharing it again unchanged reuses its link.
@@ -455,7 +560,11 @@
 		taxIncluded = state.taxIncluded ?? false;
 		serviceIncluded = state.serviceIncluded ?? false;
 		taxOnService = state.taxOnService ?? false;
+		// A bill that says something other than its currency's usual way has had it chosen.
+		taxOnServiceChosen = taxOnService !== taxOnServiceByDefault(state.currencyCode);
 		adjustments = state.adjustments ?? [];
+		renaming = undefined;
+		editing = undefined;
 	}
 
 	// A link opens the bill it holds, now or if the address changes later: a short link fetches
@@ -465,13 +574,27 @@
 	let openedFromLink = $state(false);
 	const opening = $derived(status?.kind === 'opening');
 
+	// The bill is kept as a draft in this tab as it changes (src/lib/draft.ts), once the page knows
+	// which bill it's showing: not while a link's bill is on its way, or after it failed to arrive,
+	// until something's put on the bill.
+	let settled = $state(false);
+	const billIsEmpty = $derived(
+		people.length === 0 && items.length === 0 && adjustments.length === 0
+	);
+
+	$effect(() => {
+		if (settled || !billIsEmpty) saveDraft(bill, location.hash);
+	});
+
 	async function readLink() {
 		const code = codeFromHash(location.hash);
 		if (!code) {
 			const shared = billFromHash(location.hash);
 			if (shared) open(shared);
+			settled = true;
 			return;
 		}
+		settled = false;
 		openedFromLink = true;
 		status = { kind: 'opening' };
 		const result = await openBill(code);
@@ -484,6 +607,21 @@
 		lastShared = { json: JSON.stringify(bill), code };
 		deletable = sharedHere(code);
 		status = { kind: 'opened', version: result.version };
+		settled = true;
+	}
+
+	/** A link in the address wins over the draft, unless the draft is that link's bill, changed. */
+	function openPage() {
+		const code = codeFromHash(location.hash);
+		const hasLink = code !== undefined || billFromHash(location.hash) !== undefined;
+		const draft = draftToOpen(loadDraft(), location.hash, hasLink);
+		if (!draft) {
+			void readLink();
+			return;
+		}
+		open(draft);
+		if (code) deletable = sharedHere(code);
+		settled = true;
 	}
 
 	/** When a shared bill was shared or last changed, the way the reader writes dates: "9 Nov, 14:05". */
@@ -495,8 +633,11 @@
 			minute: '2-digit'
 		}).format(time);
 
+	let canShare = $state(false);
+
 	onMount(() => {
-		void readLink();
+		canShare = typeof navigator.share === 'function';
+		openPage();
 		addEventListener('hashchange', readLink);
 		return () => removeEventListener('hashchange', readLink);
 	});
@@ -570,6 +711,46 @@
 		sharing = false;
 	}
 
+	/** The link to the bill as it is, if there already is one: the text doesn't make a new one. */
+	function currentLink(): string | undefined {
+		const json = JSON.stringify(bill);
+		const base = `${location.origin}${location.pathname}`;
+		if (lastShared?.json === json) return `${base}${SHORT_PREFIX}${lastShared.code}`;
+		const inAddress = billFromHash(location.hash);
+		return inAddress && JSON.stringify(inAddress) === json ? `${base}${location.hash}` : undefined;
+	}
+
+	async function copyText() {
+		status = undefined;
+		confirmingDelete = false;
+		const text = billAsText(bill, currentLink());
+		try {
+			await navigator.clipboard.writeText(text);
+			status = { kind: 'text-copied' };
+		} catch {
+			status = { kind: 'text-copy-failed', text };
+		}
+	}
+
+	async function shareText() {
+		status = undefined;
+		confirmingDelete = false;
+		try {
+			await navigator.share({ text: billAsText(bill, currentLink()) });
+		} catch (error) {
+			// Closing the share sheet without picking anything isn't a failure.
+			if (!(error instanceof DOMException && error.name === 'AbortError')) {
+				status = { kind: 'share-failed' };
+			}
+		}
+	}
+
+	function showSplit() {
+		const heading = document.getElementById('split-heading');
+		heading?.focus({ preventScroll: true });
+		heading?.scrollIntoView({ block: 'start' });
+	}
+
 	async function deleteShared() {
 		if (!deletable) return;
 		const shared = deletable;
@@ -598,14 +779,19 @@
 		currencyCode = DEFAULT_CURRENCY_CODE;
 		taxIncluded = false;
 		serviceIncluded = false;
-		taxOnService = false;
+		taxOnService = taxOnServiceByDefault(DEFAULT_CURRENCY_CODE);
+		taxOnServiceChosen = false;
 		adjustments = [];
 		choosing = [];
+		renaming = undefined;
+		editing = undefined;
 		history.replaceState(null, '', location.pathname);
 		confirmingClear = false;
 		deletable = undefined;
 		confirmingDelete = false;
 		status = undefined;
+		clearDraft();
+		settled = true;
 	}
 </script>
 
@@ -692,7 +878,7 @@
 				id="currency"
 				choices={currencyChoices}
 				value={currencyCode}
-				onchange={(value) => (currencyCode = value)}
+				onchange={changeCurrency}
 				placeholder="Type a currency or a country"
 			/>
 
@@ -821,7 +1007,7 @@
 											onclick={() =>
 												(reviewLines = reviewLines.filter((other) => other.id !== line.id))}
 											aria-label="Remove {line.name || `item ${index + 1}`}"
-											class="inline-flex size-8 items-center justify-center rounded-full text-muted hover:bg-surface hover:text-text"
+											class="inline-flex size-8 items-center justify-center rounded-full text-muted hover:bg-surface hover:text-text pointer-coarse:size-11"
 										>
 											<svg
 												class="size-4"
@@ -896,7 +1082,7 @@
 													(other) => other.id !== adjustment.id
 												))}
 											aria-label="Remove {adjustment.name}"
-											class="inline-flex size-8 items-center justify-center rounded-full text-muted hover:bg-surface hover:text-text"
+											class="inline-flex size-8 items-center justify-center rounded-full text-muted hover:bg-surface hover:text-text pointer-coarse:size-11"
 										>
 											<svg
 												class="size-4"
@@ -984,37 +1170,102 @@
 					<label for="person" class={label}>Name</label>
 					<input id="person" type="text" autocomplete="off" bind:value={newPerson} class={field} />
 				</div>
-				<button type="submit" disabled={!newPerson.trim()} class={`${smallButton} ${besideField}`}
-					>Add person</button
+				<button
+					type="submit"
+					disabled={!newPerson.trim()}
+					aria-describedby="add-person-reason"
+					class={`${smallButton} ${besideField}`}>Add person</button
 				>
 			</form>
+			<p id="add-person-reason" role="status" class="mt-2 text-sm text-muted empty:mt-0">
+				{#if !newPerson.trim()}{SPLIT_BILL.missing.personName}{/if}
+			</p>
 
 			{#if people.length}
 				<ul class="mt-4 flex flex-wrap gap-2">
 					{#each people as person (person.id)}
-						<li
-							class="flex items-center gap-1 rounded-full border border-control-border py-1 pr-1 pl-3 text-sm"
-						>
-							{person.name}
-							<button
-								type="button"
-								onclick={() => removePerson(person.id)}
-								aria-label="Remove {person.name}"
-								class="inline-flex size-7 items-center justify-center rounded-full text-muted hover:bg-bg hover:text-text"
-							>
-								<svg
-									class="size-3.5"
-									xmlns="http://www.w3.org/2000/svg"
-									fill="none"
-									viewBox="0 0 24 24"
-									stroke="currentColor"
-									stroke-width="2"
-									aria-hidden="true"
+						{#if renaming?.id === person.id}
+							<li class="basis-full">
+								<form
+									class="flex flex-wrap items-center gap-2"
+									onsubmit={(event) => {
+										event.preventDefault();
+										void stopRenaming(true);
+									}}
 								>
-									<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-								</svg>
-							</button>
-						</li>
+									<label for="rename-person" class="sr-only">New name for {person.name}</label>
+									<input
+										id="rename-person"
+										type="text"
+										autocomplete="off"
+										bind:value={renaming.name}
+										onkeydown={(event) => event.key === 'Escape' && stopRenaming(false)}
+										aria-describedby="rename-person-reason"
+										class="{field} min-w-0 flex-1 basis-40"
+									/>
+									<button type="submit" disabled={!renaming.name.trim()} class={smallButton}
+										>Save</button
+									>
+									<button type="button" onclick={() => stopRenaming(false)} class={smallButton}
+										>Cancel</button
+									>
+								</form>
+								<p
+									id="rename-person-reason"
+									role="status"
+									class="mt-2 text-sm text-muted empty:mt-0"
+								>
+									{#if !renaming.name.trim()}{SPLIT_BILL.missing.personName}{/if}
+								</p>
+							</li>
+						{:else}
+							<li
+								class="flex items-center rounded-full border border-control-border py-1 pr-1 pl-1 text-sm pointer-coarse:py-0"
+							>
+								<button
+									id="rename-{person.id}"
+									type="button"
+									onclick={() => startRenaming(person)}
+									aria-label="Rename {person.name}"
+									class="inline-flex min-h-7 items-center gap-1.5 rounded-full pr-1.5 pl-2 hover:bg-bg pointer-coarse:min-h-11"
+								>
+									{person.name}
+									<svg
+										class="size-3.5 shrink-0 text-muted"
+										xmlns="http://www.w3.org/2000/svg"
+										fill="none"
+										viewBox="0 0 24 24"
+										stroke="currentColor"
+										stroke-width="2"
+										aria-hidden="true"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											d="M16.9 3.6a2 2 0 0 1 2.9 2.9L8 18.3 4 19.5l1.2-4z"
+										/>
+									</svg>
+								</button>
+								<button
+									type="button"
+									onclick={() => removePerson(person.id)}
+									aria-label="Remove {person.name}"
+									class="inline-flex size-7 items-center justify-center rounded-full text-muted hover:bg-bg hover:text-text pointer-coarse:size-11"
+								>
+									<svg
+										class="size-3.5"
+										xmlns="http://www.w3.org/2000/svg"
+										fill="none"
+										viewBox="0 0 24 24"
+										stroke="currentColor"
+										stroke-width="2"
+										aria-hidden="true"
+									>
+										<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+									</svg>
+								</button>
+							</li>
+						{/if}
 					{/each}
 				</ul>
 			{:else}
@@ -1070,6 +1321,7 @@
 				<button
 					type="submit"
 					disabled={!canAddItem}
+					aria-describedby="add-item-reason price-note"
 					class="{smallButton} {besideField} col-span-2 sm:col-span-1">Add item</button
 				>
 			</form>
@@ -1080,39 +1332,153 @@
 			>
 				{#if newPriceNote}{newPriceNote.text}{/if}
 			</p>
+			<p id="add-item-reason" role="status" class="mt-2 text-sm text-muted empty:mt-0">
+				{#if addItemReason}{addItemReason}{/if}
+			</p>
 
 			{#if items.length}
 				<ul class="mt-5 space-y-3">
 					{#each items as item (item.id)}
 						<li class="rounded-xl border border-border bg-bg p-4">
-							<div class="flex items-start justify-between gap-3">
-								<div class="min-w-0">
-									<p class="font-medium break-words">{nameWithQuantity(item)}</p>
-									<p class="text-sm text-muted">
-										{money(item.price)}{(item.quantity ?? 1) > 1
-											? ` · ${money(item.price / (item.quantity ?? 1))} each`
-											: ''}
-									</p>
-								</div>
-								<button
-									type="button"
-									onclick={() => removeItem(item.id)}
-									aria-label="Remove {item.name}"
-									class="inline-flex size-8 shrink-0 items-center justify-center rounded-full text-muted hover:bg-surface hover:text-text"
+							{#if editing?.id === item.id}
+								<form
+									class="grid grid-cols-[6rem_1fr] gap-3"
+									aria-label="Change {item.name}"
+									onsubmit={(event) => {
+										event.preventDefault();
+										void stopEditing(true);
+									}}
 								>
-									<svg
-										class="size-4"
-										xmlns="http://www.w3.org/2000/svg"
-										fill="none"
-										viewBox="0 0 24 24"
-										stroke="currentColor"
-										stroke-width="2"
-										aria-hidden="true"
-									>
-										<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-									</svg>
-								</button>
-							</div>
+									<div class="col-span-2">
+										<label for="edit-item-name" class={label}>Item</label>
+										<input
+											id="edit-item-name"
+											type="text"
+											autocomplete="off"
+											bind:value={editing.name}
+											onkeydown={(event) => event.key === 'Escape' && stopEditing(false)}
+											class={field}
+										/>
+									</div>
+									<div>
+										<label for="edit-item-quantity" class={label}>Quantity</label>
+										<input
+											id="edit-item-quantity"
+											type="number"
+											inputmode="numeric"
+											min="1"
+											max={MAX_QUANTITY}
+											step="1"
+											bind:value={editing.quantity}
+											onkeydown={(event) => event.key === 'Escape' && stopEditing(false)}
+											class={field}
+										/>
+									</div>
+									<div>
+										<label for="edit-item-price" class={label}
+											>{quantityOf(editing.quantity) > 1 ? 'Price each' : 'Price'}</label
+										>
+										<input
+											id="edit-item-price"
+											type="text"
+											inputmode={amountKeypad}
+											autocomplete="off"
+											bind:value={editing.priceText}
+											onkeydown={(event) => event.key === 'Escape' && stopEditing(false)}
+											aria-describedby="edit-item-price-note"
+											aria-invalid={editPriceNote?.problem ? true : undefined}
+											class={field}
+										/>
+									</div>
+									<div class="col-span-2">
+										<p
+											id="edit-item-price-note"
+											role="status"
+											class="text-sm empty:hidden {editPriceNote?.problem
+												? 'font-medium'
+												: 'text-muted'}"
+										>
+											{#if editPriceNote}{editPriceNote.text}{/if}
+										</p>
+										<p
+											id="edit-item-reason"
+											role="status"
+											class="mt-1 text-sm text-muted empty:hidden"
+										>
+											{#if editReason}{editReason}{/if}
+										</p>
+									</div>
+									<div class="col-span-2 flex flex-wrap gap-3">
+										<button
+											type="submit"
+											disabled={!canSaveEdit}
+											aria-describedby="edit-item-reason edit-item-price-note"
+											class={smallButton}>Save</button
+										>
+										<button type="button" onclick={() => stopEditing(false)} class={smallButton}
+											>Cancel</button
+										>
+									</div>
+								</form>
+							{:else}
+								<div class="flex items-start justify-between gap-3">
+									<div class="min-w-0">
+										<p class="font-medium break-words">{nameWithQuantity(item)}</p>
+										<p class="text-sm text-muted">
+											{money(item.price)}{(item.quantity ?? 1) > 1
+												? ` · ${money(item.price / (item.quantity ?? 1))} each`
+												: ''}
+										</p>
+									</div>
+									<div class="flex shrink-0">
+										<button
+											id="edit-{item.id}"
+											type="button"
+											onclick={() => startEditing(item)}
+											aria-label="Change {item.name}"
+											class="inline-flex size-8 items-center justify-center rounded-full text-muted hover:bg-surface hover:text-text pointer-coarse:size-11"
+										>
+											<svg
+												class="size-4"
+												xmlns="http://www.w3.org/2000/svg"
+												fill="none"
+												viewBox="0 0 24 24"
+												stroke="currentColor"
+												stroke-width="2"
+												aria-hidden="true"
+											>
+												<path
+													stroke-linecap="round"
+													stroke-linejoin="round"
+													d="M16.9 3.6a2 2 0 0 1 2.9 2.9L8 18.3 4 19.5l1.2-4z"
+												/>
+											</svg>
+										</button>
+										<button
+											type="button"
+											onclick={() => removeItem(item.id)}
+											aria-label="Remove {item.name}"
+											class="inline-flex size-8 items-center justify-center rounded-full text-muted hover:bg-surface hover:text-text pointer-coarse:size-11"
+										>
+											<svg
+												class="size-4"
+												xmlns="http://www.w3.org/2000/svg"
+												fill="none"
+												viewBox="0 0 24 24"
+												stroke="currentColor"
+												stroke-width="2"
+												aria-hidden="true"
+											>
+												<path
+													stroke-linecap="round"
+													stroke-linejoin="round"
+													d="M6 18L18 6M6 6l12 12"
+												/>
+											</svg>
+										</button>
+									</div>
+								</div>
+							{/if}
 
 							{#if people.length && item.counts}
 								{@const quantity = item.quantity ?? 1}
@@ -1126,14 +1492,14 @@
 												<span
 													role="group"
 													aria-label={person.name}
-													class="inline-flex min-h-9 items-center gap-0.5 rounded-full border border-accent-edge bg-accent py-0.5 pr-0.5 pl-3.5 text-sm font-medium text-on-accent"
+													class="inline-flex min-h-9 items-center gap-0.5 rounded-full border border-accent-edge bg-accent py-0.5 pr-0.5 pl-3.5 text-sm font-medium text-on-accent pointer-coarse:py-0"
 												>
 													{person.name}
 													<button
 														type="button"
 														onclick={() => changeCount(item, person.id, -1)}
 														aria-label="One fewer for {person.name}"
-														class="ml-1.5 inline-flex size-8 items-center justify-center rounded-full text-base hover:bg-on-accent/10"
+														class="ml-1.5 inline-flex size-8 items-center justify-center rounded-full text-base hover:bg-on-accent/10 pointer-coarse:size-11"
 														>−</button
 													>
 													<span class="min-w-5 text-center tabular-nums">{count}</span>
@@ -1141,7 +1507,7 @@
 														type="button"
 														onclick={() => changeCount(item, person.id, 1)}
 														aria-label="One more for {person.name}"
-														class="inline-flex size-8 items-center justify-center rounded-full text-base hover:bg-on-accent/10"
+														class="inline-flex size-8 items-center justify-center rounded-full text-base hover:bg-on-accent/10 pointer-coarse:size-11"
 														>+</button
 													>
 												</span>
@@ -1149,7 +1515,7 @@
 												<button
 													type="button"
 													onclick={() => changeCount(item, person.id, 1)}
-													class="min-h-9 rounded-full border border-control-border px-3.5 text-sm transition-colors hover:bg-surface"
+													class="min-h-9 rounded-full border border-control-border px-3.5 text-sm transition-colors hover:bg-surface pointer-coarse:min-h-11"
 													>{person.name}</button
 												>
 											{/if}
@@ -1177,7 +1543,7 @@
 												type="button"
 												aria-pressed={had}
 												onclick={() => toggleTag(item, person.id)}
-												class="min-h-9 rounded-full border px-3.5 text-sm transition-colors {had
+												class="min-h-9 rounded-full border px-3.5 text-sm transition-colors pointer-coarse:min-h-11 {had
 													? 'border-accent-edge bg-accent font-medium text-on-accent'
 													: 'border-control-border hover:bg-surface'}"
 											>
@@ -1187,7 +1553,7 @@
 										<button
 											type="button"
 											onclick={() => toggleEveryone(item)}
-											class="min-h-9 rounded-full px-3 text-sm text-muted underline underline-offset-4 hover:text-text"
+											class="min-h-9 rounded-full px-3 text-sm text-muted underline underline-offset-4 hover:text-text pointer-coarse:min-h-11"
 										>
 											{everyoneHasIt(item) ? 'Nobody' : 'Everyone'}
 										</button>
@@ -1278,7 +1644,7 @@
 							type="checkbox"
 							checked={taxOnService && !taxIncluded}
 							disabled={taxIncluded}
-							onchange={(event) => (taxOnService = event.currentTarget.checked)}
+							onchange={(event) => setTaxOnService(event.currentTarget.checked)}
 							class={checkbox}
 						/>
 						Tax is charged on service too
@@ -1310,7 +1676,7 @@
 											type="button"
 											onclick={() => removeAdjustment(adjustment.id)}
 											aria-label="Remove {adjustment.name}"
-											class="inline-flex size-8 items-center justify-center rounded-full text-muted hover:bg-surface hover:text-text"
+											class="inline-flex size-8 items-center justify-center rounded-full text-muted hover:bg-surface hover:text-text pointer-coarse:size-11"
 										>
 											<svg
 												class="size-4"
@@ -1340,7 +1706,7 @@
 													type="button"
 													aria-pressed={isFor}
 													onclick={() => toggleAdjustmentTag(adjustment, person.id)}
-													class="min-h-9 rounded-full border px-3.5 transition-colors {isFor
+													class="min-h-9 rounded-full border px-3.5 transition-colors pointer-coarse:min-h-11 {isFor
 														? 'border-accent-edge bg-accent font-medium text-on-accent'
 														: 'border-control-border hover:bg-surface'}"
 												>
@@ -1478,7 +1844,7 @@
 		<!-- The split -->
 		{#if items.length}
 			<section class={card} aria-labelledby="split-heading">
-				<h2 id="split-heading" class={cardHeading}>The split</h2>
+				<h2 id="split-heading" tabindex="-1" class={cardHeading}>The split</h2>
 
 				<dl class="space-y-2 rounded-xl border border-border bg-bg p-4 text-sm">
 					<div class="flex justify-between gap-4">
@@ -1521,6 +1887,9 @@
 					<p class="mt-4 rounded-lg border-l-4 border-accent-edge bg-bg p-3 text-sm">
 						<strong>Not in anyone's share:</strong> items worth {money(totals.unassigned)} aren't tagged
 						or counted for anyone, so they're left out of the split below.
+						{#if totals.unshared !== totals.unassigned}{SPLIT_BILL.unsharedOfTotal(
+								money(totals.unshared)
+							)}{/if}
 					</p>
 				{/if}
 
@@ -1555,29 +1924,22 @@
 		<!-- Share and clear -->
 		{#if items.length || people.length}
 			<div>
-				<div class="flex flex-col gap-3 sm:flex-row">
-					<button type="button" onclick={copyLink} disabled={sharing} class="{primaryButton} flex-1"
-						>Copy a link to this bill</button
+				<div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+					<button
+						type="button"
+						onclick={copyLink}
+						disabled={sharing}
+						class="{primaryButton} sm:flex-[2_1_auto]">Copy a link to this bill</button
 					>
-					{#if confirmingClear}
-						<div
-							class="flex flex-1 items-center justify-center gap-2"
-							role="group"
-							aria-label="Clear everything?"
+					{#if items.length && people.length}
+						<button type="button" onclick={copyText} class="{secondaryButton} sm:flex-1"
+							>Copy as text</button
 						>
-							<span class="text-sm">Clear everything?</span>
-							<button type="button" onclick={clearEverything} class={smallButton}>Yes, clear</button
+						{#if canShare}
+							<button type="button" onclick={shareText} class="{secondaryButton} sm:flex-1"
+								>Share</button
 							>
-							<button type="button" onclick={() => (confirmingClear = false)} class={smallButton}
-								>Keep it</button
-							>
-						</div>
-					{:else}
-						<button
-							type="button"
-							onclick={() => (confirmingClear = true)}
-							class="{secondaryButton} flex-1">Clear everything</button
-						>
+						{/if}
 					{/if}
 				</div>
 				<p class="mt-3 min-h-5 text-sm" role="status">
@@ -1588,8 +1950,20 @@
 							.copiedLong}{:else if status?.kind === 'copy-failed'}{SPLIT_BILL.sharing
 							.copyFailed}{:else if status?.kind === 'deleted'}{SPLIT_BILL.sharing
 							.deleted}{:else if status?.kind === 'delete-failed'}{SPLIT_BILL.sharing
-							.deleteFailed}{/if}
+							.deleteFailed}{:else if status?.kind === 'text-copied'}{SPLIT_BILL.sharing
+							.textCopied}{:else if status?.kind === 'text-copy-failed'}{SPLIT_BILL.sharing
+							.textCopyFailed}{:else if status?.kind === 'share-failed'}{SPLIT_BILL.sharing
+							.shareFailed}{/if}
 				</p>
+				{#if status?.kind === 'text-copy-failed'}
+					<label for="split-text" class="sr-only">The split as text</label>
+					<textarea
+						id="split-text"
+						readonly
+						rows={status.text.split('\n').length}
+						value={status.text}
+						class="{field} mt-2"></textarea>
+				{/if}
 				{#if deletable}
 					{#if confirmingDelete}
 						<div class="mt-2 flex flex-wrap items-center gap-2" role="group" aria-label="Delete">
@@ -1608,8 +1982,59 @@
 						>
 					{/if}
 				{/if}
+				<div class="mt-4">
+					{#if confirmingClear}
+						<div
+							class="flex flex-wrap items-center gap-2"
+							role="group"
+							aria-label="Clear everything?"
+						>
+							<span class="text-sm">Clear everything?</span>
+							<button type="button" onclick={clearEverything} class={smallButton}>Yes, clear</button
+							>
+							<button type="button" onclick={() => (confirmingClear = false)} class={smallButton}
+								>Keep it</button
+							>
+						</div>
+					{:else}
+						<button
+							type="button"
+							onclick={() => (confirmingClear = true)}
+							class="{secondaryButton} w-full sm:w-auto">Clear everything</button
+						>
+					{/if}
+				</div>
 				<p class="mt-3 text-sm text-muted">{SPLIT_BILL.privacy}</p>
 			</div>
+		{/if}
+
+		<!-- On a phone the split is far below the tagging: the total and what isn't in anyone's share
+		     stay at the bottom while the bill is made. It's sticky, not fixed, so it takes its own
+		     space at the end of the page and never sits over the last of it. -->
+		{#if items.length}
+			<section
+				aria-label="The bill so far"
+				data-running-total
+				class="sticky bottom-0 z-10 -mx-5 border-t border-border bg-surface px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:hidden"
+			>
+				<div class="flex items-center justify-between gap-3">
+					<dl class="min-w-0 text-sm">
+						<div class="flex flex-wrap gap-x-1.5">
+							<dt>Total</dt>
+							<dd class="font-semibold">{money(totals.grandTotal)}</dd>
+						</div>
+						<div class="flex flex-wrap gap-x-1.5 {totals.unshared > 0 ? '' : 'text-muted'}">
+							<dt>Not in anyone's share yet</dt>
+							<dd class={totals.unshared > 0 ? 'font-semibold' : ''}>{money(totals.unshared)}</dd>
+						</div>
+					</dl>
+					<button
+						type="button"
+						onclick={showSplit}
+						class="{smallButton} shrink-0 pointer-coarse:min-h-11">See the split</button
+					>
+				</div>
+			</section>
 		{/if}
 	</div>
 </section>
