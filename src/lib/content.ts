@@ -65,8 +65,25 @@ export const SPLIT_BILL = {
 		copyFailed: "We couldn't copy it. The link is in your address bar now: copy it from there.",
 		deleted: "Deleted. The link doesn't open this bill anymore.",
 		deleteFailed: "We couldn't delete it. Check your connection, then try again.",
-		deleteQuestion: 'Delete the shared copy? The link stops working for everyone.'
+		deleteQuestion: 'Delete the shared copy? The link stops working for everyone.',
+		textCopied: 'Copied. Paste it in your group chat.',
+		textCopyFailed: "We couldn't copy it. Copy the text below instead.",
+		shareFailed: "We couldn't share it. Use Copy as text instead."
 	},
+	// The split as text, for a group chat.
+	text: {
+		total: 'Total',
+		unshared: "Not in anyone's share"
+	},
+	// Next to a button that can't be pressed yet: why.
+	missing: {
+		personName: 'Type a name first.',
+		itemNameAndPrice: 'Type the item and its price first.',
+		itemName: 'Type the item first.',
+		itemPrice: 'Type the price first.'
+	},
+	/** Under the untagged items' worth, when their part of the total differs from it. */
+	unsharedOfTotal: (amount: string) => `That's ${amount} of the total.`,
 	// What an amount field says under it as it's typed: what we read, or why we can't.
 	amounts: {
 		reads: (amount: string) => `= ${amount}`,

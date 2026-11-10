@@ -62,7 +62,9 @@ ships.**
   nothing loaded from another domain (fonts, images, scripts), and no network requests except
   sharing a bill, which someone starts themselves and which carries only what `src/lib/share.ts`
   encrypted with a key from the link's code. The only storage is the tokens of bills shared from
-  this device (`localStorage`, so whoever shared a bill can delete it). The
+  this device (`localStorage`, so whoever shared a bill can delete it), and Split Bill's draft of
+  the bill being made (`sessionStorage`, approved by the owner: on the device only, cleared when
+  the tab closes, never sent anywhere; `src/lib/draft.ts`). The
   Content-Security-Policy in `vite.config.ts` (a `<meta>` tag on each page, with script hashes
   SvelteKit adds) and `_headers` (`frame-ancestors`) keeps every connection on the site itself,
   and the footer's promise has to stay true. Don't add another connection, and don't loosen the
