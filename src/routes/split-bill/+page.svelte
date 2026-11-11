@@ -1125,13 +1125,13 @@
 									<Check class="mr-1 align-[-0.125em]" />{SPLIT_BILL.scanning.matches}
 								</p>
 							{:else}
-								<p class="rounded-lg border-l-4 border-accent-edge bg-bg p-3">
+								<p class="rounded-lg border border-accent-edge bg-bg p-3">
 									{SPLIT_BILL.scanning.itemsOff(money(Math.abs(reviewGap)), reviewGap < 0)}
 								</p>
 							{/if}
 						{/if}
 						{#if totalDiffers && reviewed?.total !== undefined && reviewTotal !== undefined}
-							<p class="rounded-lg border-l-4 border-accent-edge bg-bg p-3">
+							<p class="rounded-lg border border-accent-edge bg-bg p-3">
 								{SPLIT_BILL.scanning.totalOff(money(reviewTotal), money(reviewed.total))}
 							</p>
 						{/if}
@@ -1884,7 +1884,7 @@
 				</dl>
 
 				{#if totals.unassigned > 0}
-					<p class="mt-4 rounded-lg border-l-4 border-accent-edge bg-bg p-3 text-sm">
+					<p class="mt-4 rounded-lg border border-accent-edge bg-bg p-3 text-sm">
 						<strong>Not in anyone's share:</strong> items worth {money(totals.unassigned)} aren't tagged
 						or counted for anyone, so they're left out of the split below.
 						{#if totals.unshared !== totals.unassigned}{SPLIT_BILL.unsharedOfTotal(
