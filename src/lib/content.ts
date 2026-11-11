@@ -94,7 +94,9 @@ export const SPLIT_BILL = {
 	// The split as text, for a group chat.
 	text: {
 		total: 'Total',
-		unshared: "Not in anyone's share"
+		unshared: "Not in anyone's share",
+		to: (name: string) => `to ${name}`,
+		paidTheBill: '(paid the bill)'
 	},
 	// Next to a button that can't be pressed yet: why.
 	missing: {
@@ -103,6 +105,24 @@ export const SPLIT_BILL = {
 		itemName: 'Type the item first.',
 		itemPrice: 'Type the price first.'
 	},
+	// The split: what each person hands over, and to whom.
+	split: {
+		paidBy: 'Who paid?',
+		nobody: 'Not set',
+		paidTheBill: 'Paid the bill',
+		to: (name: string) => `To ${name}`,
+		ordered: (amount: string) => `Ordered ${amount}`,
+		roundUp: 'Round shares up',
+		noRounding: 'No',
+		roundTo: (amount: string) => `To ${amount}`,
+		extraToPayer: (extra: string, name: string) =>
+			`Rounding up adds ${extra}, which comes off ${name}'s part.`,
+		extraOnTop: (extra: string) => `Rounding up adds ${extra} on top of the total.`,
+		empty: 'Add the items from the bill, and the split shows here as you go.'
+	},
+	// After removing someone or something: one tap took it, one tap brings it back.
+	removed: (name: string) => `Removed ${name}.`,
+	undo: 'Undo',
 	/** Under the untagged items' worth, when their part of the total differs from it. */
 	unsharedOfTotal: (amount: string) => `That's ${amount} of the total.`,
 	// What an amount field says under it as it's typed: what we read, or why we can't.
@@ -140,7 +160,8 @@ export const SPLIT_BILL = {
 			`The items add up to ${difference} ${less ? 'less' : 'more'} than the receipt's subtotal. Check the marked prices.`,
 		totalOff: (ours: string, theirs: string) =>
 			`This comes to ${ours}, but the receipt says ${theirs}.`,
-		missingPrice: 'Fill in every price first.',
+		missingPrice: 'Fill in every price first, or remove the lines that have none.',
+		removeUnpriced: 'Remove the lines without a price',
 		add: 'Add to the bill'
 	},
 	// Shown only when someone asks, behind an ⓘ next to the setting they explain.

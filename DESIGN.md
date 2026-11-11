@@ -301,9 +301,13 @@ small uppercase heading or back link sits above it. Nothing here is set in upper
 - **Tool page:** a slim title band (title and introduction only, about 2rem of padding on phones),
   then the tool immediately. No closing panel, because the running total owns the bottom of the
   screen.
+- **Split bill from 1024 px:** two columns in the 72rem width. The bill on the left; the split on
+  the right in a 26rem column that stays in view (sticky, scrolling on its own when it's taller than
+  the screen) and updates as the bill changes. Before any item, the column holds one muted line
+  saying the split will show there. Below 1024 px it follows the bill in one column.
 - **Phones:** every control is at least 2.75rem tall on touch screens (`touch-target`), and
   2.25rem (`control-compact`) with a fine pointer. Split bill's running total is sticky (not
-  fixed) at the bottom below 640 px, padded for the home indicator, and the page scrolls focused
+  fixed) at the bottom below 1024 px, padded for the home indicator, and the page scrolls focused
   fields clear of it (`scroll-padding-bottom: 6rem`).
 - **Breakpoints:** Tailwind's defaults, 640, 768 and 1024 px, plus `pointer-coarse` for touch
   sizing.
@@ -313,6 +317,10 @@ with a title band and never closes with one: on a phone, the tool comes before t
 
 **The First Screen Rule.** On a phone, the first field of a tool is visible without scrolling.
 If a new element would push it down, it belongs lower on the page.
+
+**The Answer In Reach Rule.** Wherever a tool is being filled in, its answer is one glance or one
+tap away: the running total below 1024 px, the split's own column above. Someone opening a shared
+result lands on it, not on the form that made it.
 
 ## Elevation & Depth
 
@@ -431,7 +439,24 @@ opens the explanation as a gray-barred note on the next line, never as a floatin
 Split bill's bar at the bottom of a phone screen while items exist: the surface color, a hairline
 on top, the total in semibold, and what isn't in anyone's share yet (semibold when it isn't zero,
 muted when it is), with a small "See the split" button. Sticky, not fixed, so it never hides the
-end of the page. Hidden from 640 px.
+end of the page. Hidden from 1024 px, where the split has its own column.
+
+### The split (signature)
+
+What each person hands over comes first and largest: one row per person, the name in medium
+weight with a muted line under it ("To Budi", "Paid the bill", or what they ordered), and the
+amount in bold 1.5rem tabular figures, right-aligned. Then two radio groups, "Who paid?" and
+"Round shares up" (to two steps people actually hand over, Rp 500 and Rp 1.000 for rupiah), with
+a muted line saying what rounding added and whose part it came off. The breakdown (subtotal,
+charges, total) comes last, in an inset list: it's how the answer was reached, not the answer. A
+shared link opens with the split's heading focused, scrolled to on a phone.
+
+### Undo line
+
+After removing a person or an item, the card it was removed from says so in one line, "Removed
+Citra.", with an underlined "Undo" beside it at touch-target height. It stays until the bill
+changes some other way. There's no countdown and no confirmation dialog: one tap took it, one
+tap brings it back.
 
 ### Graphite panel and title band
 

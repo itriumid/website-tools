@@ -163,6 +163,7 @@ interface ItemDraft extends ScannedItem {
 // Text recognition sometimes joins two lines, reading the second line's quantity "1" as "i":
 // "1 French Fries i Green Juice" is two items.
 const JOINED = /\s[iIl|1]\s(?=[A-Z])/;
+const INLINE_MULTIPLIED = /^(.*\S)\s+(\d{1,3})\s*[x×]\s*(\S+)\s+(\S+)$/;
 
 /** The items in the lines between the header and the first total, in either layout. */
 function readItems(lines: Line[], places: number): ItemDraft[] {
@@ -171,6 +172,28 @@ function readItems(lines: Line[], places: number): ItemDraft[] {
 	let pendingName: string | undefined;
 
 	const add = (text: string, quantity: number, unsure = false) => {
+		// "Es Teh 2 x 8.000 16.000": a name, then its quantity, the price for one, and the price for
+		// all of them, on one line.
+		const inline = INLINE_MULTIPLIED.exec(text);
+		if (inline) {
+			const count = Number(inline[2]);
+			const unit = readAmount(inline[3], places);
+			const total = readAmount(inline[4], places);
+			if (unit && total && count > 0) {
+				items.push({
+					name: inline[1].trim(),
+					quantity: quantity > 1 ? quantity : count,
+					price: total.value,
+					unsure:
+						unsure ||
+						unit.misread ||
+						total.misread ||
+						Math.abs(unit.value * count - total.value) > 0,
+					priced: true
+				});
+				return;
+			}
+		}
 		const trailing = trailingAmount(text, places);
 		const name = (trailing?.rest ?? text).trim();
 		if (!name) return;
@@ -371,6 +394,13 @@ export function readReceipt(text: string, currencyCode: string): ScannedReceipt 
 	const after = lines.slice(end);
 	const layout =
 		drafts.filter((item) => item.priced).length * 2 >= drafts.length ? 'lines' : 'columns';
+	// One line per item: lines without a price above the first item that has one are the header,
+	// the place's name and address, not items. Only the header: a line further down without a
+	// price is kept, and marked, for the person to price or remove.
+	if (layout === 'lines') {
+		const first = drafts.findIndex((item) => item.priced);
+		if (first > 0) drafts.splice(0, first);
+	}
 
 	const labels = after.filter(
 		(line) => line.kind === 'label' && line.label !== 'ignore'
@@ -460,7 +490,13 @@ export function readReceipt(text: string, currencyCode: string): ScannedReceipt 
 
 	const items: ScannedItem[] = drafts
 		.filter((item) => item.price !== 0)
-		.map(({ name, quantity, price, unsure }) => ({ name, quantity, price, unsure }));
+		.map(({ name, quantity, price, unsure }) => ({
+			name,
+			quantity,
+			price,
+			// A line with no price can't be checked against anything.
+			unsure: unsure || price === undefined
+		}));
 	const itemsSum = items.reduce((total, item) => total + (item.price ?? 0), 0);
 	const discounts = adjustments
 		.filter((adjustment) => adjustment.kind === 'discount')
