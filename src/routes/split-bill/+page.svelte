@@ -2,6 +2,7 @@
 	import { onMount, tick } from 'svelte';
 	import { resolve } from '$app/paths';
 	import SearchableSelect, { type Choice } from '#lib/SearchableSelect.svelte';
+	import Check from '#lib/Check.svelte';
 	import Seo from '#lib/Seo.svelte';
 	import Toggletip from '#lib/Toggletip.svelte';
 	import {
@@ -1121,7 +1122,7 @@
 						{#if reviewGap !== undefined && reviewLines.length}
 							{#if Math.abs(reviewGap) < coin / 2}
 								<p>
-									<span aria-hidden="true" class="mr-1">✓</span>{SPLIT_BILL.scanning.matches}
+									<Check class="mr-1 align-[-0.125em]" />{SPLIT_BILL.scanning.matches}
 								</p>
 							{:else}
 								<p class="rounded-lg border-l-4 border-accent-edge bg-bg p-3">
@@ -1547,7 +1548,7 @@
 													? 'border-accent-edge bg-accent font-medium text-on-accent'
 													: 'border-control-border hover:bg-surface'}"
 											>
-												{#if had}<span aria-hidden="true">✓ </span>{/if}{person.name}
+												{#if had}<Check class="mr-1 align-[-0.125em]" />{/if}{person.name}
 											</button>
 										{/each}
 										<button
@@ -1710,8 +1711,7 @@
 														? 'border-accent-edge bg-accent font-medium text-on-accent'
 														: 'border-control-border hover:bg-surface'}"
 												>
-													{#if isFor}<span aria-hidden="true" class="mr-1">✓</span
-														>{/if}{person.name}
+													{#if isFor}<Check class="mr-1 align-[-0.125em]" />{/if}{person.name}
 												</button>
 											{/each}
 										</div>
