@@ -107,7 +107,7 @@ export const SPLIT_BILL = {
 		total: 'Total',
 		unshared: "Not in anyone's share",
 		to: (name: string) => `to ${name}`,
-		paidTheBill: '(paid the bill)'
+		getsBack: (amount: string) => `paid the bill, gets ${amount} back`
 	},
 	// Next to a button that can't be pressed yet: why.
 	missing: {
@@ -120,7 +120,7 @@ export const SPLIT_BILL = {
 	split: {
 		paidBy: 'Who paid?',
 		nobody: 'Not set',
-		paidTheBill: 'Paid the bill',
+		getsBack: (share: string) => `Paid the bill, gets this back. Their own share: ${share}.`,
 		to: (name: string) => `To ${name}`,
 		ordered: (amount: string) => `Ordered ${amount}`,
 		roundUp: 'Round shares up',
@@ -133,6 +133,13 @@ export const SPLIT_BILL = {
 	},
 	// After removing someone or something: one tap took it, one tap brings it back.
 	removed: (name: string) => `Removed ${name}.`,
+	removedPerson: (name: string, shared: number) =>
+		shared === 0
+			? `Removed ${name}.`
+			: `Removed ${name}. ${shared === 1 ? 'The item they shared is' : `The ${shared} items they shared are`} now split among the others.`,
+	// Behind it in the Charges card: what only some receipts say.
+	moreOnReceipt: 'More on the receipt',
+	moreOnReceiptHint: 'Prices with tax, discounts, rounding',
 	undo: 'Undo',
 	/** Under the untagged items' worth, when their part of the total differs from it. */
 	unsharedOfTotal: (amount: string) => `That's ${amount} of the total.`,
@@ -173,7 +180,9 @@ export const SPLIT_BILL = {
 			`This comes to ${ours}, but the receipt says ${theirs}.`,
 		missingPrice: 'Fill in every price first, or remove the lines that have none.',
 		removeUnpriced: 'Remove the lines without a price',
-		add: 'Add to the bill'
+		add: 'Add to the bill',
+		itemsStay: (count: number) =>
+			`The ${count === 1 ? 'item' : `${count} items`} already on the bill stay: these are added after them.`
 	},
 	// Shown only when someone asks, behind an ⓘ next to the setting they explain.
 	explanations: {
