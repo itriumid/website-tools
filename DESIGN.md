@@ -212,7 +212,7 @@ dark default and `prefers-color-scheme: light`. The binding rules are in the han
   a selected chip, an unsure receipt line, a note's edge, a card's hover edge, and the checked
   box or radio button. It reaches 3:1 on white.
 - **Rose text** (`rose-text`): pink as text on light backgrounds (`--accent-text`). Action lines
-  with the arrow, such as "Open Split bill", and the index's tagline. 4.8:1 on paper, 5.4:1 on
+  with the arrow, such as "Open Split bill". 4.8:1 on paper, 5.4:1 on
   white: AA with little headroom, so never put it on a pink tint.
 
 ### Neutral
@@ -267,7 +267,8 @@ in sentence case and plain, readable working text. It's served from the site its
   from 640 px.
 - **Card title** (`card-title`): a tool's name on the index card.
 - **Title** (`title`): a section card's heading inside a tool (`cardHeading`), semibold.
-- **Lead** (`lead`): the index introduction, muted, at most about 42rem wide.
+- **Lead** (`lead`): longer introductions, muted, at most about 42rem wide. The index's tagline
+  is larger (1.5rem, then 1.875rem from 640 px, medium weight) and in the text color.
 - **Body** (`body`): a tool's introduction and running prose.
 - **Control** (`control`): field text, chips, notes, hints and amounts, at 0.875rem. On touch
   screens field text rises to 1rem (`pointer-coarse:text-base`) so iOS Safari doesn't zoom the
@@ -294,7 +295,7 @@ small uppercase heading or back link sits above it. Nothing here is set in upper
 - **Gutters:** 1.25rem on phones (`gutter-phone`), 2rem from 640 px (`gutter-wide`).
 - **Rhythm:** a page ends with 5rem of space (`section`). Within a tool, cards stack 1.25 to 1.5rem
   apart, and fields and their hints step in 0.5rem to 1rem.
-- **Index:** the full opening slab (title, pink tagline, one muted line), then the tool cards in
+- **Index:** the opening slab (the title and a tagline naming the two jobs, in the text color), then the tool cards in
   one column, two from 640 px, Split bill first. Then a section heading and the cards for tools on
   sites of their own. A closing slab ends it: what stays on the device as a ruled list, and the
   source as a secondary button.
@@ -411,8 +412,9 @@ inset, and the floating-list shadow. The active option fills with the page color
   edge, 1.25rem of padding (1.5rem from 640 px), and a title-size heading 1rem above the content.
   They don't respond to hover, because they aren't links.
 - **Tool cards (on the index):** the whole card is the link. Its name is in card-title type, then
-  a muted summary, then a sample of what the tool makes (an inset list of shares or the link, hidden
-  from screen readers because the summary says it), then a pink action line with the drawn arrow,
+  a muted summary, then a sample of what the tool makes under a muted caption ("Each person's
+  share", "The link it makes"): an inset list of shares or the link, hidden from screen readers
+  with its caption because the summary says it, then a pink action line with the drawn arrow,
   hidden from screen readers too so each card's name isn't the same words. On hover the card lifts
   4 px, its edge turns pink (deep rose on light backgrounds), and the arrow moves 4 px right, all
   gated on `motion-safe`.
@@ -462,7 +464,7 @@ tap brings it back.
 
 The `.band` from itrium.id: the dark tokens in either theme (stepping up to graphite surface in
 dark mode), rounded 1.5rem, inset and wider than the content. On the index it's a full panel that
-holds the title, tagline and lead and nothing above the title, and a closing panel ends the page.
+holds the title and the tagline and nothing above the title, and a closing panel ends the page.
 The error page is one panel: its heading in display type and a ruled list of where to go instead,
 each row with the arrow. On a tool
 page it's a title band holding just the title and the introduction.
