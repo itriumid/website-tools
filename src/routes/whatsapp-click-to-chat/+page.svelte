@@ -25,6 +25,8 @@
 	let copiedTimer: ReturnType<typeof setTimeout> | undefined;
 
 	const result = $derived(chatTarget(countryCode, typed, message));
+	// The example number is Indonesian: shown only for Indonesia, where it's a real shape.
+	const placeholder = $derived(countryName === DEFAULT_COUNTRY_NAME ? '811 9710 096' : '');
 	const target = $derived(result && 'link' in result ? result : undefined);
 	const problem = $derived(result && 'problem' in result ? result.problem : undefined);
 
@@ -82,19 +84,48 @@
 				inputmode="tel"
 				autocomplete="off"
 				bind:value={typed}
-				placeholder="811 9710 096"
+				{placeholder}
 				aria-describedby="number-hint number-problem"
 				aria-invalid={problem ? true : undefined}
 				class={field}
 			/>
-			<p id="number-hint" class="mt-1.5 text-xs text-muted">
-				A number that starts with + or 00 already has its country, so we use it as it is.
-				{#if target}Chatting with <strong class="text-text">{target.display}</strong>.{/if}
-			</p>
+			<!-- Before anything's typed, how a number with its country is read; after, what's wrong. -->
+			{#if !typed.trim()}
+				<p id="number-hint" class="mt-1.5 text-sm text-muted">{WHATSAPP.hint}</p>
+			{/if}
 			<p id="number-problem" class="mt-1.5 text-sm font-medium empty:mt-0" role="status">
 				{#if problem}{WHATSAPP.problems[problem]}{/if}
 			</p>
 		</div>
+
+		<!-- The result: who the chat is with, as people read a number, then what was left out of
+		     what was typed, then the link itself, small. -->
+		<section aria-labelledby="result-heading">
+			<h2 id="result-heading" class={label}>{WHATSAPP.result.heading}</h2>
+			{#if target}
+				<div class="rounded-xl border border-border bg-bg p-4">
+					<p class="text-2xl font-bold tracking-tight break-words tabular-nums">
+						{target.display}
+					</p>
+					{#if message.trim()}
+						<p class="mt-2 text-sm break-words whitespace-pre-line text-muted">
+							{message.trim()}
+						</p>
+					{/if}
+					{#if target.lettersDropped || target.extension}
+						<ul class="mt-3 space-y-1 text-sm">
+							{#if target.lettersDropped}<li>{WHATSAPP.result.lettersDropped}</li>{/if}
+							{#if target.extension}<li>{WHATSAPP.result.extension(target.extension)}</li>{/if}
+						</ul>
+					{/if}
+					<p class="mt-3 font-mono text-xs break-all text-muted select-all">{target.link}</p>
+				</div>
+			{:else}
+				<p class="rounded-xl border border-dashed border-control-border p-4 text-sm text-muted">
+					{WHATSAPP.result.empty}
+				</p>
+			{/if}
+		</section>
 
 		<div>
 			<label for="message" class={label}>Message <span class="text-muted">(optional)</span></label>
@@ -106,20 +137,11 @@
 				class="{field} resize-y"></textarea>
 		</div>
 
-		<div>
-			<p class={label}>Your link</p>
-			{#if target}
-				<p class="rounded-lg border border-border bg-bg p-3 font-mono text-sm break-all select-all">
-					{target.link}
-				</p>
-			{:else}
-				<p class="rounded-lg border border-dashed border-control-border p-3 text-sm text-muted">
-					Enter a phone number and the link appears here.
-				</p>
-			{/if}
-		</div>
-
-		<div class="flex flex-col gap-3 sm:flex-row">
+		<!-- On a phone the actions stay at the bottom of the screen while the message is typed, so
+		     the link is always one tap away. -->
+		<div
+			class="sticky bottom-0 -mx-5 flex flex-col gap-3 border-t border-border bg-surface px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:static sm:mx-0 sm:flex-row sm:border-0 sm:p-0"
+		>
 			{#if target}
 				<a
 					href={target.link}
