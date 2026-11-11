@@ -665,6 +665,7 @@
 			const shared = billFromHash(location.hash);
 			if (shared) open(shared);
 			settled = true;
+			if (shared) await landOnSplit();
 			return;
 		}
 		settled = false;
@@ -681,6 +682,13 @@
 		deletable = sharedHere(code);
 		status = { kind: 'opened', version: result.version };
 		settled = true;
+		await landOnSplit();
+	}
+
+	/** Whoever opens a shared bill came for their share: take them to it. */
+	async function landOnSplit() {
+		await tick();
+		if (items.length) showSplit();
 	}
 
 	/** A link in the address wins over the draft, unless the draft is that link's bill, changed. */
@@ -930,14 +938,17 @@
 	</div>
 	{#if status?.kind === 'gone' || status?.kind === 'unreachable'}
 		<div class="mt-3 flex flex-wrap gap-3">
+			<!-- When the server can't be reached, trying again is the way forward: the bill is still
+			     there. Starting a new one is only for a bill that's gone. -->
 			{#if status.kind === 'unreachable'}
 				<button type="button" onclick={readLink} class={smallButton}
 					>{SPLIT_BILL.sharing.retry}</button
 				>
+			{:else}
+				<button type="button" onclick={clearEverything} class={smallButton}
+					>{SPLIT_BILL.sharing.startNew}</button
+				>
 			{/if}
-			<button type="button" onclick={clearEverything} class={smallButton}
-				>{SPLIT_BILL.sharing.startNew}</button
-			>
 		</div>
 	{/if}
 
