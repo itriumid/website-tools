@@ -105,6 +105,9 @@ export const SPLIT_BILL = {
 		itemName: 'Type the item first.',
 		itemPrice: 'Type the price first.'
 	},
+	// After removing someone or something: one tap took it, one tap brings it back.
+	removed: (name: string) => `Removed ${name}.`,
+	undo: 'Undo',
 	/** Under the untagged items' worth, when their part of the total differs from it. */
 	unsharedOfTotal: (amount: string) => `That's ${amount} of the total.`,
 	// What an amount field says under it as it's typed: what we read, or why we can't.

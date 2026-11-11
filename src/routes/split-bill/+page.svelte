@@ -172,7 +172,47 @@
 		document.getElementById(`rename-${id}`)?.focus();
 	}
 
+	/* ─── Undoing a removal ─── */
+	// Removing someone or something is one tap, so it can be undone: the bill as it was is kept
+	// until the bill changes some other way. There's no countdown: an undo that races the person
+	// is no undo for someone slower.
+	interface Removal {
+		/** Which card says so: the one the removal was made from. */
+		from: 'people' | 'items';
+		name: string;
+		before: Pick<BillState, 'people' | 'items'> & { adjustments: BillAdjustment[] };
+		/** The bill right after the removal: any other change makes the undo stale. */
+		after: string;
+	}
+	let removal: Removal | undefined = $state();
+
+	function undoable(from: Removal['from'], name: string, change: () => void) {
+		const before = {
+			people: $state.snapshot(people),
+			items: $state.snapshot(items),
+			adjustments: $state.snapshot(adjustments)
+		};
+		change();
+		removal = { from, name, before, after: JSON.stringify(bill) };
+	}
+
+	function undoRemoval() {
+		if (!removal) return;
+		people = removal.before.people;
+		items = removal.before.items;
+		adjustments = removal.before.adjustments;
+		removal = undefined;
+	}
+
+	$effect(() => {
+		if (removal && JSON.stringify(bill) !== removal.after) removal = undefined;
+	});
+
 	function removePerson(id: string) {
+		undoable('people', nameOf(id), () => forgetPerson(id));
+	}
+
+	function forgetPerson(id: string) {
 		people = people.filter((person) => person.id !== id);
 		for (const item of items) {
 			item.assignedPersonIds = item.assignedPersonIds.filter((tagged) => tagged !== id);
@@ -305,7 +345,10 @@
 	}
 
 	function removeItem(id: string) {
-		items = items.filter((item) => item.id !== id);
+		const name = items.find((item) => item.id === id)?.name ?? '';
+		undoable('items', name, () => {
+			items = items.filter((item) => item.id !== id);
+		});
 	}
 
 	function toggleTag(item: BillItem, personId: string) {
@@ -572,6 +615,7 @@
 		// A bill that says something other than its currency's usual way has had it chosen.
 		taxOnServiceChosen = taxOnService !== taxOnServiceByDefault(state.currencyCode);
 		adjustments = state.adjustments ?? [];
+		removal = undefined;
 		renaming = undefined;
 		editing = undefined;
 	}
@@ -791,6 +835,7 @@
 		taxOnService = taxOnServiceByDefault(DEFAULT_CURRENCY_CODE);
 		taxOnServiceChosen = false;
 		adjustments = [];
+		removal = undefined;
 		choosing = [];
 		renaming = undefined;
 		editing = undefined;
@@ -1280,6 +1325,20 @@
 			{:else}
 				<p class="mt-4 text-sm text-muted">Nobody yet. Add the people splitting this bill.</p>
 			{/if}
+			<!-- After a removal from this card: what went, and the way back. -->
+			<p
+				class="flex flex-wrap items-center gap-x-3 text-sm {removal?.from === 'people'
+					? 'mt-3 min-h-11'
+					: ''}"
+				role="status"
+			>
+				{#if removal?.from === 'people'}{SPLIT_BILL.removed(removal.name)}<button
+						type="button"
+						onclick={undoRemoval}
+						class="min-h-11 font-medium underline underline-offset-4 hover:text-accent-text"
+						>{SPLIT_BILL.undo}</button
+					>{/if}
+			</p>
 		</section>
 
 		<!-- Items -->
@@ -1591,6 +1650,20 @@
 			{:else}
 				<p class="mt-5 text-sm text-muted">No items yet. Add the items from the bill.</p>
 			{/if}
+			<!-- After a removal from this card: what went, and the way back. -->
+			<p
+				class="flex flex-wrap items-center gap-x-3 text-sm {removal?.from === 'items'
+					? 'mt-3 min-h-11'
+					: ''}"
+				role="status"
+			>
+				{#if removal?.from === 'items'}{SPLIT_BILL.removed(removal.name)}<button
+						type="button"
+						onclick={undoRemoval}
+						class="min-h-11 font-medium underline underline-offset-4 hover:text-accent-text"
+						>{SPLIT_BILL.undo}</button
+					>{/if}
+			</p>
 		</section>
 
 		<!-- Charges and adjustments, in the order a receipt prints them: after the items -->
