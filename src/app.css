@@ -20,6 +20,8 @@
 	/* The edge of a field or button, which people need to see to find it: 3:1 against both the page
 	   and a card. The softer --border is for dividing lines that nothing depends on. */
 	--control-border: #8a8a8a;
+	/* Pink as text: pastel on graphite, rose on light backgrounds (4.8:1 on the page, 5.4:1 on white). */
+	--accent-text: #febfca;
 	/* The focus outline: pink on graphite, graphite on light backgrounds, where pink is 1.5:1. */
 	--focus: #febfca;
 	color-scheme: dark;
@@ -34,6 +36,7 @@
 		/* #AAAAAA is too faint to read on white, so light mode uses a darker gray. */
 		--muted: #6b6b6b;
 		--accent-edge: #c46475;
+		--accent-text: #a84d60;
 		--control-border: #767676;
 		--focus: #2b2b2b;
 		color-scheme: light;
@@ -50,6 +53,7 @@
 	--color-accent: var(--accent);
 	--color-on-accent: var(--on-accent);
 	--color-accent-edge: var(--accent-edge);
+	--color-accent-text: var(--accent-text);
 	--color-control-border: var(--control-border);
 }
 
@@ -69,10 +73,27 @@ html {
 	color: var(--on-accent);
 }
 
-:focus-visible {
-	outline: 2px solid var(--focus);
-	outline-offset: 3px;
-	border-radius: 4px;
+@layer base {
+	/* In the base layer, so an element's own rounding (a pill, a card) wins over the 4px here: the
+	   outline follows the element's shape instead of squaring it off. */
+	:focus-visible {
+		outline: 2px solid var(--focus);
+		outline-offset: 3px;
+		border-radius: 4px;
+	}
+
+	/* No paragraph ends on a single stranded word, and headings balance their lines. */
+	p,
+	li,
+	dd {
+		text-wrap: pretty;
+	}
+
+	h1,
+	h2,
+	h3 {
+		text-wrap: balance;
+	}
 }
 
 /* Split bill's running total stays at the bottom of a phone's screen: whatever has focus scrolls
@@ -86,5 +107,33 @@ html {
 @media (prefers-reduced-motion: reduce) {
 	html {
 		scroll-behavior: auto;
+	}
+}
+
+/*
+ * A graphite band, the same as itrium.id's: the dark tokens, in either theme. In dark mode the page
+ * is graphite already, so the band steps up to the card gray to stay visible. Muted gray on the
+ * band's cards (#3D3D3D) is 4.6:1, and the control edge 3.1:1, so both still pass there.
+ */
+.band {
+	--bg: #2b2b2b;
+	--surface: #343434;
+	--border: #474747;
+	--text: #f2f2f2;
+	--muted: #aaaaaa;
+	--accent-edge: #febfca;
+	--accent-text: #febfca;
+	--control-border: #8a8a8a;
+	--focus: #febfca;
+	color-scheme: dark;
+	background-color: var(--bg);
+	color: var(--text);
+}
+
+@media (prefers-color-scheme: dark) {
+	.band {
+		--bg: #343434;
+		--surface: #3d3d3d;
+		--border: #4f4f4f;
 	}
 }

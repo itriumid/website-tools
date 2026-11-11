@@ -65,7 +65,7 @@
 	{id}
 	role="status"
 	class="block basis-full text-sm text-muted empty:hidden {open
-		? 'mt-1 rounded-lg border-l-4 border-control-border bg-bg p-3'
+		? 'mt-1 rounded-lg border border-border bg-bg p-3'
 		: ''}"
 	>{#if open}{text}{/if}</span
 >

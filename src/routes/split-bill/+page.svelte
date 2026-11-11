@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
-	import { resolve } from '$app/paths';
 	import SearchableSelect, { type Choice } from '#lib/SearchableSelect.svelte';
+	import Check from '#lib/Check.svelte';
 	import Seo from '#lib/Seo.svelte';
+	import TitleBand from '#lib/TitleBand.svelte';
 	import Toggletip from '#lib/Toggletip.svelte';
 	import {
 		readReceipt,
@@ -813,15 +814,10 @@
 	}}
 />
 
+<TitleBand title={SPLIT_BILL.name} introduction={SPLIT_BILL.introduction} width="max-w-2xl" />
+
 <section class="mx-auto max-w-2xl px-5 pt-6 pb-20 sm:px-8">
-	<p class="text-sm">
-		<a href={resolve('/')} class="text-muted underline underline-offset-4 hover:text-text"
-			>← All tools</a
-		>
-	</p>
-	<h1 class="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">{SPLIT_BILL.name}</h1>
-	<p class="mt-3 text-muted">{SPLIT_BILL.introduction}</p>
-	<div class="mt-4 {openedFromLink ? 'min-h-6' : 'empty:mt-0'}" role="status">
+	<div class="mb-6 {openedFromLink ? 'min-h-6' : 'empty:mb-0'}" role="status">
 		{#if status?.kind === 'opening'}
 			<p class="flex items-center gap-2">
 				<svg
@@ -866,7 +862,7 @@
 
 	<!-- While a shared bill opens, the empty one under it can't be changed: it's about to be replaced. -->
 	<div
-		class="mt-8 space-y-6 motion-safe:transition-opacity {opening ? 'opacity-50' : ''}"
+		class="space-y-6 motion-safe:transition-opacity {opening ? 'opacity-50' : ''}"
 		aria-busy={opening}
 		inert={opening}
 	>
@@ -1121,16 +1117,16 @@
 						{#if reviewGap !== undefined && reviewLines.length}
 							{#if Math.abs(reviewGap) < coin / 2}
 								<p>
-									<span aria-hidden="true" class="mr-1">✓</span>{SPLIT_BILL.scanning.matches}
+									<Check class="mr-1 align-[-0.125em]" />{SPLIT_BILL.scanning.matches}
 								</p>
 							{:else}
-								<p class="rounded-lg border-l-4 border-accent-edge bg-bg p-3">
+								<p class="rounded-lg border border-accent-edge bg-bg p-3">
 									{SPLIT_BILL.scanning.itemsOff(money(Math.abs(reviewGap)), reviewGap < 0)}
 								</p>
 							{/if}
 						{/if}
 						{#if totalDiffers && reviewed?.total !== undefined && reviewTotal !== undefined}
-							<p class="rounded-lg border-l-4 border-accent-edge bg-bg p-3">
+							<p class="rounded-lg border border-accent-edge bg-bg p-3">
 								{SPLIT_BILL.scanning.totalOff(money(reviewTotal), money(reviewed.total))}
 							</p>
 						{/if}
@@ -1547,7 +1543,7 @@
 													? 'border-accent-edge bg-accent font-medium text-on-accent'
 													: 'border-control-border hover:bg-surface'}"
 											>
-												{#if had}<span aria-hidden="true">✓ </span>{/if}{person.name}
+												{#if had}<Check class="mr-1 align-[-0.125em]" />{/if}{person.name}
 											</button>
 										{/each}
 										<button
@@ -1710,8 +1706,7 @@
 														? 'border-accent-edge bg-accent font-medium text-on-accent'
 														: 'border-control-border hover:bg-surface'}"
 												>
-													{#if isFor}<span aria-hidden="true" class="mr-1">✓</span
-														>{/if}{person.name}
+													{#if isFor}<Check class="mr-1 align-[-0.125em]" />{/if}{person.name}
 												</button>
 											{/each}
 										</div>
@@ -1884,7 +1879,7 @@
 				</dl>
 
 				{#if totals.unassigned > 0}
-					<p class="mt-4 rounded-lg border-l-4 border-accent-edge bg-bg p-3 text-sm">
+					<p class="mt-4 rounded-lg border border-accent-edge bg-bg p-3 text-sm">
 						<strong>Not in anyone's share:</strong> items worth {money(totals.unassigned)} aren't tagged
 						or counted for anyone, so they're left out of the split below.
 						{#if totals.unshared !== totals.unassigned}{SPLIT_BILL.unsharedOfTotal(

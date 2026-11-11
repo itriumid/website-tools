@@ -10,6 +10,7 @@
 </script>
 
 <script lang="ts">
+	import Check from '#lib/Check.svelte';
 	import { field } from '#lib/styles.js';
 
 	interface Props {
@@ -152,7 +153,7 @@
 				onmouseenter={() => (active = index)}
 			>
 				<span class={choice.value === value ? 'font-semibold' : ''}>
-					{#if choice.value === value}<span aria-hidden="true">✓ </span>{/if}{choice.label}
+					{#if choice.value === value}<Check class="mr-1 align-[-0.125em]" />{/if}{choice.label}
 				</span>
 				{#if choice.detail}
 					<span class="block text-xs {index === active ? 'text-on-accent' : 'text-muted'}">
