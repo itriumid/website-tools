@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
 	import SearchableSelect, { type Choice } from '#lib/SearchableSelect.svelte';
+	import Arrow from '#lib/Arrow.svelte';
 	import Check from '#lib/Check.svelte';
 	import Seo from '#lib/Seo.svelte';
 	import TitleBand from '#lib/TitleBand.svelte';
@@ -88,6 +89,8 @@
 	// Until someone sets tax on service themselves, it follows the currency's usual way.
 	let taxOnServiceChosen = $state(false);
 	let adjustments: BillAdjustment[] = $state([]);
+	// Whether "More on the receipt" is open: it opens itself when the bill has anything in it.
+	let moreOpen = $state(false);
 	// Who paid, and the step each share rounds up to: both optional, as in a link.
 	let paidBy: string | undefined = $state();
 	let roundTo: number | undefined = $state();
@@ -118,6 +121,16 @@
 	const steps = $derived(roundingSteps(currencyCode));
 	const money = (amount: number) => formatMoney(amount, currencyCode);
 	const nameOf = (id: string) => people.find((person) => person.id === id)?.name ?? '';
+	$effect(() => {
+		if (taxIncluded || serviceIncluded || taxOnServiceChosen || adjustments.length) moreOpen = true;
+	});
+	const anyTagged = $derived(
+		items.some(
+			(item) =>
+				item.assignedPersonIds.length > 0 ||
+				Object.values(item.counts ?? {}).some((count) => count > 0)
+		)
+	);
 	const payerName = $derived(bill.paidBy ? nameOf(bill.paidBy) : undefined);
 
 	/* ─── Amounts as typed ─── */
@@ -190,6 +203,8 @@
 		/** Which card says so: the one the removal was made from. */
 		from: 'people' | 'items';
 		name: string;
+		/** For a person: how many items they shared with others, now split among fewer. */
+		shared?: number;
 		before: Pick<BillState, 'people' | 'items'> & {
 			adjustments: BillAdjustment[];
 			paidBy?: string;
@@ -224,7 +239,13 @@
 	});
 
 	function removePerson(id: string) {
+		const shared = items.filter(
+			(item) =>
+				item.assignedPersonIds.includes(id) &&
+				item.assignedPersonIds.some((other) => other !== id && people.some((p) => p.id === other))
+		).length;
 		undoable('people', nameOf(id), () => forgetPerson(id));
+		if (removal) removal.shared = shared;
 	}
 
 	function forgetPerson(id: string) {
@@ -1200,6 +1221,9 @@
 						{/if}
 
 						<div class="mt-4 space-y-2 text-sm" role="status">
+							{#if reviewLines.length && items.length}
+								<p>{SPLIT_BILL.scanning.itemsStay(items.length)}</p>
+							{/if}
 							{#if reviewLines.length && scanned.servicePercentage !== undefined && scanned.taxPercentage !== undefined}
 								<p>
 									{SPLIT_BILL.scanning.rates(
@@ -1387,7 +1411,10 @@
 						: ''}"
 					role="status"
 				>
-					{#if removal?.from === 'people'}{SPLIT_BILL.removed(removal.name)}<button
+					{#if removal?.from === 'people'}{SPLIT_BILL.removedPerson(
+							removal.name,
+							removal.shared ?? 0
+						)}<button
 							type="button"
 							onclick={undoRemoval}
 							class="min-h-11 font-medium underline underline-offset-4 hover:text-accent-text"
@@ -1753,230 +1780,243 @@
 					</div>
 				</div>
 
-				<div class="mt-4 space-y-1">
-					<div class="flex flex-wrap items-center gap-x-1">
-						<label class={checkRow}>
-							<input
-								type="checkbox"
-								checked={taxIncluded}
-								onchange={(event) => setTaxIncluded(event.currentTarget.checked)}
-								class={checkbox}
-							/>
-							Prices include tax
-						</label>
-						<Toggletip
-							label="About prices that include tax"
-							text={SPLIT_BILL.explanations.taxIncluded}
-						/>
-					</div>
-					<div class="flex flex-wrap items-center gap-x-1">
-						<label class={checkRow}>
-							<input type="checkbox" bind:checked={serviceIncluded} class={checkbox} />
-							Prices include service
-						</label>
-					</div>
-					<div class="flex flex-wrap items-center gap-x-1">
-						<label class="{checkRow} {taxIncluded ? 'text-muted' : ''}">
-							<input
-								type="checkbox"
-								checked={taxOnService && !taxIncluded}
-								disabled={taxIncluded}
-								onchange={(event) => setTaxOnService(event.currentTarget.checked)}
-								class={checkbox}
-							/>
-							Tax is charged on service too
-						</label>
-						<Toggletip label="About tax on service" text={SPLIT_BILL.explanations.taxOnService} />
-					</div>
-				</div>
-
-				<div class="mt-6 border-t border-border pt-5">
-					<div class="flex flex-wrap items-center gap-x-1">
-						<h3 class="text-base font-semibold">Adjustments</h3>
-						<Toggletip label="About adjustments" text={SPLIT_BILL.explanations.adjustments} />
-					</div>
-
-					{#if adjustments.length}
-						<ul class="mt-3 divide-y divide-border rounded-xl border border-border bg-bg">
-							{#each adjustments as adjustment (adjustment.id)}
-								{@const forSome =
-									(adjustment.assignedPersonIds?.length ?? 0) > 0 ||
-									choosing.includes(adjustment.id)}
-								<li class="py-2 pr-2 pl-4 text-sm">
-									<div class="flex items-center justify-between gap-3">
-										<span class="min-w-0">
-											<span class="font-medium break-words">{adjustment.name}</span>
-											<span class="text-muted"> · {KIND_NAMES[adjustment.kind]}</span>
-										</span>
-										<span class="flex shrink-0 items-center gap-1">
-											{signed(adjustment.amount)}
-											<button
-												type="button"
-												onclick={() => removeAdjustment(adjustment.id)}
-												aria-label="Remove {adjustment.name}"
-												class="inline-flex size-8 items-center justify-center rounded-full text-muted hover:bg-surface hover:text-text pointer-coarse:size-11"
-											>
-												<svg
-													class="size-4"
-													xmlns="http://www.w3.org/2000/svg"
-													fill="none"
-													viewBox="0 0 24 24"
-													stroke="currentColor"
-													stroke-width="2"
-													aria-hidden="true"
-												>
-													<path
-														stroke-linecap="round"
-														stroke-linejoin="round"
-														d="M6 18L18 6M6 6l12 12"
-													/>
-												</svg>
-											</button>
-										</span>
-									</div>
-									{#if people.length && forSome}
-										<fieldset class="mt-2 mb-1">
-											<legend class="mb-2 text-muted">Who is it for?</legend>
-											<div class="flex flex-wrap gap-2">
-												{#each people as person (person.id)}
-													{@const isFor =
-														adjustment.assignedPersonIds?.includes(person.id) ?? false}
-													<button
-														type="button"
-														aria-pressed={isFor}
-														onclick={() => toggleAdjustmentTag(adjustment, person.id)}
-														class="min-h-9 rounded-full border px-3.5 transition-colors pointer-coarse:min-h-11 {isFor
-															? 'border-accent-edge bg-accent font-medium text-on-accent'
-															: 'border-control-border hover:bg-surface'}"
-													>
-														{#if isFor}<Check class="mr-1 align-[-0.125em]" />{/if}{person.name}
-													</button>
-												{/each}
-											</div>
-											{#if !adjustment.assignedPersonIds?.length}
-												<p class="mt-2 text-muted">Until you pick someone, it's everyone's.</p>
-											{/if}
-											<button
-												type="button"
-												onclick={() => shareWithEveryone(adjustment)}
-												class="mt-1 min-h-9 text-muted underline underline-offset-4 hover:text-text"
-												>Share with everyone again</button
-											>
-										</fieldset>
-									{:else if people.length}
-										<button
-											type="button"
-											onclick={() => (choosing = [...choosing, adjustment.id])}
-											class="min-h-9 text-muted underline underline-offset-4 hover:text-text"
-											>Just for some people</button
-										>
-									{/if}
-								</li>
-							{/each}
-						</ul>
-					{:else}
-						<p class="mt-2 text-sm text-muted">
-							None. Add a discount or rounding if the receipt has one.
-						</p>
-					{/if}
-
-					<!-- Radio buttons, not a <select>: WebKit's own styling for a select breaks this site's
-				     style-src policy, and three choices are quicker to tap than a menu anyway. -->
-					<form
-						class="mt-4 space-y-3"
-						onsubmit={(event) => {
-							event.preventDefault();
-							addAdjustment();
-						}}
+				<!-- Most bills need only the two rates. What else a receipt can say waits here, and opens
+				     itself when a scan or a link brings any of it. -->
+				<details bind:open={moreOpen} class="group mt-4">
+					<summary
+						class="grid min-h-11 cursor-pointer list-none grid-cols-[auto_1fr] items-center gap-x-2 py-1 text-sm font-medium [&::-webkit-details-marker]:hidden"
 					>
-						<fieldset>
-							<legend class={label}>Type</legend>
-							<div class="flex flex-wrap gap-x-5">
-								{#each ADJUSTMENT_KINDS as kind (kind)}
-									<label class={checkRow}>
-										<input
-											type="radio"
-											name="adjustment-kind"
-											value={kind}
-											bind:group={newAdjustmentKind}
-											class={checkbox}
-										/>
-										{KIND_NAMES[kind]}
-									</label>
+						<Arrow class="group-open:rotate-90 motion-safe:transition-transform" />
+						<span>{SPLIT_BILL.moreOnReceipt}</span>
+						<span class="col-start-2 font-normal text-muted">{SPLIT_BILL.moreOnReceiptHint}</span>
+					</summary>
+					<div class="mt-2 space-y-1">
+						<div class="flex flex-wrap items-center gap-x-1">
+							<label class={checkRow}>
+								<input
+									type="checkbox"
+									checked={taxIncluded}
+									onchange={(event) => setTaxIncluded(event.currentTarget.checked)}
+									class={checkbox}
+								/>
+								Prices include tax
+							</label>
+							<Toggletip
+								label="About prices that include tax"
+								text={SPLIT_BILL.explanations.taxIncluded}
+							/>
+						</div>
+						<div class="flex flex-wrap items-center gap-x-1">
+							<label class={checkRow}>
+								<input type="checkbox" bind:checked={serviceIncluded} class={checkbox} />
+								Prices include service
+							</label>
+						</div>
+						<div class="flex flex-wrap items-center gap-x-1">
+							<label class="{checkRow} {taxIncluded ? 'text-muted' : ''}">
+								<input
+									type="checkbox"
+									checked={taxOnService && !taxIncluded}
+									disabled={taxIncluded}
+									onchange={(event) => setTaxOnService(event.currentTarget.checked)}
+									class={checkbox}
+								/>
+								Tax is charged on service too
+							</label>
+							<Toggletip label="About tax on service" text={SPLIT_BILL.explanations.taxOnService} />
+						</div>
+					</div>
+
+					<div class="mt-6 border-t border-border pt-5">
+						<div class="flex flex-wrap items-center gap-x-1">
+							<h3 class="text-base font-semibold">Adjustments</h3>
+							<Toggletip label="About adjustments" text={SPLIT_BILL.explanations.adjustments} />
+						</div>
+
+						{#if adjustments.length}
+							<ul class="mt-3 divide-y divide-border rounded-xl border border-border bg-bg">
+								{#each adjustments as adjustment (adjustment.id)}
+									{@const forSome =
+										(adjustment.assignedPersonIds?.length ?? 0) > 0 ||
+										choosing.includes(adjustment.id)}
+									<li class="py-2 pr-2 pl-4 text-sm">
+										<div class="flex items-center justify-between gap-3">
+											<span class="min-w-0">
+												<span class="font-medium break-words">{adjustment.name}</span>
+												<span class="text-muted"> · {KIND_NAMES[adjustment.kind]}</span>
+											</span>
+											<span class="flex shrink-0 items-center gap-1">
+												{signed(adjustment.amount)}
+												<button
+													type="button"
+													onclick={() => removeAdjustment(adjustment.id)}
+													aria-label="Remove {adjustment.name}"
+													class="inline-flex size-8 items-center justify-center rounded-full text-muted hover:bg-surface hover:text-text pointer-coarse:size-11"
+												>
+													<svg
+														class="size-4"
+														xmlns="http://www.w3.org/2000/svg"
+														fill="none"
+														viewBox="0 0 24 24"
+														stroke="currentColor"
+														stroke-width="2"
+														aria-hidden="true"
+													>
+														<path
+															stroke-linecap="round"
+															stroke-linejoin="round"
+															d="M6 18L18 6M6 6l12 12"
+														/>
+													</svg>
+												</button>
+											</span>
+										</div>
+										{#if people.length && forSome}
+											<fieldset class="mt-2 mb-1">
+												<legend class="mb-2 text-muted">Who is it for?</legend>
+												<div class="flex flex-wrap gap-2">
+													{#each people as person (person.id)}
+														{@const isFor =
+															adjustment.assignedPersonIds?.includes(person.id) ?? false}
+														<button
+															type="button"
+															aria-pressed={isFor}
+															onclick={() => toggleAdjustmentTag(adjustment, person.id)}
+															class="min-h-9 rounded-full border px-3.5 transition-colors pointer-coarse:min-h-11 {isFor
+																? 'border-accent-edge bg-accent font-medium text-on-accent'
+																: 'border-control-border hover:bg-surface'}"
+														>
+															{#if isFor}<Check class="mr-1 align-[-0.125em]" />{/if}{person.name}
+														</button>
+													{/each}
+												</div>
+												{#if !adjustment.assignedPersonIds?.length}
+													<p class="mt-2 text-muted">Until you pick someone, it's everyone's.</p>
+												{/if}
+												<button
+													type="button"
+													onclick={() => shareWithEveryone(adjustment)}
+													class="mt-1 min-h-9 text-muted underline underline-offset-4 hover:text-text"
+													>Share with everyone again</button
+												>
+											</fieldset>
+										{:else if people.length}
+											<button
+												type="button"
+												onclick={() => (choosing = [...choosing, adjustment.id])}
+												class="min-h-9 text-muted underline underline-offset-4 hover:text-text"
+												>Just for some people</button
+											>
+										{/if}
+									</li>
 								{/each}
-							</div>
-						</fieldset>
-						<div>
-							<div class="grid gap-3 sm:grid-cols-[1fr_9rem]">
-								<div>
-									<label for="adjustment-name" class={label}>Name on the receipt</label>
-									<input
-										id="adjustment-name"
-										type="text"
-										autocomplete="off"
-										placeholder={KIND_NAMES[newAdjustmentKind]}
-										bind:value={newAdjustmentName}
-										class={field}
-									/>
-								</div>
-								<div>
-									<label for="adjustment-amount" class={label}>Amount</label>
-									<input
-										id="adjustment-amount"
-										type="text"
-										inputmode={amountKeypad}
-										autocomplete="off"
-										bind:value={newAdjustmentText}
-										aria-describedby="adjustment-amount-note"
-										aria-invalid={newAdjustmentNote?.problem ? true : undefined}
-										class={field}
-									/>
-								</div>
-							</div>
-							<p
-								id="adjustment-amount-note"
-								role="status"
-								class="mt-2 text-sm empty:mt-0 {newAdjustmentNote?.problem
-									? 'font-medium'
-									: 'text-muted'}"
-							>
-								{#if newAdjustmentNote}{newAdjustmentNote.text}{/if}
+							</ul>
+						{:else}
+							<p class="mt-2 text-sm text-muted">
+								None. Add a discount or rounding if the receipt has one.
 							</p>
-						</div>
-						<div class="flex flex-wrap items-center justify-between gap-3">
-							{#if newAdjustmentKind === 'discount'}
-								<p class="text-sm text-muted">Comes off the bill.</p>
-							{:else}
-								<fieldset class="flex flex-wrap items-center gap-x-5">
-									<legend class="sr-only">Does it take off or add?</legend>
-									<label class={checkRow}>
+						{/if}
+
+						<!-- Radio buttons, not a <select>: WebKit's own styling for a select breaks this site's
+				     style-src policy, and three choices are quicker to tap than a menu anyway. -->
+						<form
+							class="mt-4 space-y-3"
+							onsubmit={(event) => {
+								event.preventDefault();
+								addAdjustment();
+							}}
+						>
+							<fieldset>
+								<legend class={label}>Type</legend>
+								<div class="flex flex-wrap gap-x-5">
+									{#each ADJUSTMENT_KINDS as kind (kind)}
+										<label class={checkRow}>
+											<input
+												type="radio"
+												name="adjustment-kind"
+												value={kind}
+												bind:group={newAdjustmentKind}
+												class={checkbox}
+											/>
+											{KIND_NAMES[kind]}
+										</label>
+									{/each}
+								</div>
+							</fieldset>
+							<div>
+								<div class="grid gap-3 sm:grid-cols-[1fr_9rem]">
+									<div>
+										<label for="adjustment-name" class={label}>Name on the receipt</label>
 										<input
-											type="radio"
-											name="adjustment-direction"
-											checked={!newAdjustmentAdds}
-											onchange={() => (newAdjustmentAdds = false)}
-											class={checkbox}
+											id="adjustment-name"
+											type="text"
+											autocomplete="off"
+											placeholder={KIND_NAMES[newAdjustmentKind]}
+											bind:value={newAdjustmentName}
+											class={field}
 										/>
-										Takes off
-									</label>
-									<label class={checkRow}>
+									</div>
+									<div>
+										<label for="adjustment-amount" class={label}>Amount</label>
 										<input
-											type="radio"
-											name="adjustment-direction"
-											checked={newAdjustmentAdds}
-											onchange={() => (newAdjustmentAdds = true)}
-											class={checkbox}
+											id="adjustment-amount"
+											type="text"
+											inputmode={amountKeypad}
+											autocomplete="off"
+											bind:value={newAdjustmentText}
+											aria-describedby="adjustment-amount-note"
+											aria-invalid={newAdjustmentNote?.problem ? true : undefined}
+											class={field}
 										/>
-										Adds
-									</label>
-								</fieldset>
-							{/if}
-							<button type="submit" disabled={!canAddAdjustment} class="{smallButton} {besideField}"
-								>Add adjustment</button
-							>
-						</div>
-					</form>
-				</div>
+									</div>
+								</div>
+								<p
+									id="adjustment-amount-note"
+									role="status"
+									class="mt-2 text-sm empty:mt-0 {newAdjustmentNote?.problem
+										? 'font-medium'
+										: 'text-muted'}"
+								>
+									{#if newAdjustmentNote}{newAdjustmentNote.text}{/if}
+								</p>
+							</div>
+							<div class="flex flex-wrap items-center justify-between gap-3">
+								{#if newAdjustmentKind === 'discount'}
+									<p class="text-sm text-muted">Comes off the bill.</p>
+								{:else}
+									<fieldset class="flex flex-wrap items-center gap-x-5">
+										<legend class="sr-only">Does it take off or add?</legend>
+										<label class={checkRow}>
+											<input
+												type="radio"
+												name="adjustment-direction"
+												checked={!newAdjustmentAdds}
+												onchange={() => (newAdjustmentAdds = false)}
+												class={checkbox}
+											/>
+											Takes off
+										</label>
+										<label class={checkRow}>
+											<input
+												type="radio"
+												name="adjustment-direction"
+												checked={newAdjustmentAdds}
+												onchange={() => (newAdjustmentAdds = true)}
+												class={checkbox}
+											/>
+											Adds
+										</label>
+									</fieldset>
+								{/if}
+								<button
+									type="submit"
+									disabled={!canAddAdjustment}
+									class="{smallButton} {besideField}">Add adjustment</button
+								>
+							</div>
+						</form>
+					</div>
+				</details>
 			</section>
 		</div>
 
@@ -1997,7 +2037,9 @@
 									<div class="min-w-0">
 										<p class="font-medium break-words">{nameOf(settlement.personId)}</p>
 										{#if settlement.paidTheBill}
-											<p class="text-sm text-muted">{SPLIT_BILL.split.paidTheBill}</p>
+											<p class="text-sm text-muted">
+												{SPLIT_BILL.split.getsBack(money(settlement.amount))}
+											</p>
 										{:else if payerName}
 											<p class="text-sm text-muted">{SPLIT_BILL.split.to(payerName)}</p>
 										{:else if share.base !== share.total}
@@ -2006,8 +2048,9 @@
 											</p>
 										{/if}
 									</div>
+									<!-- Whoever paid hands nothing over: their big number is what comes back. -->
 									<p class="shrink-0 text-2xl font-bold tracking-tight tabular-nums">
-										{money(settlement.amount)}
+										{money(settlement.paidTheBill ? settledUp.back : settlement.amount)}
 									</p>
 								</li>
 							{/each}
@@ -2078,7 +2121,13 @@
 					{/if}
 
 					{#if totals.unassigned > 0}
-						<p class="mt-4 rounded-lg border border-accent-edge bg-bg p-3 text-sm">
+						<!-- Pink once tagging's begun and something's still left out; gray before that, when
+						     nothing's tagged yet only because nobody's started. -->
+						<p
+							class="mt-4 rounded-lg border bg-bg p-3 text-sm {anyTagged
+								? 'border-accent-edge'
+								: 'border-border text-muted'}"
+						>
 							<strong>Not in anyone's share:</strong> items worth {money(totals.unassigned)} aren't tagged
 							or counted for anyone, so they're left out of the shares.
 							{#if totals.unshared !== totals.unassigned}{SPLIT_BILL.unsharedOfTotal(
