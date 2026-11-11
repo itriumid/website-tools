@@ -96,7 +96,7 @@ export const SPLIT_BILL = {
 		total: 'Total',
 		unshared: "Not in anyone's share",
 		to: (name: string) => `to ${name}`,
-		paidTheBill: '(paid the bill)'
+		getsBack: (amount: string) => `paid the bill, gets ${amount} back`
 	},
 	// Next to a button that can't be pressed yet: why.
 	missing: {

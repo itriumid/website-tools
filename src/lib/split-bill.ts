@@ -662,6 +662,8 @@ export interface SettledBill {
 	settlements: Settlement[];
 	/** What rounding up added to the shares, together: it comes off the payer's part. */
 	extra: number;
+	/** What comes back to whoever paid: everyone else's amounts, together. Zero with no payer. */
+	back: number;
 }
 
 /**
@@ -691,13 +693,17 @@ export function settleBill(state: BillState, totals = calculateBill(state)): Set
 		const paying = settlements.find((settlement) => settlement.paidTheBill)!;
 		paying.own = Math.max(0, paying.own - extra);
 	}
+	const back = payer
+		? settlements.filter((s) => !s.paidTheBill).reduce((sum, s) => sum + s.own, 0)
+		: 0;
 	return {
 		settlements: settlements.map(({ personId, own, paidTheBill }) => ({
 			personId,
 			amount: own / coins,
 			paidTheBill
 		})),
-		extra: extra / coins
+		extra: extra / coins,
+		back: back / coins
 	};
 }
 
@@ -751,14 +757,14 @@ export function missingForItem(
  */
 export function billAsText(state: BillState, link?: string): string {
 	const totals = calculateBill(state);
-	const { settlements } = settleBill(state, totals);
+	const { settlements, back } = settleBill(state, totals);
 	const money = (amount: number) => formatMoney(amount, state.currencyCode);
 	const payer = state.people.find((person) => person.id === state.paidBy);
 	const lines = state.people.map((person, index) => {
 		const { amount, paidTheBill } = settlements[index];
+		if (paidTheBill) return `${person.name}: ${SPLIT_BILL.text.getsBack(money(back))}`;
 		const line = `${person.name}: ${money(amount)}`;
-		if (!payer) return line;
-		return `${line} ${paidTheBill ? SPLIT_BILL.text.paidTheBill : SPLIT_BILL.text.to(payer.name)}`;
+		return payer ? `${line} ${SPLIT_BILL.text.to(payer.name)}` : line;
 	});
 	if (totals.unshared > 0) lines.push(`${SPLIT_BILL.text.unshared}: ${money(totals.unshared)}`);
 	lines.push(`${SPLIT_BILL.text.total}: ${money(totals.grandTotal)}`);
