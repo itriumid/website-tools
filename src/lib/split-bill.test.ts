@@ -1041,6 +1041,8 @@ describe('settling up: who paid, and rounding', () => {
 			{ personId: 'c', amount: 10500, paidTheBill: false }
 		]);
 		expect(settled.extra).toBe(666);
+		// What comes back to Ayu: everyone else's amounts.
+		expect(settled.back).toBe(44000);
 		// Still the whole bill, to the rupiah.
 		expect(amounts(state).reduce((sum, amount) => sum + amount, 0)).toBe(
 			calculateBill(state).grandTotal
@@ -1053,6 +1055,7 @@ describe('settling up: who paid, and rounding', () => {
 			100000, 34000, 11000
 		]);
 		expect(settled.extra).toBe(1666);
+		expect(settled.back).toBe(0);
 	});
 
 	it('leaves a share of nothing at nothing', () => {
@@ -1087,7 +1090,7 @@ describe('settling up: who paid, and rounding', () => {
 
 	it('says who to pay in the text, when someone paid', () => {
 		expect(billAsText(three({ paidBy: 'a', roundTo: 500 }))).toBe(
-			'Ayu: Rp 99.334 (paid the bill)\nBudi: Rp 33.500 to Ayu\nCitra: Rp 10.500 to Ayu\nTotal: Rp 143.334'
+			'Ayu: paid the bill, gets Rp 44.000 back\nBudi: Rp 33.500 to Ayu\nCitra: Rp 10.500 to Ayu\nTotal: Rp 143.334'
 		);
 	});
 });
