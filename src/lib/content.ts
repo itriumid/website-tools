@@ -105,6 +105,21 @@ export const SPLIT_BILL = {
 		itemName: 'Type the item first.',
 		itemPrice: 'Type the price first.'
 	},
+	// The split: what each person hands over, and to whom.
+	split: {
+		paidBy: 'Who paid?',
+		nobody: 'Not set',
+		paidTheBill: 'Paid the bill',
+		to: (name: string) => `To ${name}`,
+		ordered: (amount: string) => `Ordered ${amount}`,
+		roundUp: 'Round shares up',
+		noRounding: 'No',
+		roundTo: (amount: string) => `To ${amount}`,
+		extraToPayer: (extra: string, name: string) =>
+			`Rounding up adds ${extra}, which comes off ${name}'s part.`,
+		extraOnTop: (extra: string) => `Rounding up adds ${extra} on top of the total.`,
+		empty: 'Add the items from the bill, and the split shows here as you go.'
+	},
 	// After removing someone or something: one tap took it, one tap brings it back.
 	removed: (name: string) => `Removed ${name}.`,
 	undo: 'Undo',

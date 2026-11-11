@@ -28,6 +28,8 @@
 		formatMoney,
 		missingForItem,
 		parseAmount,
+		roundingSteps,
+		settleBill,
 		taxOnServiceByDefault,
 		ADJUSTMENT_KINDS,
 		type AdjustmentKind,
@@ -86,6 +88,9 @@
 	// Until someone sets tax on service themselves, it follows the currency's usual way.
 	let taxOnServiceChosen = $state(false);
 	let adjustments: BillAdjustment[] = $state([]);
+	// Who paid, and the step each share rounds up to: both optional, as in a link.
+	let paidBy: string | undefined = $state();
+	let roundTo: number | undefined = $state();
 
 	const percentage = (value: number | null) =>
 		typeof value === 'number' && Number.isFinite(value) ? Math.min(100, Math.max(0, value)) : 0;
@@ -104,11 +109,16 @@
 		if (serviceIncluded) state.serviceIncluded = true;
 		if (taxOnService && !taxIncluded) state.taxOnService = true;
 		if (adjustments.length) state.adjustments = $state.snapshot(adjustments);
+		if (paidBy && people.some((person) => person.id === paidBy)) state.paidBy = paidBy;
+		if (roundTo) state.roundTo = roundTo;
 		return state;
 	});
 	const totals = $derived(calculateBill(bill));
+	const settledUp = $derived(settleBill(bill, totals));
+	const steps = $derived(roundingSteps(currencyCode));
 	const money = (amount: number) => formatMoney(amount, currencyCode);
 	const nameOf = (id: string) => people.find((person) => person.id === id)?.name ?? '';
+	const payerName = $derived(bill.paidBy ? nameOf(bill.paidBy) : undefined);
 
 	/* ─── Amounts as typed ─── */
 	// Amount fields are text, not numbers: "45.000" is forty-five thousand rupiah, which a number
@@ -180,7 +190,10 @@
 		/** Which card says so: the one the removal was made from. */
 		from: 'people' | 'items';
 		name: string;
-		before: Pick<BillState, 'people' | 'items'> & { adjustments: BillAdjustment[] };
+		before: Pick<BillState, 'people' | 'items'> & {
+			adjustments: BillAdjustment[];
+			paidBy?: string;
+		};
 		/** The bill right after the removal: any other change makes the undo stale. */
 		after: string;
 	}
@@ -190,7 +203,8 @@
 		const before = {
 			people: $state.snapshot(people),
 			items: $state.snapshot(items),
-			adjustments: $state.snapshot(adjustments)
+			adjustments: $state.snapshot(adjustments),
+			paidBy
 		};
 		change();
 		removal = { from, name, before, after: JSON.stringify(bill) };
@@ -201,6 +215,7 @@
 		people = removal.before.people;
 		items = removal.before.items;
 		adjustments = removal.before.adjustments;
+		paidBy = removal.before.paidBy;
 		removal = undefined;
 	}
 
@@ -213,6 +228,7 @@
 	}
 
 	function forgetPerson(id: string) {
+		if (paidBy === id) paidBy = undefined;
 		people = people.filter((person) => person.id !== id);
 		for (const item of items) {
 			item.assignedPersonIds = item.assignedPersonIds.filter((tagged) => tagged !== id);
@@ -373,6 +389,8 @@
 
 	function changeCurrency(code: string) {
 		if (!taxOnServiceChosen) taxOnService = taxOnServiceByDefault(code);
+		// A step in one currency means nothing in another: Rp 500 isn't $500.
+		if (code !== currencyCode) roundTo = undefined;
 		currencyCode = code;
 	}
 
@@ -615,6 +633,8 @@
 		// A bill that says something other than its currency's usual way has had it chosen.
 		taxOnServiceChosen = taxOnService !== taxOnServiceByDefault(state.currencyCode);
 		adjustments = state.adjustments ?? [];
+		paidBy = state.paidBy;
+		roundTo = state.roundTo;
 		removal = undefined;
 		renaming = undefined;
 		editing = undefined;
@@ -801,7 +821,9 @@
 	function showSplit() {
 		const heading = document.getElementById('split-heading');
 		heading?.focus({ preventScroll: true });
-		heading?.scrollIntoView({ block: 'start' });
+		// From 1024px the split has a column of its own and is already in view: scrolling would only
+		// push the top of its card out of that column.
+		if (!matchMedia('(min-width: 64rem)').matches) heading?.scrollIntoView({ block: 'start' });
 	}
 
 	async function deleteShared() {
@@ -835,6 +857,8 @@
 		taxOnService = taxOnServiceByDefault(DEFAULT_CURRENCY_CODE);
 		taxOnServiceChosen = false;
 		adjustments = [];
+		paidBy = undefined;
+		roundTo = undefined;
 		removal = undefined;
 		choosing = [];
 		renaming = undefined;
@@ -867,9 +891,13 @@
 	}}
 />
 
-<TitleBand title={SPLIT_BILL.name} introduction={SPLIT_BILL.introduction} width="max-w-2xl" />
+<TitleBand
+	title={SPLIT_BILL.name}
+	introduction={SPLIT_BILL.introduction}
+	width="max-w-2xl lg:max-w-6xl"
+/>
 
-<section class="mx-auto max-w-2xl px-5 pt-6 pb-20 sm:px-8">
+<section class="mx-auto max-w-2xl px-5 pt-6 pb-20 sm:px-8 lg:max-w-6xl">
 	<div class="mb-6 {openedFromLink ? 'min-h-6' : 'empty:mb-0'}" role="status">
 		{#if status?.kind === 'opening'}
 			<p class="flex items-center gap-2">
@@ -914,195 +942,103 @@
 	{/if}
 
 	<!-- While a shared bill opens, the empty one under it can't be changed: it's about to be replaced. -->
+	<!-- From 1024px the split sits beside the bill and stays in view while it's made; below that it
+	     follows the bill, and the running total keeps the answer in reach. -->
 	<div
-		class="space-y-6 motion-safe:transition-opacity {opening ? 'opacity-50' : ''}"
+		class="space-y-6 motion-safe:transition-opacity lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] lg:items-start lg:space-y-0 lg:gap-x-10 {opening
+			? 'opacity-50'
+			: ''}"
 		aria-busy={opening}
 		inert={opening}
 	>
-		<!-- The bill: what's decided before any price is typed -->
-		<section class={card} aria-labelledby="bill-heading">
-			<h2 id="bill-heading" class={cardHeading}>The bill</h2>
-			<label for="currency" class={label}>Currency</label>
-			<SearchableSelect
-				id="currency"
-				choices={currencyChoices}
-				value={currencyCode}
-				onchange={changeCurrency}
-				placeholder="Type a currency or a country"
-			/>
+		<div class="space-y-6">
+			<!-- The bill: what's decided before any price is typed -->
+			<section class={card} aria-labelledby="bill-heading">
+				<h2 id="bill-heading" class={cardHeading}>The bill</h2>
+				<label for="currency" class={label}>Currency</label>
+				<SearchableSelect
+					id="currency"
+					choices={currencyChoices}
+					value={currencyCode}
+					onchange={changeCurrency}
+					placeholder="Type a currency or a country"
+				/>
 
-			{#if !scanning}
-				<button
-					type="button"
-					onclick={() => (scanning = true)}
-					class="{secondaryButton} mt-4 w-full">{SPLIT_BILL.scanning.open}</button
-				>
-			{:else if !scanned}
-				<form
-					class="mt-5 border-t border-border pt-5"
-					onsubmit={(event) => {
-						event.preventDefault();
-						readScan();
-					}}
-				>
-					<label for="receipt-photo" class={label}>{SPLIT_BILL.scanning.photo}</label>
-					<p id="receipt-photo-hint" class="mb-2 text-sm text-muted">
-						{SPLIT_BILL.scanning.photoHint}
-					</p>
-					<input
-						id="receipt-photo"
-						type="file"
-						accept="image/*"
-						aria-describedby="receipt-photo-hint"
-						onchange={(event) => showPhoto(event.currentTarget.files?.[0])}
-						class="block w-full text-sm text-muted file:mr-3 file:min-h-9 file:cursor-pointer file:rounded-full file:border file:border-control-border file:bg-transparent file:px-4 file:text-sm file:font-medium file:text-text hover:file:bg-bg"
-					/>
-					{#if photoUrl}
-						<img
-							src={photoUrl}
-							alt={SPLIT_BILL.scanning.photoAlt}
-							class="mt-3 max-h-[70vh] w-full rounded-xl border border-border object-contain"
+				{#if !scanning}
+					<button
+						type="button"
+						onclick={() => (scanning = true)}
+						class="{secondaryButton} mt-4 w-full">{SPLIT_BILL.scanning.open}</button
+					>
+				{:else if !scanned}
+					<form
+						class="mt-5 border-t border-border pt-5"
+						onsubmit={(event) => {
+							event.preventDefault();
+							readScan();
+						}}
+					>
+						<label for="receipt-photo" class={label}>{SPLIT_BILL.scanning.photo}</label>
+						<p id="receipt-photo-hint" class="mb-2 text-sm text-muted">
+							{SPLIT_BILL.scanning.photoHint}
+						</p>
+						<input
+							id="receipt-photo"
+							type="file"
+							accept="image/*"
+							aria-describedby="receipt-photo-hint"
+							onchange={(event) => showPhoto(event.currentTarget.files?.[0])}
+							class="block w-full text-sm text-muted file:mr-3 file:min-h-9 file:cursor-pointer file:rounded-full file:border file:border-control-border file:bg-transparent file:px-4 file:text-sm file:font-medium file:text-text hover:file:bg-bg"
 						/>
-					{/if}
+						{#if photoUrl}
+							<img
+								src={photoUrl}
+								alt={SPLIT_BILL.scanning.photoAlt}
+								class="mt-3 max-h-[70vh] w-full rounded-xl border border-border object-contain"
+							/>
+						{/if}
 
-					<label for="receipt-text" class="{label} mt-5">{SPLIT_BILL.scanning.field}</label>
-					<p id="receipt-hint" class="mb-2 text-sm text-muted">{SPLIT_BILL.scanning.hint}</p>
-					<textarea
-						id="receipt-text"
-						rows="8"
-						aria-describedby="receipt-hint"
-						bind:value={receiptText}
-						class={field}></textarea>
-					<div class="mt-3 flex flex-wrap gap-3">
-						<button type="submit" disabled={!receiptText.trim()} class={smallButton}
-							>{SPLIT_BILL.scanning.read}</button
-						>
-						<button type="button" onclick={closeScan} class={smallButton}
-							>{SPLIT_BILL.scanning.cancel}</button
-						>
-					</div>
-				</form>
-			{:else}
-				<div class="mt-5 border-t border-border pt-5">
-					<div class="flex flex-wrap items-center gap-x-1">
-						<h3 class="text-base font-semibold">{SPLIT_BILL.scanning.review}</h3>
-						<Toggletip label="About what to check" text={SPLIT_BILL.explanations.unsure} />
-					</div>
+						<label for="receipt-text" class="{label} mt-5">{SPLIT_BILL.scanning.field}</label>
+						<p id="receipt-hint" class="mb-2 text-sm text-muted">{SPLIT_BILL.scanning.hint}</p>
+						<textarea
+							id="receipt-text"
+							rows="8"
+							aria-describedby="receipt-hint"
+							bind:value={receiptText}
+							class={field}></textarea>
+						<div class="mt-3 flex flex-wrap gap-3">
+							<button type="submit" disabled={!receiptText.trim()} class={smallButton}
+								>{SPLIT_BILL.scanning.read}</button
+							>
+							<button type="button" onclick={closeScan} class={smallButton}
+								>{SPLIT_BILL.scanning.cancel}</button
+							>
+						</div>
+					</form>
+				{:else}
+					<div class="mt-5 border-t border-border pt-5">
+						<div class="flex flex-wrap items-center gap-x-1">
+							<h3 class="text-base font-semibold">{SPLIT_BILL.scanning.review}</h3>
+							<Toggletip label="About what to check" text={SPLIT_BILL.explanations.unsure} />
+						</div>
 
-					{#if reviewLines.length === 0}
-						<p class="mt-2 text-sm">{SPLIT_BILL.scanning.nothing}</p>
-					{:else}
-						<ul class="mt-3 space-y-3">
-							{#each reviewLines as line, index (line.id)}
-								{@const lineNote = amountNote(
-									readTypedAmount(line.priceText),
-									SPLIT_BILL.amounts.negativePrice,
-									false
-								)}
-								<li
-									class="rounded-xl border bg-bg p-3 {line.unsure
-										? 'border-accent-edge'
-										: 'border-border'}"
-								>
-									{#if line.unsure}
-										<p class="mb-2 flex items-center gap-1.5 text-sm font-medium">
-											<svg
-												class="size-4 shrink-0"
-												xmlns="http://www.w3.org/2000/svg"
-												fill="none"
-												viewBox="0 0 24 24"
-												stroke="currentColor"
-												stroke-width="2"
-												aria-hidden="true"
-											>
-												<path
-													stroke-linecap="round"
-													stroke-linejoin="round"
-													d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"
-												/>
-											</svg>
-											{SPLIT_BILL.scanning.check}
-										</p>
-									{/if}
-									<!-- On a phone the name takes a row of its own: next to the price, it's cut off. -->
-									<div
-										class="grid grid-cols-[1fr_auto] items-center gap-2 sm:grid-cols-[1fr_7.5rem_auto]"
+						{#if reviewLines.length === 0}
+							<p class="mt-2 text-sm">{SPLIT_BILL.scanning.nothing}</p>
+						{:else}
+							<ul class="mt-3 space-y-3">
+								{#each reviewLines as line, index (line.id)}
+									{@const lineNote = amountNote(
+										readTypedAmount(line.priceText),
+										SPLIT_BILL.amounts.negativePrice,
+										false
+									)}
+									<li
+										class="rounded-xl border bg-bg p-3 {line.unsure
+											? 'border-accent-edge'
+											: 'border-border'}"
 									>
-										<label for="review-name-{line.id}" class="sr-only">Item {index + 1}</label>
-										<input
-											id="review-name-{line.id}"
-											type="text"
-											autocomplete="off"
-											bind:value={line.name}
-											oninput={() => (line.unsure = false)}
-											class="{field} col-span-2 sm:col-span-1"
-										/>
-										<label for="review-price-{line.id}" class="sr-only"
-											>Price of item {index + 1}</label
-										>
-										<input
-											id="review-price-{line.id}"
-											type="text"
-											inputmode={amountKeypad}
-											autocomplete="off"
-											bind:value={line.priceText}
-											oninput={() => (line.unsure = false)}
-											aria-describedby="review-price-note-{line.id}"
-											aria-invalid={lineNote?.problem ? true : undefined}
-											class={field}
-										/>
-										<button
-											type="button"
-											onclick={() =>
-												(reviewLines = reviewLines.filter((other) => other.id !== line.id))}
-											aria-label="Remove {line.name || `item ${index + 1}`}"
-											class="inline-flex size-8 items-center justify-center rounded-full text-muted hover:bg-surface hover:text-text pointer-coarse:size-11"
-										>
-											<svg
-												class="size-4"
-												xmlns="http://www.w3.org/2000/svg"
-												fill="none"
-												viewBox="0 0 24 24"
-												stroke="currentColor"
-												stroke-width="2"
-												aria-hidden="true"
-											>
-												<path
-													stroke-linecap="round"
-													stroke-linejoin="round"
-													d="M6 18L18 6M6 6l12 12"
-												/>
-											</svg>
-										</button>
-									</div>
-									<p
-										id="review-price-note-{line.id}"
-										role="status"
-										class="mt-2 text-sm empty:mt-0 {lineNote?.problem
-											? 'font-medium'
-											: 'text-muted'}"
-									>
-										{#if lineNote}{lineNote.text}{/if}
-									</p>
-									{#if line.quantity > 1}
-										<p class="mt-2 text-sm text-muted">
-											{SPLIT_BILL.scanning.quantity(line.quantity)}
-										</p>
-									{/if}
-								</li>
-							{/each}
-						</ul>
-					{/if}
-
-					{#if reviewAdjustments.length}
-						<ul class="mt-3 divide-y divide-border rounded-xl border border-border bg-bg">
-							{#each reviewAdjustments as adjustment (adjustment.id)}
-								<li class="flex items-center justify-between gap-3 py-2 pr-2 pl-4 text-sm">
-									<span class="min-w-0">
-										<span class="font-medium break-words">{adjustment.name}</span>
-										<span class="text-muted"> · {KIND_NAMES[adjustment.kind]}</span>
-										{#if adjustment.unsure}
-											<span class="mt-0.5 flex items-center gap-1.5 font-medium">
+										{#if line.unsure}
+											<p class="mb-2 flex items-center gap-1.5 text-sm font-medium">
 												<svg
 													class="size-4 shrink-0"
 													xmlns="http://www.w3.org/2000/svg"
@@ -1119,975 +1055,1162 @@
 													/>
 												</svg>
 												{SPLIT_BILL.scanning.check}
-											</span>
+											</p>
 										{/if}
-									</span>
-									<span class="flex shrink-0 items-center gap-1">
-										{signed(adjustment.amount)}
-										<button
-											type="button"
-											onclick={() =>
-												(reviewAdjustments = reviewAdjustments.filter(
-													(other) => other.id !== adjustment.id
-												))}
-											aria-label="Remove {adjustment.name}"
-											class="inline-flex size-8 items-center justify-center rounded-full text-muted hover:bg-surface hover:text-text pointer-coarse:size-11"
+										<!-- On a phone the name takes a row of its own: next to the price, it's cut off. -->
+										<div
+											class="grid grid-cols-[1fr_auto] items-center gap-2 sm:grid-cols-[1fr_7.5rem_auto]"
 										>
-											<svg
-												class="size-4"
-												xmlns="http://www.w3.org/2000/svg"
-												fill="none"
-												viewBox="0 0 24 24"
-												stroke="currentColor"
-												stroke-width="2"
-												aria-hidden="true"
+											<label for="review-name-{line.id}" class="sr-only">Item {index + 1}</label>
+											<input
+												id="review-name-{line.id}"
+												type="text"
+												autocomplete="off"
+												bind:value={line.name}
+												oninput={() => (line.unsure = false)}
+												class="{field} col-span-2 sm:col-span-1"
+											/>
+											<label for="review-price-{line.id}" class="sr-only"
+												>Price of item {index + 1}</label
 											>
-												<path
-													stroke-linecap="round"
-													stroke-linejoin="round"
-													d="M6 18L18 6M6 6l12 12"
-												/>
-											</svg>
-										</button>
-									</span>
-								</li>
-							{/each}
-						</ul>
-					{/if}
-
-					<div class="mt-4 space-y-2 text-sm" role="status">
-						{#if reviewLines.length && scanned.servicePercentage !== undefined && scanned.taxPercentage !== undefined}
-							<p>
-								{SPLIT_BILL.scanning.rates(
-									scanned.servicePercentage,
-									scanned.taxPercentage,
-									scanned.taxOnService
-								)}
-							</p>
-						{:else if reviewLines.length}
-							<p>{SPLIT_BILL.scanning.noRates}</p>
-						{/if}
-						{#if reviewGap !== undefined && reviewLines.length}
-							{#if Math.abs(reviewGap) < coin / 2}
-								<p>
-									<Check class="mr-1 align-[-0.125em]" />{SPLIT_BILL.scanning.matches}
-								</p>
-							{:else}
-								<p class="rounded-lg border border-accent-edge bg-bg p-3">
-									{SPLIT_BILL.scanning.itemsOff(money(Math.abs(reviewGap)), reviewGap < 0)}
-								</p>
-							{/if}
-						{/if}
-						{#if totalDiffers && reviewed?.total !== undefined && reviewTotal !== undefined}
-							<p class="rounded-lg border border-accent-edge bg-bg p-3">
-								{SPLIT_BILL.scanning.totalOff(money(reviewTotal), money(reviewed.total))}
-							</p>
-						{/if}
-						{#if pricesMissing && reviewLines.length}
-							<p>{SPLIT_BILL.scanning.missingPrice}</p>
-						{/if}
-					</div>
-
-					<div class="mt-4 flex flex-wrap gap-3">
-						<button
-							type="button"
-							onclick={addScan}
-							disabled={pricesMissing || reviewLines.length === 0}
-							class={primaryButton}>{SPLIT_BILL.scanning.add}</button
-						>
-						{#if pricesMissing && reviewLines.length}
-							<button type="button" onclick={removeUnpriced} class={secondaryButton}
-								>{SPLIT_BILL.scanning.removeUnpriced}</button
-							>
-						{/if}
-						<button type="button" onclick={closeScan} class={secondaryButton}
-							>{SPLIT_BILL.scanning.cancel}</button
-						>
-					</div>
-				</div>
-			{/if}
-		</section>
-
-		<!-- People -->
-		<section class={card} aria-labelledby="people-heading">
-			<h2 id="people-heading" class={cardHeading}>
-				People {#if people.length}<span class="font-normal text-muted">({people.length})</span>{/if}
-			</h2>
-			<form
-				class="flex items-end gap-2"
-				onsubmit={(event) => {
-					event.preventDefault();
-					addPerson();
-				}}
-			>
-				<div class="min-w-0 flex-1">
-					<label for="person" class={label}>Name</label>
-					<input id="person" type="text" autocomplete="off" bind:value={newPerson} class={field} />
-				</div>
-				<button
-					type="submit"
-					disabled={!newPerson.trim()}
-					aria-describedby="add-person-reason"
-					class={`${smallButton} ${besideField}`}>Add person</button
-				>
-			</form>
-			<p id="add-person-reason" role="status" class="mt-2 text-sm text-muted empty:mt-0">
-				{#if !newPerson.trim()}{SPLIT_BILL.missing.personName}{/if}
-			</p>
-
-			{#if people.length}
-				<ul class="mt-4 flex flex-wrap gap-2">
-					{#each people as person (person.id)}
-						{#if renaming?.id === person.id}
-							<li class="basis-full">
-								<form
-									class="flex flex-wrap items-center gap-2"
-									onsubmit={(event) => {
-										event.preventDefault();
-										void stopRenaming(true);
-									}}
-								>
-									<label for="rename-person" class="sr-only">New name for {person.name}</label>
-									<input
-										id="rename-person"
-										type="text"
-										autocomplete="off"
-										bind:value={renaming.name}
-										onkeydown={(event) => event.key === 'Escape' && stopRenaming(false)}
-										aria-describedby="rename-person-reason"
-										class="{field} min-w-0 flex-1 basis-40"
-									/>
-									<button type="submit" disabled={!renaming.name.trim()} class={smallButton}
-										>Save</button
-									>
-									<button type="button" onclick={() => stopRenaming(false)} class={smallButton}
-										>Cancel</button
-									>
-								</form>
-								<p
-									id="rename-person-reason"
-									role="status"
-									class="mt-2 text-sm text-muted empty:mt-0"
-								>
-									{#if !renaming.name.trim()}{SPLIT_BILL.missing.personName}{/if}
-								</p>
-							</li>
-						{:else}
-							<li
-								class="flex items-center rounded-full border border-control-border py-1 pr-1 pl-1 text-sm pointer-coarse:py-0"
-							>
-								<button
-									id="rename-{person.id}"
-									type="button"
-									onclick={() => startRenaming(person)}
-									aria-label="Rename {person.name}"
-									class="inline-flex min-h-7 items-center gap-1.5 rounded-full pr-1.5 pl-2 hover:bg-bg pointer-coarse:min-h-11"
-								>
-									{person.name}
-									<svg
-										class="size-3.5 shrink-0 text-muted"
-										xmlns="http://www.w3.org/2000/svg"
-										fill="none"
-										viewBox="0 0 24 24"
-										stroke="currentColor"
-										stroke-width="2"
-										aria-hidden="true"
-									>
-										<path
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											d="M16.9 3.6a2 2 0 0 1 2.9 2.9L8 18.3 4 19.5l1.2-4z"
-										/>
-									</svg>
-								</button>
-								<button
-									type="button"
-									onclick={() => removePerson(person.id)}
-									aria-label="Remove {person.name}"
-									class="inline-flex size-7 items-center justify-center rounded-full text-muted hover:bg-bg hover:text-text pointer-coarse:size-11"
-								>
-									<svg
-										class="size-3.5"
-										xmlns="http://www.w3.org/2000/svg"
-										fill="none"
-										viewBox="0 0 24 24"
-										stroke="currentColor"
-										stroke-width="2"
-										aria-hidden="true"
-									>
-										<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-									</svg>
-								</button>
-							</li>
-						{/if}
-					{/each}
-				</ul>
-			{:else}
-				<p class="mt-4 text-sm text-muted">Nobody yet. Add the people splitting this bill.</p>
-			{/if}
-			<!-- After a removal from this card: what went, and the way back. -->
-			<p
-				class="flex flex-wrap items-center gap-x-3 text-sm {removal?.from === 'people'
-					? 'mt-3 min-h-11'
-					: ''}"
-				role="status"
-			>
-				{#if removal?.from === 'people'}{SPLIT_BILL.removed(removal.name)}<button
-						type="button"
-						onclick={undoRemoval}
-						class="min-h-11 font-medium underline underline-offset-4 hover:text-accent-text"
-						>{SPLIT_BILL.undo}</button
-					>{/if}
-			</p>
-		</section>
-
-		<!-- Items -->
-		<section class={card} aria-labelledby="items-heading">
-			<h2 id="items-heading" class={cardHeading}>
-				Items {#if items.length}<span class="font-normal text-muted">({items.length})</span>{/if}
-			</h2>
-			<form
-				class="grid grid-cols-[6rem_1fr] gap-3 sm:grid-cols-[1fr_6rem_9rem_auto] sm:items-end"
-				onsubmit={(event) => {
-					event.preventDefault();
-					addItem();
-				}}
-			>
-				<div class="col-span-2 sm:col-span-1">
-					<label for="item" class={label}>Item</label>
-					<input id="item" type="text" autocomplete="off" bind:value={newItem} class={field} />
-				</div>
-				<div>
-					<label for="quantity" class={label}>Quantity</label>
-					<input
-						id="quantity"
-						type="number"
-						inputmode="numeric"
-						min="1"
-						max={MAX_QUANTITY}
-						step="1"
-						bind:value={newQuantity}
-						class={field}
-					/>
-				</div>
-				<div>
-					<!-- People know a menu's price for one, so with several it asks for that. -->
-					<label for="price" class={label}
-						>{quantityOf(newQuantity) > 1 ? 'Price each' : 'Price'}</label
-					>
-					<input
-						id="price"
-						type="text"
-						inputmode={amountKeypad}
-						autocomplete="off"
-						bind:value={newPriceText}
-						aria-describedby="price-note"
-						aria-invalid={newPriceNote?.problem ? true : undefined}
-						class={field}
-					/>
-				</div>
-				<button
-					type="submit"
-					disabled={!canAddItem}
-					aria-describedby="add-item-reason price-note"
-					class="{smallButton} {besideField} col-span-2 sm:col-span-1">Add item</button
-				>
-			</form>
-			<p
-				id="price-note"
-				role="status"
-				class="mt-2 text-sm empty:mt-0 {newPriceNote?.problem ? 'font-medium' : 'text-muted'}"
-			>
-				{#if newPriceNote}{newPriceNote.text}{/if}
-			</p>
-			<p id="add-item-reason" role="status" class="mt-2 text-sm text-muted empty:mt-0">
-				{#if addItemReason}{addItemReason}{/if}
-			</p>
-
-			{#if items.length}
-				<ul class="mt-5 space-y-3">
-					{#each items as item (item.id)}
-						<li class="rounded-xl border border-border bg-bg p-4">
-							{#if editing?.id === item.id}
-								<form
-									class="grid grid-cols-[6rem_1fr] gap-3"
-									aria-label="Change {item.name}"
-									onsubmit={(event) => {
-										event.preventDefault();
-										void stopEditing(true);
-									}}
-								>
-									<div class="col-span-2">
-										<label for="edit-item-name" class={label}>Item</label>
-										<input
-											id="edit-item-name"
-											type="text"
-											autocomplete="off"
-											bind:value={editing.name}
-											onkeydown={(event) => event.key === 'Escape' && stopEditing(false)}
-											class={field}
-										/>
-									</div>
-									<div>
-										<label for="edit-item-quantity" class={label}>Quantity</label>
-										<input
-											id="edit-item-quantity"
-											type="number"
-											inputmode="numeric"
-											min="1"
-											max={MAX_QUANTITY}
-											step="1"
-											bind:value={editing.quantity}
-											onkeydown={(event) => event.key === 'Escape' && stopEditing(false)}
-											class={field}
-										/>
-									</div>
-									<div>
-										<label for="edit-item-price" class={label}
-											>{quantityOf(editing.quantity) > 1 ? 'Price each' : 'Price'}</label
-										>
-										<input
-											id="edit-item-price"
-											type="text"
-											inputmode={amountKeypad}
-											autocomplete="off"
-											bind:value={editing.priceText}
-											onkeydown={(event) => event.key === 'Escape' && stopEditing(false)}
-											aria-describedby="edit-item-price-note"
-											aria-invalid={editPriceNote?.problem ? true : undefined}
-											class={field}
-										/>
-									</div>
-									<div class="col-span-2">
+											<input
+												id="review-price-{line.id}"
+												type="text"
+												inputmode={amountKeypad}
+												autocomplete="off"
+												bind:value={line.priceText}
+												oninput={() => (line.unsure = false)}
+												aria-describedby="review-price-note-{line.id}"
+												aria-invalid={lineNote?.problem ? true : undefined}
+												class={field}
+											/>
+											<button
+												type="button"
+												onclick={() =>
+													(reviewLines = reviewLines.filter((other) => other.id !== line.id))}
+												aria-label="Remove {line.name || `item ${index + 1}`}"
+												class="inline-flex size-8 items-center justify-center rounded-full text-muted hover:bg-surface hover:text-text pointer-coarse:size-11"
+											>
+												<svg
+													class="size-4"
+													xmlns="http://www.w3.org/2000/svg"
+													fill="none"
+													viewBox="0 0 24 24"
+													stroke="currentColor"
+													stroke-width="2"
+													aria-hidden="true"
+												>
+													<path
+														stroke-linecap="round"
+														stroke-linejoin="round"
+														d="M6 18L18 6M6 6l12 12"
+													/>
+												</svg>
+											</button>
+										</div>
 										<p
-											id="edit-item-price-note"
+											id="review-price-note-{line.id}"
 											role="status"
-											class="text-sm empty:hidden {editPriceNote?.problem
+											class="mt-2 text-sm empty:mt-0 {lineNote?.problem
 												? 'font-medium'
 												: 'text-muted'}"
 										>
-											{#if editPriceNote}{editPriceNote.text}{/if}
+											{#if lineNote}{lineNote.text}{/if}
 										</p>
-										<p
-											id="edit-item-reason"
-											role="status"
-											class="mt-1 text-sm text-muted empty:hidden"
+										{#if line.quantity > 1}
+											<p class="mt-2 text-sm text-muted">
+												{SPLIT_BILL.scanning.quantity(line.quantity)}
+											</p>
+										{/if}
+									</li>
+								{/each}
+							</ul>
+						{/if}
+
+						{#if reviewAdjustments.length}
+							<ul class="mt-3 divide-y divide-border rounded-xl border border-border bg-bg">
+								{#each reviewAdjustments as adjustment (adjustment.id)}
+									<li class="flex items-center justify-between gap-3 py-2 pr-2 pl-4 text-sm">
+										<span class="min-w-0">
+											<span class="font-medium break-words">{adjustment.name}</span>
+											<span class="text-muted"> · {KIND_NAMES[adjustment.kind]}</span>
+											{#if adjustment.unsure}
+												<span class="mt-0.5 flex items-center gap-1.5 font-medium">
+													<svg
+														class="size-4 shrink-0"
+														xmlns="http://www.w3.org/2000/svg"
+														fill="none"
+														viewBox="0 0 24 24"
+														stroke="currentColor"
+														stroke-width="2"
+														aria-hidden="true"
+													>
+														<path
+															stroke-linecap="round"
+															stroke-linejoin="round"
+															d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"
+														/>
+													</svg>
+													{SPLIT_BILL.scanning.check}
+												</span>
+											{/if}
+										</span>
+										<span class="flex shrink-0 items-center gap-1">
+											{signed(adjustment.amount)}
+											<button
+												type="button"
+												onclick={() =>
+													(reviewAdjustments = reviewAdjustments.filter(
+														(other) => other.id !== adjustment.id
+													))}
+												aria-label="Remove {adjustment.name}"
+												class="inline-flex size-8 items-center justify-center rounded-full text-muted hover:bg-surface hover:text-text pointer-coarse:size-11"
+											>
+												<svg
+													class="size-4"
+													xmlns="http://www.w3.org/2000/svg"
+													fill="none"
+													viewBox="0 0 24 24"
+													stroke="currentColor"
+													stroke-width="2"
+													aria-hidden="true"
+												>
+													<path
+														stroke-linecap="round"
+														stroke-linejoin="round"
+														d="M6 18L18 6M6 6l12 12"
+													/>
+												</svg>
+											</button>
+										</span>
+									</li>
+								{/each}
+							</ul>
+						{/if}
+
+						<div class="mt-4 space-y-2 text-sm" role="status">
+							{#if reviewLines.length && scanned.servicePercentage !== undefined && scanned.taxPercentage !== undefined}
+								<p>
+									{SPLIT_BILL.scanning.rates(
+										scanned.servicePercentage,
+										scanned.taxPercentage,
+										scanned.taxOnService
+									)}
+								</p>
+							{:else if reviewLines.length}
+								<p>{SPLIT_BILL.scanning.noRates}</p>
+							{/if}
+							{#if reviewGap !== undefined && reviewLines.length}
+								{#if Math.abs(reviewGap) < coin / 2}
+									<p>
+										<Check class="mr-1 align-[-0.125em]" />{SPLIT_BILL.scanning.matches}
+									</p>
+								{:else}
+									<p class="rounded-lg border border-accent-edge bg-bg p-3">
+										{SPLIT_BILL.scanning.itemsOff(money(Math.abs(reviewGap)), reviewGap < 0)}
+									</p>
+								{/if}
+							{/if}
+							{#if totalDiffers && reviewed?.total !== undefined && reviewTotal !== undefined}
+								<p class="rounded-lg border border-accent-edge bg-bg p-3">
+									{SPLIT_BILL.scanning.totalOff(money(reviewTotal), money(reviewed.total))}
+								</p>
+							{/if}
+							{#if pricesMissing && reviewLines.length}
+								<p>{SPLIT_BILL.scanning.missingPrice}</p>
+							{/if}
+						</div>
+
+						<div class="mt-4 flex flex-wrap gap-3">
+							<button
+								type="button"
+								onclick={addScan}
+								disabled={pricesMissing || reviewLines.length === 0}
+								class={primaryButton}>{SPLIT_BILL.scanning.add}</button
+							>
+							{#if pricesMissing && reviewLines.length}
+								<button type="button" onclick={removeUnpriced} class={secondaryButton}
+									>{SPLIT_BILL.scanning.removeUnpriced}</button
+								>
+							{/if}
+							<button type="button" onclick={closeScan} class={secondaryButton}
+								>{SPLIT_BILL.scanning.cancel}</button
+							>
+						</div>
+					</div>
+				{/if}
+			</section>
+
+			<!-- People -->
+			<section class={card} aria-labelledby="people-heading">
+				<h2 id="people-heading" class={cardHeading}>
+					People {#if people.length}<span class="font-normal text-muted">({people.length})</span
+						>{/if}
+				</h2>
+				<form
+					class="flex items-end gap-2"
+					onsubmit={(event) => {
+						event.preventDefault();
+						addPerson();
+					}}
+				>
+					<div class="min-w-0 flex-1">
+						<label for="person" class={label}>Name</label>
+						<input
+							id="person"
+							type="text"
+							autocomplete="off"
+							bind:value={newPerson}
+							class={field}
+						/>
+					</div>
+					<button
+						type="submit"
+						disabled={!newPerson.trim()}
+						aria-describedby="add-person-reason"
+						class={`${smallButton} ${besideField}`}>Add person</button
+					>
+				</form>
+				<p id="add-person-reason" role="status" class="mt-2 text-sm text-muted empty:mt-0">
+					{#if !newPerson.trim()}{SPLIT_BILL.missing.personName}{/if}
+				</p>
+
+				{#if people.length}
+					<ul class="mt-4 flex flex-wrap gap-2">
+						{#each people as person (person.id)}
+							{#if renaming?.id === person.id}
+								<li class="basis-full">
+									<form
+										class="flex flex-wrap items-center gap-2"
+										onsubmit={(event) => {
+											event.preventDefault();
+											void stopRenaming(true);
+										}}
+									>
+										<label for="rename-person" class="sr-only">New name for {person.name}</label>
+										<input
+											id="rename-person"
+											type="text"
+											autocomplete="off"
+											bind:value={renaming.name}
+											onkeydown={(event) => event.key === 'Escape' && stopRenaming(false)}
+											aria-describedby="rename-person-reason"
+											class="{field} min-w-0 flex-1 basis-40"
+										/>
+										<button type="submit" disabled={!renaming.name.trim()} class={smallButton}
+											>Save</button
 										>
-											{#if editReason}{editReason}{/if}
-										</p>
-									</div>
-									<div class="col-span-2 flex flex-wrap gap-3">
-										<button
-											type="submit"
-											disabled={!canSaveEdit}
-											aria-describedby="edit-item-reason edit-item-price-note"
-											class={smallButton}>Save</button
-										>
-										<button type="button" onclick={() => stopEditing(false)} class={smallButton}
+										<button type="button" onclick={() => stopRenaming(false)} class={smallButton}
 											>Cancel</button
 										>
-									</div>
-								</form>
+									</form>
+									<p
+										id="rename-person-reason"
+										role="status"
+										class="mt-2 text-sm text-muted empty:mt-0"
+									>
+										{#if !renaming.name.trim()}{SPLIT_BILL.missing.personName}{/if}
+									</p>
+								</li>
 							{:else}
-								<div class="flex items-start justify-between gap-3">
-									<div class="min-w-0">
-										<p class="font-medium break-words">{nameWithQuantity(item)}</p>
-										<p class="text-sm text-muted">
-											{money(item.price)}{(item.quantity ?? 1) > 1
-												? ` · ${money(item.price / (item.quantity ?? 1))} each`
-												: ''}
-										</p>
-									</div>
-									<div class="flex shrink-0">
-										<button
-											id="edit-{item.id}"
-											type="button"
-											onclick={() => startEditing(item)}
-											aria-label="Change {item.name}"
-											class="inline-flex size-8 items-center justify-center rounded-full text-muted hover:bg-surface hover:text-text pointer-coarse:size-11"
+								<li
+									class="flex items-center rounded-full border border-control-border py-1 pr-1 pl-1 text-sm pointer-coarse:py-0"
+								>
+									<button
+										id="rename-{person.id}"
+										type="button"
+										onclick={() => startRenaming(person)}
+										aria-label="Rename {person.name}"
+										class="inline-flex min-h-7 items-center gap-1.5 rounded-full pr-1.5 pl-2 hover:bg-bg pointer-coarse:min-h-11"
+									>
+										{person.name}
+										<svg
+											class="size-3.5 shrink-0 text-muted"
+											xmlns="http://www.w3.org/2000/svg"
+											fill="none"
+											viewBox="0 0 24 24"
+											stroke="currentColor"
+											stroke-width="2"
+											aria-hidden="true"
 										>
-											<svg
-												class="size-4"
-												xmlns="http://www.w3.org/2000/svg"
-												fill="none"
-												viewBox="0 0 24 24"
-												stroke="currentColor"
-												stroke-width="2"
-												aria-hidden="true"
-											>
-												<path
-													stroke-linecap="round"
-													stroke-linejoin="round"
-													d="M16.9 3.6a2 2 0 0 1 2.9 2.9L8 18.3 4 19.5l1.2-4z"
-												/>
-											</svg>
-										</button>
-										<button
-											type="button"
-											onclick={() => removeItem(item.id)}
-											aria-label="Remove {item.name}"
-											class="inline-flex size-8 items-center justify-center rounded-full text-muted hover:bg-surface hover:text-text pointer-coarse:size-11"
+											<path
+												stroke-linecap="round"
+												stroke-linejoin="round"
+												d="M16.9 3.6a2 2 0 0 1 2.9 2.9L8 18.3 4 19.5l1.2-4z"
+											/>
+										</svg>
+									</button>
+									<button
+										type="button"
+										onclick={() => removePerson(person.id)}
+										aria-label="Remove {person.name}"
+										class="inline-flex size-7 items-center justify-center rounded-full text-muted hover:bg-bg hover:text-text pointer-coarse:size-11"
+									>
+										<svg
+											class="size-3.5"
+											xmlns="http://www.w3.org/2000/svg"
+											fill="none"
+											viewBox="0 0 24 24"
+											stroke="currentColor"
+											stroke-width="2"
+											aria-hidden="true"
 										>
-											<svg
-												class="size-4"
-												xmlns="http://www.w3.org/2000/svg"
-												fill="none"
-												viewBox="0 0 24 24"
-												stroke="currentColor"
-												stroke-width="2"
-												aria-hidden="true"
-											>
-												<path
-													stroke-linecap="round"
-													stroke-linejoin="round"
-													d="M6 18L18 6M6 6l12 12"
-												/>
-											</svg>
-										</button>
-									</div>
-								</div>
+											<path
+												stroke-linecap="round"
+												stroke-linejoin="round"
+												d="M6 18L18 6M6 6l12 12"
+											/>
+										</svg>
+									</button>
+								</li>
 							{/if}
+						{/each}
+					</ul>
+				{:else}
+					<p class="mt-4 text-sm text-muted">Nobody yet. Add the people splitting this bill.</p>
+				{/if}
+				<!-- After a removal from this card: what went, and the way back. -->
+				<p
+					class="flex flex-wrap items-center gap-x-3 text-sm {removal?.from === 'people'
+						? 'mt-3 min-h-11'
+						: ''}"
+					role="status"
+				>
+					{#if removal?.from === 'people'}{SPLIT_BILL.removed(removal.name)}<button
+							type="button"
+							onclick={undoRemoval}
+							class="min-h-11 font-medium underline underline-offset-4 hover:text-accent-text"
+							>{SPLIT_BILL.undo}</button
+						>{/if}
+				</p>
+			</section>
 
-							{#if people.length && item.counts}
-								{@const quantity = item.quantity ?? 1}
-								{@const counted = countedOf(item)}
-								<fieldset class="mt-3">
-									<legend class="mb-2 text-sm text-muted">How many each had</legend>
-									<div class="flex flex-wrap gap-2">
-										{#each people as person (person.id)}
-											{@const count = item.counts[person.id] ?? 0}
-											{#if count > 0}
-												<span
-													role="group"
-													aria-label={person.name}
-													class="inline-flex min-h-9 items-center gap-0.5 rounded-full border border-accent-edge bg-accent py-0.5 pr-0.5 pl-3.5 text-sm font-medium text-on-accent pointer-coarse:py-0"
+			<!-- Items -->
+			<section class={card} aria-labelledby="items-heading">
+				<h2 id="items-heading" class={cardHeading}>
+					Items {#if items.length}<span class="font-normal text-muted">({items.length})</span>{/if}
+				</h2>
+				<form
+					class="grid grid-cols-[6rem_1fr] gap-3 sm:grid-cols-[1fr_6rem_9rem_auto] sm:items-end"
+					onsubmit={(event) => {
+						event.preventDefault();
+						addItem();
+					}}
+				>
+					<div class="col-span-2 sm:col-span-1">
+						<label for="item" class={label}>Item</label>
+						<input id="item" type="text" autocomplete="off" bind:value={newItem} class={field} />
+					</div>
+					<div>
+						<label for="quantity" class={label}>Quantity</label>
+						<input
+							id="quantity"
+							type="number"
+							inputmode="numeric"
+							min="1"
+							max={MAX_QUANTITY}
+							step="1"
+							bind:value={newQuantity}
+							class={field}
+						/>
+					</div>
+					<div>
+						<!-- People know a menu's price for one, so with several it asks for that. -->
+						<label for="price" class={label}
+							>{quantityOf(newQuantity) > 1 ? 'Price each' : 'Price'}</label
+						>
+						<input
+							id="price"
+							type="text"
+							inputmode={amountKeypad}
+							autocomplete="off"
+							bind:value={newPriceText}
+							aria-describedby="price-note"
+							aria-invalid={newPriceNote?.problem ? true : undefined}
+							class={field}
+						/>
+					</div>
+					<button
+						type="submit"
+						disabled={!canAddItem}
+						aria-describedby="add-item-reason price-note"
+						class="{smallButton} {besideField} col-span-2 sm:col-span-1">Add item</button
+					>
+				</form>
+				<p
+					id="price-note"
+					role="status"
+					class="mt-2 text-sm empty:mt-0 {newPriceNote?.problem ? 'font-medium' : 'text-muted'}"
+				>
+					{#if newPriceNote}{newPriceNote.text}{/if}
+				</p>
+				<p id="add-item-reason" role="status" class="mt-2 text-sm text-muted empty:mt-0">
+					{#if addItemReason}{addItemReason}{/if}
+				</p>
+
+				{#if items.length}
+					<ul class="mt-5 space-y-3">
+						{#each items as item (item.id)}
+							<li class="rounded-xl border border-border bg-bg p-4">
+								{#if editing?.id === item.id}
+									<form
+										class="grid grid-cols-[6rem_1fr] gap-3"
+										aria-label="Change {item.name}"
+										onsubmit={(event) => {
+											event.preventDefault();
+											void stopEditing(true);
+										}}
+									>
+										<div class="col-span-2">
+											<label for="edit-item-name" class={label}>Item</label>
+											<input
+												id="edit-item-name"
+												type="text"
+												autocomplete="off"
+												bind:value={editing.name}
+												onkeydown={(event) => event.key === 'Escape' && stopEditing(false)}
+												class={field}
+											/>
+										</div>
+										<div>
+											<label for="edit-item-quantity" class={label}>Quantity</label>
+											<input
+												id="edit-item-quantity"
+												type="number"
+												inputmode="numeric"
+												min="1"
+												max={MAX_QUANTITY}
+												step="1"
+												bind:value={editing.quantity}
+												onkeydown={(event) => event.key === 'Escape' && stopEditing(false)}
+												class={field}
+											/>
+										</div>
+										<div>
+											<label for="edit-item-price" class={label}
+												>{quantityOf(editing.quantity) > 1 ? 'Price each' : 'Price'}</label
+											>
+											<input
+												id="edit-item-price"
+												type="text"
+												inputmode={amountKeypad}
+												autocomplete="off"
+												bind:value={editing.priceText}
+												onkeydown={(event) => event.key === 'Escape' && stopEditing(false)}
+												aria-describedby="edit-item-price-note"
+												aria-invalid={editPriceNote?.problem ? true : undefined}
+												class={field}
+											/>
+										</div>
+										<div class="col-span-2">
+											<p
+												id="edit-item-price-note"
+												role="status"
+												class="text-sm empty:hidden {editPriceNote?.problem
+													? 'font-medium'
+													: 'text-muted'}"
+											>
+												{#if editPriceNote}{editPriceNote.text}{/if}
+											</p>
+											<p
+												id="edit-item-reason"
+												role="status"
+												class="mt-1 text-sm text-muted empty:hidden"
+											>
+												{#if editReason}{editReason}{/if}
+											</p>
+										</div>
+										<div class="col-span-2 flex flex-wrap gap-3">
+											<button
+												type="submit"
+												disabled={!canSaveEdit}
+												aria-describedby="edit-item-reason edit-item-price-note"
+												class={smallButton}>Save</button
+											>
+											<button type="button" onclick={() => stopEditing(false)} class={smallButton}
+												>Cancel</button
+											>
+										</div>
+									</form>
+								{:else}
+									<div class="flex items-start justify-between gap-3">
+										<div class="min-w-0">
+											<p class="font-medium break-words">{nameWithQuantity(item)}</p>
+											<p class="text-sm text-muted">
+												{money(item.price)}{(item.quantity ?? 1) > 1
+													? ` · ${money(item.price / (item.quantity ?? 1))} each`
+													: ''}
+											</p>
+										</div>
+										<div class="flex shrink-0">
+											<button
+												id="edit-{item.id}"
+												type="button"
+												onclick={() => startEditing(item)}
+												aria-label="Change {item.name}"
+												class="inline-flex size-8 items-center justify-center rounded-full text-muted hover:bg-surface hover:text-text pointer-coarse:size-11"
+											>
+												<svg
+													class="size-4"
+													xmlns="http://www.w3.org/2000/svg"
+													fill="none"
+													viewBox="0 0 24 24"
+													stroke="currentColor"
+													stroke-width="2"
+													aria-hidden="true"
 												>
-													{person.name}
-													<button
-														type="button"
-														onclick={() => changeCount(item, person.id, -1)}
-														aria-label="One fewer for {person.name}"
-														class="ml-1.5 inline-flex size-8 items-center justify-center rounded-full text-base hover:bg-on-accent/10 pointer-coarse:size-11"
-														>−</button
+													<path
+														stroke-linecap="round"
+														stroke-linejoin="round"
+														d="M16.9 3.6a2 2 0 0 1 2.9 2.9L8 18.3 4 19.5l1.2-4z"
+													/>
+												</svg>
+											</button>
+											<button
+												type="button"
+												onclick={() => removeItem(item.id)}
+												aria-label="Remove {item.name}"
+												class="inline-flex size-8 items-center justify-center rounded-full text-muted hover:bg-surface hover:text-text pointer-coarse:size-11"
+											>
+												<svg
+													class="size-4"
+													xmlns="http://www.w3.org/2000/svg"
+													fill="none"
+													viewBox="0 0 24 24"
+													stroke="currentColor"
+													stroke-width="2"
+													aria-hidden="true"
+												>
+													<path
+														stroke-linecap="round"
+														stroke-linejoin="round"
+														d="M6 18L18 6M6 6l12 12"
+													/>
+												</svg>
+											</button>
+										</div>
+									</div>
+								{/if}
+
+								{#if people.length && item.counts}
+									{@const quantity = item.quantity ?? 1}
+									{@const counted = countedOf(item)}
+									<fieldset class="mt-3">
+										<legend class="mb-2 text-sm text-muted">How many each had</legend>
+										<div class="flex flex-wrap gap-2">
+											{#each people as person (person.id)}
+												{@const count = item.counts[person.id] ?? 0}
+												{#if count > 0}
+													<span
+														role="group"
+														aria-label={person.name}
+														class="inline-flex min-h-9 items-center gap-0.5 rounded-full border border-accent-edge bg-accent py-0.5 pr-0.5 pl-3.5 text-sm font-medium text-on-accent pointer-coarse:py-0"
 													>
-													<span class="min-w-5 text-center tabular-nums">{count}</span>
+														{person.name}
+														<button
+															type="button"
+															onclick={() => changeCount(item, person.id, -1)}
+															aria-label="One fewer for {person.name}"
+															class="ml-1.5 inline-flex size-8 items-center justify-center rounded-full text-base hover:bg-on-accent/10 pointer-coarse:size-11"
+															>−</button
+														>
+														<span class="min-w-5 text-center tabular-nums">{count}</span>
+														<button
+															type="button"
+															onclick={() => changeCount(item, person.id, 1)}
+															aria-label="One more for {person.name}"
+															class="inline-flex size-8 items-center justify-center rounded-full text-base hover:bg-on-accent/10 pointer-coarse:size-11"
+															>+</button
+														>
+													</span>
+												{:else}
 													<button
 														type="button"
 														onclick={() => changeCount(item, person.id, 1)}
-														aria-label="One more for {person.name}"
-														class="inline-flex size-8 items-center justify-center rounded-full text-base hover:bg-on-accent/10 pointer-coarse:size-11"
-														>+</button
+														class="min-h-9 rounded-full border border-control-border px-3.5 text-sm transition-colors hover:bg-surface pointer-coarse:min-h-11"
+														>{person.name}</button
 													>
-												</span>
-											{:else}
-												<button
-													type="button"
-													onclick={() => changeCount(item, person.id, 1)}
-													class="min-h-9 rounded-full border border-control-border px-3.5 text-sm transition-colors hover:bg-surface pointer-coarse:min-h-11"
-													>{person.name}</button
-												>
-											{/if}
-										{/each}
-									</div>
-									<p class="mt-2 text-sm" role="status">
-										{counted} of {quantity} counted{#if counted < quantity}: {quantity - counted} not
-											in anyone's share yet.{:else if counted > quantity}, more than there were:
-											each share is made smaller to fit.{:else}.{/if}
-									</p>
-									<button
-										type="button"
-										onclick={() => stopCounting(item)}
-										class="mt-1 min-h-9 text-sm text-muted underline underline-offset-4 hover:text-text"
-										>Share evenly instead</button
-									>
-								</fieldset>
-							{:else if people.length}
-								<fieldset class="mt-3">
-									<legend class="mb-2 text-sm text-muted">Who had this?</legend>
-									<div class="flex flex-wrap gap-2">
-										{#each people as person (person.id)}
-											{@const had = item.assignedPersonIds.includes(person.id)}
-											<button
-												type="button"
-												aria-pressed={had}
-												onclick={() => toggleTag(item, person.id)}
-												class="min-h-9 rounded-full border px-3.5 text-sm transition-colors pointer-coarse:min-h-11 {had
-													? 'border-accent-edge bg-accent font-medium text-on-accent'
-													: 'border-control-border hover:bg-surface'}"
-											>
-												{#if had}<Check class="mr-1 align-[-0.125em]" />{/if}{person.name}
-											</button>
-										{/each}
-										<button
-											type="button"
-											onclick={() => toggleEveryone(item)}
-											class="min-h-9 rounded-full px-3 text-sm text-muted underline underline-offset-4 hover:text-text pointer-coarse:min-h-11"
-										>
-											{everyoneHasIt(item) ? 'Nobody' : 'Everyone'}
-										</button>
-									</div>
-									{#if (item.quantity ?? 1) > 1}
-										<div class="mt-1 flex flex-wrap items-center gap-x-1">
-											<button
-												type="button"
-												onclick={() => startCounting(item)}
-												class="min-h-9 text-sm text-muted underline underline-offset-4 hover:text-text"
-												>Count who had how many</button
-											>
-											<Toggletip
-												label="About counting who had how many"
-												text={SPLIT_BILL.explanations.counting}
-											/>
-										</div>
-									{/if}
-								</fieldset>
-							{:else}
-								<p class="mt-3 text-sm text-muted">Add people first, then tag who had this.</p>
-							{/if}
-						</li>
-					{/each}
-				</ul>
-			{:else}
-				<p class="mt-5 text-sm text-muted">No items yet. Add the items from the bill.</p>
-			{/if}
-			<!-- After a removal from this card: what went, and the way back. -->
-			<p
-				class="flex flex-wrap items-center gap-x-3 text-sm {removal?.from === 'items'
-					? 'mt-3 min-h-11'
-					: ''}"
-				role="status"
-			>
-				{#if removal?.from === 'items'}{SPLIT_BILL.removed(removal.name)}<button
-						type="button"
-						onclick={undoRemoval}
-						class="min-h-11 font-medium underline underline-offset-4 hover:text-accent-text"
-						>{SPLIT_BILL.undo}</button
-					>{/if}
-			</p>
-		</section>
-
-		<!-- Charges and adjustments, in the order a receipt prints them: after the items -->
-		<section class={card} aria-labelledby="charges-heading">
-			<h2 id="charges-heading" class={cardHeading}>Charges and adjustments</h2>
-			<div class="grid grid-cols-2 gap-4">
-				<div>
-					<label for="tax" class={label}>Tax (%)</label>
-					<input
-						id="tax"
-						type="number"
-						inputmode="decimal"
-						min="0"
-						max="100"
-						step="0.5"
-						bind:value={taxInput}
-						class={field}
-					/>
-				</div>
-				<div>
-					<label for="service" class={label}>Service (%)</label>
-					<input
-						id="service"
-						type="number"
-						inputmode="decimal"
-						min="0"
-						max="100"
-						step="0.5"
-						bind:value={serviceInput}
-						class={field}
-					/>
-				</div>
-			</div>
-
-			<div class="mt-4 space-y-1">
-				<div class="flex flex-wrap items-center gap-x-1">
-					<label class={checkRow}>
-						<input
-							type="checkbox"
-							checked={taxIncluded}
-							onchange={(event) => setTaxIncluded(event.currentTarget.checked)}
-							class={checkbox}
-						/>
-						Prices include tax
-					</label>
-					<Toggletip
-						label="About prices that include tax"
-						text={SPLIT_BILL.explanations.taxIncluded}
-					/>
-				</div>
-				<div class="flex flex-wrap items-center gap-x-1">
-					<label class={checkRow}>
-						<input type="checkbox" bind:checked={serviceIncluded} class={checkbox} />
-						Prices include service
-					</label>
-				</div>
-				<div class="flex flex-wrap items-center gap-x-1">
-					<label class="{checkRow} {taxIncluded ? 'text-muted' : ''}">
-						<input
-							type="checkbox"
-							checked={taxOnService && !taxIncluded}
-							disabled={taxIncluded}
-							onchange={(event) => setTaxOnService(event.currentTarget.checked)}
-							class={checkbox}
-						/>
-						Tax is charged on service too
-					</label>
-					<Toggletip label="About tax on service" text={SPLIT_BILL.explanations.taxOnService} />
-				</div>
-			</div>
-
-			<div class="mt-6 border-t border-border pt-5">
-				<div class="flex flex-wrap items-center gap-x-1">
-					<h3 class="text-base font-semibold">Adjustments</h3>
-					<Toggletip label="About adjustments" text={SPLIT_BILL.explanations.adjustments} />
-				</div>
-
-				{#if adjustments.length}
-					<ul class="mt-3 divide-y divide-border rounded-xl border border-border bg-bg">
-						{#each adjustments as adjustment (adjustment.id)}
-							{@const forSome =
-								(adjustment.assignedPersonIds?.length ?? 0) > 0 || choosing.includes(adjustment.id)}
-							<li class="py-2 pr-2 pl-4 text-sm">
-								<div class="flex items-center justify-between gap-3">
-									<span class="min-w-0">
-										<span class="font-medium break-words">{adjustment.name}</span>
-										<span class="text-muted"> · {KIND_NAMES[adjustment.kind]}</span>
-									</span>
-									<span class="flex shrink-0 items-center gap-1">
-										{signed(adjustment.amount)}
-										<button
-											type="button"
-											onclick={() => removeAdjustment(adjustment.id)}
-											aria-label="Remove {adjustment.name}"
-											class="inline-flex size-8 items-center justify-center rounded-full text-muted hover:bg-surface hover:text-text pointer-coarse:size-11"
-										>
-											<svg
-												class="size-4"
-												xmlns="http://www.w3.org/2000/svg"
-												fill="none"
-												viewBox="0 0 24 24"
-												stroke="currentColor"
-												stroke-width="2"
-												aria-hidden="true"
-											>
-												<path
-													stroke-linecap="round"
-													stroke-linejoin="round"
-													d="M6 18L18 6M6 6l12 12"
-												/>
-											</svg>
-										</button>
-									</span>
-								</div>
-								{#if people.length && forSome}
-									<fieldset class="mt-2 mb-1">
-										<legend class="mb-2 text-muted">Who is it for?</legend>
-										<div class="flex flex-wrap gap-2">
-											{#each people as person (person.id)}
-												{@const isFor = adjustment.assignedPersonIds?.includes(person.id) ?? false}
-												<button
-													type="button"
-													aria-pressed={isFor}
-													onclick={() => toggleAdjustmentTag(adjustment, person.id)}
-													class="min-h-9 rounded-full border px-3.5 transition-colors pointer-coarse:min-h-11 {isFor
-														? 'border-accent-edge bg-accent font-medium text-on-accent'
-														: 'border-control-border hover:bg-surface'}"
-												>
-													{#if isFor}<Check class="mr-1 align-[-0.125em]" />{/if}{person.name}
-												</button>
+												{/if}
 											{/each}
 										</div>
-										{#if !adjustment.assignedPersonIds?.length}
-											<p class="mt-2 text-muted">Until you pick someone, it's everyone's.</p>
-										{/if}
+										<p class="mt-2 text-sm" role="status">
+											{counted} of {quantity} counted{#if counted < quantity}: {quantity - counted} not
+												in anyone's share yet.{:else if counted > quantity}, more than there were:
+												each share is made smaller to fit.{:else}.{/if}
+										</p>
 										<button
 											type="button"
-											onclick={() => shareWithEveryone(adjustment)}
-											class="mt-1 min-h-9 text-muted underline underline-offset-4 hover:text-text"
-											>Share with everyone again</button
+											onclick={() => stopCounting(item)}
+											class="mt-1 min-h-9 text-sm text-muted underline underline-offset-4 hover:text-text"
+											>Share evenly instead</button
 										>
 									</fieldset>
 								{:else if people.length}
-									<button
-										type="button"
-										onclick={() => (choosing = [...choosing, adjustment.id])}
-										class="min-h-9 text-muted underline underline-offset-4 hover:text-text"
-										>Just for some people</button
-									>
+									<fieldset class="mt-3">
+										<legend class="mb-2 text-sm text-muted">Who had this?</legend>
+										<div class="flex flex-wrap gap-2">
+											{#each people as person (person.id)}
+												{@const had = item.assignedPersonIds.includes(person.id)}
+												<button
+													type="button"
+													aria-pressed={had}
+													onclick={() => toggleTag(item, person.id)}
+													class="min-h-9 rounded-full border px-3.5 text-sm transition-colors pointer-coarse:min-h-11 {had
+														? 'border-accent-edge bg-accent font-medium text-on-accent'
+														: 'border-control-border hover:bg-surface'}"
+												>
+													{#if had}<Check class="mr-1 align-[-0.125em]" />{/if}{person.name}
+												</button>
+											{/each}
+											<button
+												type="button"
+												onclick={() => toggleEveryone(item)}
+												class="min-h-9 rounded-full px-3 text-sm text-muted underline underline-offset-4 hover:text-text pointer-coarse:min-h-11"
+											>
+												{everyoneHasIt(item) ? 'Nobody' : 'Everyone'}
+											</button>
+										</div>
+										{#if (item.quantity ?? 1) > 1}
+											<div class="mt-1 flex flex-wrap items-center gap-x-1">
+												<button
+													type="button"
+													onclick={() => startCounting(item)}
+													class="min-h-9 text-sm text-muted underline underline-offset-4 hover:text-text"
+													>Count who had how many</button
+												>
+												<Toggletip
+													label="About counting who had how many"
+													text={SPLIT_BILL.explanations.counting}
+												/>
+											</div>
+										{/if}
+									</fieldset>
+								{:else}
+									<p class="mt-3 text-sm text-muted">Add people first, then tag who had this.</p>
 								{/if}
 							</li>
 						{/each}
 					</ul>
 				{:else}
-					<p class="mt-2 text-sm text-muted">
-						None. Add a discount or rounding if the receipt has one.
-					</p>
+					<p class="mt-5 text-sm text-muted">No items yet. Add the items from the bill.</p>
 				{/if}
-
-				<!-- Radio buttons, not a <select>: WebKit's own styling for a select breaks this site's
-				     style-src policy, and three choices are quicker to tap than a menu anyway. -->
-				<form
-					class="mt-4 space-y-3"
-					onsubmit={(event) => {
-						event.preventDefault();
-						addAdjustment();
-					}}
+				<!-- After a removal from this card: what went, and the way back. -->
+				<p
+					class="flex flex-wrap items-center gap-x-3 text-sm {removal?.from === 'items'
+						? 'mt-3 min-h-11'
+						: ''}"
+					role="status"
 				>
-					<fieldset>
-						<legend class={label}>Type</legend>
-						<div class="flex flex-wrap gap-x-5">
-							{#each ADJUSTMENT_KINDS as kind (kind)}
-								<label class={checkRow}>
-									<input
-										type="radio"
-										name="adjustment-kind"
-										value={kind}
-										bind:group={newAdjustmentKind}
-										class={checkbox}
-									/>
-									{KIND_NAMES[kind]}
-								</label>
-							{/each}
-						</div>
-					</fieldset>
-					<div>
-						<div class="grid gap-3 sm:grid-cols-[1fr_9rem]">
-							<div>
-								<label for="adjustment-name" class={label}>Name on the receipt</label>
-								<input
-									id="adjustment-name"
-									type="text"
-									autocomplete="off"
-									placeholder={KIND_NAMES[newAdjustmentKind]}
-									bind:value={newAdjustmentName}
-									class={field}
-								/>
-							</div>
-							<div>
-								<label for="adjustment-amount" class={label}>Amount</label>
-								<input
-									id="adjustment-amount"
-									type="text"
-									inputmode={amountKeypad}
-									autocomplete="off"
-									bind:value={newAdjustmentText}
-									aria-describedby="adjustment-amount-note"
-									aria-invalid={newAdjustmentNote?.problem ? true : undefined}
-									class={field}
-								/>
-							</div>
-						</div>
-						<p
-							id="adjustment-amount-note"
-							role="status"
-							class="mt-2 text-sm empty:mt-0 {newAdjustmentNote?.problem
-								? 'font-medium'
-								: 'text-muted'}"
-						>
-							{#if newAdjustmentNote}{newAdjustmentNote.text}{/if}
-						</p>
-					</div>
-					<div class="flex flex-wrap items-center justify-between gap-3">
-						{#if newAdjustmentKind === 'discount'}
-							<p class="text-sm text-muted">Comes off the bill.</p>
-						{:else}
-							<fieldset class="flex flex-wrap items-center gap-x-5">
-								<legend class="sr-only">Does it take off or add?</legend>
-								<label class={checkRow}>
-									<input
-										type="radio"
-										name="adjustment-direction"
-										checked={!newAdjustmentAdds}
-										onchange={() => (newAdjustmentAdds = false)}
-										class={checkbox}
-									/>
-									Takes off
-								</label>
-								<label class={checkRow}>
-									<input
-										type="radio"
-										name="adjustment-direction"
-										checked={newAdjustmentAdds}
-										onchange={() => (newAdjustmentAdds = true)}
-										class={checkbox}
-									/>
-									Adds
-								</label>
-							</fieldset>
-						{/if}
-						<button type="submit" disabled={!canAddAdjustment} class="{smallButton} {besideField}"
-							>Add adjustment</button
-						>
-					</div>
-				</form>
-			</div>
-		</section>
-
-		<!-- The split -->
-		{#if items.length}
-			<section class={card} aria-labelledby="split-heading">
-				<h2 id="split-heading" tabindex="-1" class={cardHeading}>The split</h2>
-
-				<dl class="space-y-2 rounded-xl border border-border bg-bg p-4 text-sm">
-					<div class="flex justify-between gap-4">
-						<dt>Subtotal</dt>
-						<dd>{money(totals.subtotal)}</dd>
-					</div>
-					{#each discountsOf(bill) as adjustment (adjustment.id)}
-						<div class="flex justify-between gap-4 text-muted">
-							<dt class="break-words">{adjustmentLabel(adjustment)}</dt>
-							<dd class="shrink-0">{signed(adjustment.amount)}</dd>
-						</div>
-					{/each}
-					{#if bill.servicePercentage > 0}
-						<div class="flex justify-between gap-4 text-muted">
-							<dt>Service ({bill.servicePercentage}%)</dt>
-							<dd>{bill.serviceIncluded ? 'included' : money(totals.service)}</dd>
-						</div>
-					{/if}
-					{#if bill.taxPercentage > 0}
-						<div class="flex justify-between gap-4 text-muted">
-							<dt>Tax ({bill.taxPercentage}%{bill.taxOnService ? ', on service too' : ''})</dt>
-							<dd>{bill.taxIncluded ? 'included' : money(totals.tax)}</dd>
-						</div>
-					{/if}
-					{#each lateAdjustmentsOf(bill) as adjustment (adjustment.id)}
-						<div class="flex justify-between gap-4 text-muted">
-							<dt class="break-words">{adjustmentLabel(adjustment)}</dt>
-							<dd class="shrink-0">{signed(adjustment.amount)}</dd>
-						</div>
-					{/each}
-					<div
-						class="flex justify-between gap-4 border-t border-border pt-2 text-base font-semibold"
-					>
-						<dt>Total</dt>
-						<dd>{money(totals.grandTotal)}</dd>
-					</div>
-				</dl>
-
-				{#if totals.unassigned > 0}
-					<p class="mt-4 rounded-lg border border-accent-edge bg-bg p-3 text-sm">
-						<strong>Not in anyone's share:</strong> items worth {money(totals.unassigned)} aren't tagged
-						or counted for anyone, so they're left out of the split below.
-						{#if totals.unshared !== totals.unassigned}{SPLIT_BILL.unsharedOfTotal(
-								money(totals.unshared)
-							)}{/if}
-					</p>
-				{/if}
-
-				{#if people.length}
-					<table class="mt-5 w-full text-left text-sm">
-						<caption class="mb-2 text-left text-sm font-semibold">What each person owes</caption>
-						<thead class="sr-only"
-							><tr><th scope="col">Person</th><th scope="col">Owes</th></tr></thead
-						>
-						<tbody class="divide-y divide-border">
-							{#each totals.shares as share (share.personId)}
-								<tr>
-									<th scope="row" class="py-3 pr-4 font-medium break-words"
-										>{nameOf(share.personId)}</th
-									>
-									<td class="py-3 text-right">
-										<span class="font-semibold">{money(share.total)}</span>
-										{#if share.base !== share.total}
-											<span class="block text-xs text-muted">
-												{money(share.base)} before charges and adjustments
-											</span>
-										{/if}
-									</td>
-								</tr>
-							{/each}
-						</tbody>
-					</table>
-				{/if}
-			</section>
-		{/if}
-
-		<!-- Share and clear -->
-		{#if items.length || people.length}
-			<div>
-				<div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-					<button
-						type="button"
-						onclick={copyLink}
-						disabled={sharing}
-						class="{primaryButton} sm:flex-[2_1_auto]">Copy a link to this bill</button
-					>
-					{#if items.length && people.length}
-						<button type="button" onclick={copyText} class="{secondaryButton} sm:flex-1"
-							>Copy as text</button
-						>
-						{#if canShare}
-							<button type="button" onclick={shareText} class="{secondaryButton} sm:flex-1"
-								>Share</button
-							>
-						{/if}
-					{/if}
-				</div>
-				<p class="mt-3 min-h-5 text-sm" role="status">
-					{#if status?.kind === 'copied'}{SPLIT_BILL.sharing
-							.copied}{:else if status?.kind === 'copied-updated'}{SPLIT_BILL.sharing
-							.copiedUpdated}{:else if status?.kind === 'copied-new'}{SPLIT_BILL.sharing
-							.copiedNew}{:else if status?.kind === 'copied-long'}{SPLIT_BILL.sharing
-							.copiedLong}{:else if status?.kind === 'copy-failed'}{SPLIT_BILL.sharing
-							.copyFailed}{:else if status?.kind === 'deleted'}{SPLIT_BILL.sharing
-							.deleted}{:else if status?.kind === 'delete-failed'}{SPLIT_BILL.sharing
-							.deleteFailed}{:else if status?.kind === 'text-copied'}{SPLIT_BILL.sharing
-							.textCopied}{:else if status?.kind === 'text-copy-failed'}{SPLIT_BILL.sharing
-							.textCopyFailed}{:else if status?.kind === 'share-failed'}{SPLIT_BILL.sharing
-							.shareFailed}{/if}
+					{#if removal?.from === 'items'}{SPLIT_BILL.removed(removal.name)}<button
+							type="button"
+							onclick={undoRemoval}
+							class="min-h-11 font-medium underline underline-offset-4 hover:text-accent-text"
+							>{SPLIT_BILL.undo}</button
+						>{/if}
 				</p>
-				{#if status?.kind === 'text-copy-failed'}
-					<label for="split-text" class="sr-only">The split as text</label>
-					<textarea
-						id="split-text"
-						readonly
-						rows={status.text.split('\n').length}
-						value={status.text}
-						class="{field} mt-2"></textarea>
-				{/if}
-				{#if deletable}
-					{#if confirmingDelete}
-						<div class="mt-2 flex flex-wrap items-center gap-2" role="group" aria-label="Delete">
-							<span class="text-sm">{SPLIT_BILL.sharing.deleteQuestion}</span>
-							<button type="button" onclick={deleteShared} class={smallButton}>Yes, delete</button>
-							<button type="button" onclick={() => (confirmingDelete = false)} class={smallButton}
-								>Keep it</button
-							>
-						</div>
-					{:else}
-						<button
-							type="button"
-							onclick={() => (confirmingDelete = true)}
-							class="mt-2 min-h-9 text-sm text-muted underline underline-offset-4 hover:text-text"
-							>Delete the shared copy</button
-						>
-					{/if}
-				{/if}
-				<div class="mt-4">
-					{#if confirmingClear}
-						<div
-							class="flex flex-wrap items-center gap-2"
-							role="group"
-							aria-label="Clear everything?"
-						>
-							<span class="text-sm">Clear everything?</span>
-							<button type="button" onclick={clearEverything} class={smallButton}>Yes, clear</button
-							>
-							<button type="button" onclick={() => (confirmingClear = false)} class={smallButton}
-								>Keep it</button
-							>
-						</div>
-					{:else}
-						<button
-							type="button"
-							onclick={() => (confirmingClear = true)}
-							class="{secondaryButton} w-full sm:w-auto">Clear everything</button
-						>
-					{/if}
+			</section>
+
+			<!-- Charges and adjustments, in the order a receipt prints them: after the items -->
+			<section class={card} aria-labelledby="charges-heading">
+				<h2 id="charges-heading" class={cardHeading}>Charges and adjustments</h2>
+				<div class="grid grid-cols-2 gap-4">
+					<div>
+						<label for="tax" class={label}>Tax (%)</label>
+						<input
+							id="tax"
+							type="number"
+							inputmode="decimal"
+							min="0"
+							max="100"
+							step="0.5"
+							bind:value={taxInput}
+							class={field}
+						/>
+					</div>
+					<div>
+						<label for="service" class={label}>Service (%)</label>
+						<input
+							id="service"
+							type="number"
+							inputmode="decimal"
+							min="0"
+							max="100"
+							step="0.5"
+							bind:value={serviceInput}
+							class={field}
+						/>
+					</div>
 				</div>
-				<p class="mt-3 text-sm text-muted">{SPLIT_BILL.privacy}</p>
-			</div>
-		{/if}
+
+				<div class="mt-4 space-y-1">
+					<div class="flex flex-wrap items-center gap-x-1">
+						<label class={checkRow}>
+							<input
+								type="checkbox"
+								checked={taxIncluded}
+								onchange={(event) => setTaxIncluded(event.currentTarget.checked)}
+								class={checkbox}
+							/>
+							Prices include tax
+						</label>
+						<Toggletip
+							label="About prices that include tax"
+							text={SPLIT_BILL.explanations.taxIncluded}
+						/>
+					</div>
+					<div class="flex flex-wrap items-center gap-x-1">
+						<label class={checkRow}>
+							<input type="checkbox" bind:checked={serviceIncluded} class={checkbox} />
+							Prices include service
+						</label>
+					</div>
+					<div class="flex flex-wrap items-center gap-x-1">
+						<label class="{checkRow} {taxIncluded ? 'text-muted' : ''}">
+							<input
+								type="checkbox"
+								checked={taxOnService && !taxIncluded}
+								disabled={taxIncluded}
+								onchange={(event) => setTaxOnService(event.currentTarget.checked)}
+								class={checkbox}
+							/>
+							Tax is charged on service too
+						</label>
+						<Toggletip label="About tax on service" text={SPLIT_BILL.explanations.taxOnService} />
+					</div>
+				</div>
+
+				<div class="mt-6 border-t border-border pt-5">
+					<div class="flex flex-wrap items-center gap-x-1">
+						<h3 class="text-base font-semibold">Adjustments</h3>
+						<Toggletip label="About adjustments" text={SPLIT_BILL.explanations.adjustments} />
+					</div>
+
+					{#if adjustments.length}
+						<ul class="mt-3 divide-y divide-border rounded-xl border border-border bg-bg">
+							{#each adjustments as adjustment (adjustment.id)}
+								{@const forSome =
+									(adjustment.assignedPersonIds?.length ?? 0) > 0 ||
+									choosing.includes(adjustment.id)}
+								<li class="py-2 pr-2 pl-4 text-sm">
+									<div class="flex items-center justify-between gap-3">
+										<span class="min-w-0">
+											<span class="font-medium break-words">{adjustment.name}</span>
+											<span class="text-muted"> · {KIND_NAMES[adjustment.kind]}</span>
+										</span>
+										<span class="flex shrink-0 items-center gap-1">
+											{signed(adjustment.amount)}
+											<button
+												type="button"
+												onclick={() => removeAdjustment(adjustment.id)}
+												aria-label="Remove {adjustment.name}"
+												class="inline-flex size-8 items-center justify-center rounded-full text-muted hover:bg-surface hover:text-text pointer-coarse:size-11"
+											>
+												<svg
+													class="size-4"
+													xmlns="http://www.w3.org/2000/svg"
+													fill="none"
+													viewBox="0 0 24 24"
+													stroke="currentColor"
+													stroke-width="2"
+													aria-hidden="true"
+												>
+													<path
+														stroke-linecap="round"
+														stroke-linejoin="round"
+														d="M6 18L18 6M6 6l12 12"
+													/>
+												</svg>
+											</button>
+										</span>
+									</div>
+									{#if people.length && forSome}
+										<fieldset class="mt-2 mb-1">
+											<legend class="mb-2 text-muted">Who is it for?</legend>
+											<div class="flex flex-wrap gap-2">
+												{#each people as person (person.id)}
+													{@const isFor =
+														adjustment.assignedPersonIds?.includes(person.id) ?? false}
+													<button
+														type="button"
+														aria-pressed={isFor}
+														onclick={() => toggleAdjustmentTag(adjustment, person.id)}
+														class="min-h-9 rounded-full border px-3.5 transition-colors pointer-coarse:min-h-11 {isFor
+															? 'border-accent-edge bg-accent font-medium text-on-accent'
+															: 'border-control-border hover:bg-surface'}"
+													>
+														{#if isFor}<Check class="mr-1 align-[-0.125em]" />{/if}{person.name}
+													</button>
+												{/each}
+											</div>
+											{#if !adjustment.assignedPersonIds?.length}
+												<p class="mt-2 text-muted">Until you pick someone, it's everyone's.</p>
+											{/if}
+											<button
+												type="button"
+												onclick={() => shareWithEveryone(adjustment)}
+												class="mt-1 min-h-9 text-muted underline underline-offset-4 hover:text-text"
+												>Share with everyone again</button
+											>
+										</fieldset>
+									{:else if people.length}
+										<button
+											type="button"
+											onclick={() => (choosing = [...choosing, adjustment.id])}
+											class="min-h-9 text-muted underline underline-offset-4 hover:text-text"
+											>Just for some people</button
+										>
+									{/if}
+								</li>
+							{/each}
+						</ul>
+					{:else}
+						<p class="mt-2 text-sm text-muted">
+							None. Add a discount or rounding if the receipt has one.
+						</p>
+					{/if}
+
+					<!-- Radio buttons, not a <select>: WebKit's own styling for a select breaks this site's
+				     style-src policy, and three choices are quicker to tap than a menu anyway. -->
+					<form
+						class="mt-4 space-y-3"
+						onsubmit={(event) => {
+							event.preventDefault();
+							addAdjustment();
+						}}
+					>
+						<fieldset>
+							<legend class={label}>Type</legend>
+							<div class="flex flex-wrap gap-x-5">
+								{#each ADJUSTMENT_KINDS as kind (kind)}
+									<label class={checkRow}>
+										<input
+											type="radio"
+											name="adjustment-kind"
+											value={kind}
+											bind:group={newAdjustmentKind}
+											class={checkbox}
+										/>
+										{KIND_NAMES[kind]}
+									</label>
+								{/each}
+							</div>
+						</fieldset>
+						<div>
+							<div class="grid gap-3 sm:grid-cols-[1fr_9rem]">
+								<div>
+									<label for="adjustment-name" class={label}>Name on the receipt</label>
+									<input
+										id="adjustment-name"
+										type="text"
+										autocomplete="off"
+										placeholder={KIND_NAMES[newAdjustmentKind]}
+										bind:value={newAdjustmentName}
+										class={field}
+									/>
+								</div>
+								<div>
+									<label for="adjustment-amount" class={label}>Amount</label>
+									<input
+										id="adjustment-amount"
+										type="text"
+										inputmode={amountKeypad}
+										autocomplete="off"
+										bind:value={newAdjustmentText}
+										aria-describedby="adjustment-amount-note"
+										aria-invalid={newAdjustmentNote?.problem ? true : undefined}
+										class={field}
+									/>
+								</div>
+							</div>
+							<p
+								id="adjustment-amount-note"
+								role="status"
+								class="mt-2 text-sm empty:mt-0 {newAdjustmentNote?.problem
+									? 'font-medium'
+									: 'text-muted'}"
+							>
+								{#if newAdjustmentNote}{newAdjustmentNote.text}{/if}
+							</p>
+						</div>
+						<div class="flex flex-wrap items-center justify-between gap-3">
+							{#if newAdjustmentKind === 'discount'}
+								<p class="text-sm text-muted">Comes off the bill.</p>
+							{:else}
+								<fieldset class="flex flex-wrap items-center gap-x-5">
+									<legend class="sr-only">Does it take off or add?</legend>
+									<label class={checkRow}>
+										<input
+											type="radio"
+											name="adjustment-direction"
+											checked={!newAdjustmentAdds}
+											onchange={() => (newAdjustmentAdds = false)}
+											class={checkbox}
+										/>
+										Takes off
+									</label>
+									<label class={checkRow}>
+										<input
+											type="radio"
+											name="adjustment-direction"
+											checked={newAdjustmentAdds}
+											onchange={() => (newAdjustmentAdds = true)}
+											class={checkbox}
+										/>
+										Adds
+									</label>
+								</fieldset>
+							{/if}
+							<button type="submit" disabled={!canAddAdjustment} class="{smallButton} {besideField}"
+								>Add adjustment</button
+							>
+						</div>
+					</form>
+				</div>
+			</section>
+		</div>
+
+		<div
+			class="space-y-6 lg:sticky lg:top-6 lg:-m-2 lg:max-h-[calc(100dvh-3rem)] lg:overflow-y-auto lg:overscroll-contain lg:p-2"
+		>
+			<!-- The split -->
+			{#if items.length}
+				<section class={card} aria-labelledby="split-heading">
+					<h2 id="split-heading" tabindex="-1" class={cardHeading}>The split</h2>
+
+					{#if people.length}
+						<!-- What each person hands over comes first, and largest: it's what the table asked. -->
+						<ul class="divide-y divide-border" aria-label="What each person owes">
+							{#each settledUp.settlements as settlement, index (settlement.personId)}
+								{@const share = totals.shares[index]}
+								<li class="flex items-center justify-between gap-4 py-3">
+									<div class="min-w-0">
+										<p class="font-medium break-words">{nameOf(settlement.personId)}</p>
+										{#if settlement.paidTheBill}
+											<p class="text-sm text-muted">{SPLIT_BILL.split.paidTheBill}</p>
+										{:else if payerName}
+											<p class="text-sm text-muted">{SPLIT_BILL.split.to(payerName)}</p>
+										{:else if share.base !== share.total}
+											<p class="text-sm text-muted">
+												{SPLIT_BILL.split.ordered(money(share.base))}
+											</p>
+										{/if}
+									</div>
+									<p class="shrink-0 text-2xl font-bold tracking-tight tabular-nums">
+										{money(settlement.amount)}
+									</p>
+								</li>
+							{/each}
+						</ul>
+
+						<fieldset class="mt-5">
+							<legend class="mb-1 text-sm font-medium">{SPLIT_BILL.split.paidBy}</legend>
+							<div class="flex flex-wrap gap-x-5">
+								<label class={checkRow}>
+									<input
+										type="radio"
+										name="paid-by"
+										checked={!payerName}
+										onchange={() => (paidBy = undefined)}
+										class={checkbox}
+									/>
+									{SPLIT_BILL.split.nobody}
+								</label>
+								{#each people as person (person.id)}
+									<label class="{checkRow} break-all">
+										<input
+											type="radio"
+											name="paid-by"
+											checked={paidBy === person.id}
+											onchange={() => (paidBy = person.id)}
+											class={checkbox}
+										/>
+										{person.name}
+									</label>
+								{/each}
+							</div>
+						</fieldset>
+
+						<fieldset class="mt-3">
+							<legend class="mb-1 text-sm font-medium">{SPLIT_BILL.split.roundUp}</legend>
+							<div class="flex flex-wrap gap-x-5">
+								<label class={checkRow}>
+									<input
+										type="radio"
+										name="round-to"
+										checked={!roundTo}
+										onchange={() => (roundTo = undefined)}
+										class={checkbox}
+									/>
+									{SPLIT_BILL.split.noRounding}
+								</label>
+								{#each steps as step (step)}
+									<label class={checkRow}>
+										<input
+											type="radio"
+											name="round-to"
+											checked={roundTo === step}
+											onchange={() => (roundTo = step)}
+											class={checkbox}
+										/>
+										{SPLIT_BILL.split.roundTo(money(step))}
+									</label>
+								{/each}
+							</div>
+							{#if settledUp.extra > 0}
+								<p class="mt-1 text-sm text-muted">
+									{payerName
+										? SPLIT_BILL.split.extraToPayer(money(settledUp.extra), payerName)
+										: SPLIT_BILL.split.extraOnTop(money(settledUp.extra))}
+								</p>
+							{/if}
+						</fieldset>
+					{/if}
+
+					{#if totals.unassigned > 0}
+						<p class="mt-4 rounded-lg border border-accent-edge bg-bg p-3 text-sm">
+							<strong>Not in anyone's share:</strong> items worth {money(totals.unassigned)} aren't tagged
+							or counted for anyone, so they're left out of the shares.
+							{#if totals.unshared !== totals.unassigned}{SPLIT_BILL.unsharedOfTotal(
+									money(totals.unshared)
+								)}{/if}
+						</p>
+					{/if}
+
+					<dl
+						class="mt-5 space-y-2 rounded-xl border border-border bg-bg p-4 text-sm"
+						aria-label="How it adds up"
+					>
+						<div class="flex justify-between gap-4">
+							<dt>Subtotal</dt>
+							<dd>{money(totals.subtotal)}</dd>
+						</div>
+						{#each discountsOf(bill) as adjustment (adjustment.id)}
+							<div class="flex justify-between gap-4 text-muted">
+								<dt class="break-words">{adjustmentLabel(adjustment)}</dt>
+								<dd class="shrink-0">{signed(adjustment.amount)}</dd>
+							</div>
+						{/each}
+						{#if bill.servicePercentage > 0}
+							<div class="flex justify-between gap-4 text-muted">
+								<dt>Service ({bill.servicePercentage}%)</dt>
+								<dd>{bill.serviceIncluded ? 'included' : money(totals.service)}</dd>
+							</div>
+						{/if}
+						{#if bill.taxPercentage > 0}
+							<div class="flex justify-between gap-4 text-muted">
+								<dt>Tax ({bill.taxPercentage}%{bill.taxOnService ? ', on service too' : ''})</dt>
+								<dd>{bill.taxIncluded ? 'included' : money(totals.tax)}</dd>
+							</div>
+						{/if}
+						{#each lateAdjustmentsOf(bill) as adjustment (adjustment.id)}
+							<div class="flex justify-between gap-4 text-muted">
+								<dt class="break-words">{adjustmentLabel(adjustment)}</dt>
+								<dd class="shrink-0">{signed(adjustment.amount)}</dd>
+							</div>
+						{/each}
+						<div
+							class="flex justify-between gap-4 border-t border-border pt-2 text-base font-semibold"
+						>
+							<dt>Total</dt>
+							<dd>{money(totals.grandTotal)}</dd>
+						</div>
+					</dl>
+				</section>
+			{:else}
+				<p class="hidden rounded-2xl border border-border p-6 text-sm text-muted lg:block">
+					{SPLIT_BILL.split.empty}
+				</p>
+			{/if}
+
+			<!-- Share and clear -->
+			{#if items.length || people.length}
+				<div>
+					<div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap lg:flex-col">
+						<button
+							type="button"
+							onclick={copyLink}
+							disabled={sharing}
+							class="{primaryButton} sm:flex-[2_1_auto]">Copy a link to this bill</button
+						>
+						{#if items.length && people.length}
+							<button type="button" onclick={copyText} class="{secondaryButton} sm:flex-1"
+								>Copy as text</button
+							>
+							{#if canShare}
+								<button type="button" onclick={shareText} class="{secondaryButton} sm:flex-1"
+									>Share</button
+								>
+							{/if}
+						{/if}
+					</div>
+					<p class="mt-3 min-h-5 text-sm" role="status">
+						{#if status?.kind === 'copied'}{SPLIT_BILL.sharing
+								.copied}{:else if status?.kind === 'copied-updated'}{SPLIT_BILL.sharing
+								.copiedUpdated}{:else if status?.kind === 'copied-new'}{SPLIT_BILL.sharing
+								.copiedNew}{:else if status?.kind === 'copied-long'}{SPLIT_BILL.sharing
+								.copiedLong}{:else if status?.kind === 'copy-failed'}{SPLIT_BILL.sharing
+								.copyFailed}{:else if status?.kind === 'deleted'}{SPLIT_BILL.sharing
+								.deleted}{:else if status?.kind === 'delete-failed'}{SPLIT_BILL.sharing
+								.deleteFailed}{:else if status?.kind === 'text-copied'}{SPLIT_BILL.sharing
+								.textCopied}{:else if status?.kind === 'text-copy-failed'}{SPLIT_BILL.sharing
+								.textCopyFailed}{:else if status?.kind === 'share-failed'}{SPLIT_BILL.sharing
+								.shareFailed}{/if}
+					</p>
+					{#if status?.kind === 'text-copy-failed'}
+						<label for="split-text" class="sr-only">The split as text</label>
+						<textarea
+							id="split-text"
+							readonly
+							rows={status.text.split('\n').length}
+							value={status.text}
+							class="{field} mt-2"></textarea>
+					{/if}
+					{#if deletable}
+						{#if confirmingDelete}
+							<div class="mt-2 flex flex-wrap items-center gap-2" role="group" aria-label="Delete">
+								<span class="text-sm">{SPLIT_BILL.sharing.deleteQuestion}</span>
+								<button type="button" onclick={deleteShared} class={smallButton}>Yes, delete</button
+								>
+								<button type="button" onclick={() => (confirmingDelete = false)} class={smallButton}
+									>Keep it</button
+								>
+							</div>
+						{:else}
+							<button
+								type="button"
+								onclick={() => (confirmingDelete = true)}
+								class="mt-2 min-h-9 text-sm text-muted underline underline-offset-4 hover:text-text"
+								>Delete the shared copy</button
+							>
+						{/if}
+					{/if}
+					<div class="mt-4">
+						{#if confirmingClear}
+							<div
+								class="flex flex-wrap items-center gap-2"
+								role="group"
+								aria-label="Clear everything?"
+							>
+								<span class="text-sm">Clear everything?</span>
+								<button type="button" onclick={clearEverything} class={smallButton}
+									>Yes, clear</button
+								>
+								<button type="button" onclick={() => (confirmingClear = false)} class={smallButton}
+									>Keep it</button
+								>
+							</div>
+						{:else}
+							<button
+								type="button"
+								onclick={() => (confirmingClear = true)}
+								class="{secondaryButton} w-full sm:w-auto">Clear everything</button
+							>
+						{/if}
+					</div>
+					<p class="mt-3 text-sm text-muted">{SPLIT_BILL.privacy}</p>
+				</div>
+			{/if}
+		</div>
 
 		<!-- On a phone the split is far below the tagging: the total and what isn't in anyone's share
 		     stay at the bottom while the bill is made. It's sticky, not fixed, so it takes its own
@@ -2096,7 +2219,7 @@
 			<section
 				aria-label="The bill so far"
 				data-running-total
-				class="sticky bottom-0 z-10 -mx-5 border-t border-border bg-surface px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:hidden"
+				class="sticky bottom-0 z-10 -mx-5 border-t border-border bg-surface px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:-mx-8 sm:px-8 lg:hidden"
 			>
 				<div class="flex items-center justify-between gap-3">
 					<dl class="min-w-0 text-sm">

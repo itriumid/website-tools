@@ -96,9 +96,9 @@ html {
 	}
 }
 
-/* Split bill's running total stays at the bottom of a phone's screen: whatever has focus scrolls
-   clear of it, not under it. */
-@media (width < 40rem) {
+/* Split bill's running total stays at the bottom of the screen until the split has a column of its
+   own: whatever has focus scrolls clear of it, not under it. */
+@media (width < 64rem) {
 	html:has([data-running-total]) {
 		scroll-padding-bottom: 6rem;
 	}
