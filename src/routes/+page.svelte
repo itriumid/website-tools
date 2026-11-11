@@ -7,7 +7,6 @@
 		ELSEWHERE,
 		ELSEWHERE_HEADING,
 		HEADING,
-		INTRODUCTION,
 		PROMISE,
 		PROMISE_HEADING,
 		SOURCE_LABEL,
@@ -29,12 +28,10 @@
 
 <section class="px-3 sm:px-5">
 	<div class="band mx-auto max-w-6xl rounded-3xl">
-		<div class="mx-auto max-w-5xl px-6 py-14 sm:px-8 sm:py-20">
+		<div class="mx-auto max-w-5xl px-6 py-10 sm:px-8 sm:py-16">
 			<h1 class="text-5xl font-bold tracking-tight sm:text-7xl">{HEADING}</h1>
-			<p class="mt-5 max-w-2xl text-2xl leading-snug font-medium text-accent-text sm:text-3xl">
-				{TAGLINE}
-			</p>
-			<p class="mt-5 max-w-2xl text-lg leading-relaxed text-muted">{INTRODUCTION}</p>
+			<!-- The two jobs, in the text color: the first pink a visitor meets is something to press. -->
+			<p class="mt-5 max-w-2xl text-2xl leading-snug font-medium sm:text-3xl">{TAGLINE}</p>
 		</div>
 	</div>
 </section>
@@ -48,16 +45,17 @@
 					<p class="mt-2 text-muted">{tool.summary}</p>
 					<!-- What the tool makes, as it looks in the tool. It's a picture, so screen readers
 					     skip it: the summary already says it. -->
-					<div
-						class="mt-5 divide-y divide-border rounded-xl bg-bg px-4 text-sm tabular-nums"
-						aria-hidden="true"
-					>
-						{#each tool.sample as line (line.value)}
-							<div class="flex justify-between gap-4 py-2">
-								{#if line.label}<span>{line.label}</span>{/if}
-								<span class={line.label ? 'font-semibold' : 'min-w-0 truncate'}>{line.value}</span>
-							</div>
-						{/each}
+					<div class="mt-5" aria-hidden="true">
+						<p class="text-sm text-muted">{tool.sampleCaption}</p>
+						<div class="mt-2 divide-y divide-border rounded-xl bg-bg px-4 text-sm tabular-nums">
+							{#each tool.sample as line (line.value)}
+								<div class="flex justify-between gap-4 py-2">
+									{#if line.label}<span>{line.label}</span>{/if}
+									<span class={line.label ? 'font-semibold' : 'min-w-0 truncate'}>{line.value}</span
+									>
+								</div>
+							{/each}
+						</div>
 					</div>
 					<span class="mt-5 {actionLine}" aria-hidden="true"
 						>Open {tool.name}<Arrow class={arrowMove} /></span
