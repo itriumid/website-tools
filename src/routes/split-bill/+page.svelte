@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
-	import { resolve } from '$app/paths';
 	import SearchableSelect, { type Choice } from '#lib/SearchableSelect.svelte';
 	import Check from '#lib/Check.svelte';
 	import Seo from '#lib/Seo.svelte';
+	import TitleBand from '#lib/TitleBand.svelte';
 	import Toggletip from '#lib/Toggletip.svelte';
 	import {
 		readReceipt,
@@ -814,15 +814,10 @@
 	}}
 />
 
+<TitleBand title={SPLIT_BILL.name} introduction={SPLIT_BILL.introduction} width="max-w-2xl" />
+
 <section class="mx-auto max-w-2xl px-5 pt-6 pb-20 sm:px-8">
-	<p class="text-sm">
-		<a href={resolve('/')} class="text-muted underline underline-offset-4 hover:text-text"
-			>← All tools</a
-		>
-	</p>
-	<h1 class="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">{SPLIT_BILL.name}</h1>
-	<p class="mt-3 text-muted">{SPLIT_BILL.introduction}</p>
-	<div class="mt-4 {openedFromLink ? 'min-h-6' : 'empty:mt-0'}" role="status">
+	<div class="mb-6 {openedFromLink ? 'min-h-6' : 'empty:mb-0'}" role="status">
 		{#if status?.kind === 'opening'}
 			<p class="flex items-center gap-2">
 				<svg
@@ -867,7 +862,7 @@
 
 	<!-- While a shared bill opens, the empty one under it can't be changed: it's about to be replaced. -->
 	<div
-		class="mt-8 space-y-6 motion-safe:transition-opacity {opening ? 'opacity-50' : ''}"
+		class="space-y-6 motion-safe:transition-opacity {opening ? 'opacity-50' : ''}"
 		aria-busy={opening}
 		inert={opening}
 	>

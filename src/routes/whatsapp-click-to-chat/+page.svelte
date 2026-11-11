@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { resolve } from '$app/paths';
 	import SearchableSelect, { type Choice } from '#lib/SearchableSelect.svelte';
 	import Seo from '#lib/Seo.svelte';
+	import TitleBand from '#lib/TitleBand.svelte';
 	import { WHATSAPP } from '#lib/content.js';
 	import { COUNTRIES, DEFAULT_COUNTRY_NAME } from '#lib/countries.js';
 	import { card, field, label, primaryButton, secondaryButton } from '#lib/styles.js';
@@ -59,16 +59,10 @@
 	}}
 />
 
-<section class="mx-auto max-w-xl px-5 pt-6 pb-20 sm:px-8">
-	<p class="text-sm">
-		<a href={resolve('/')} class="text-muted underline underline-offset-4 hover:text-text"
-			>← All tools</a
-		>
-	</p>
-	<h1 class="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">{WHATSAPP.name}</h1>
-	<p class="mt-3 text-muted">{WHATSAPP.introduction}</p>
+<TitleBand title={WHATSAPP.name} introduction={WHATSAPP.introduction} width="max-w-xl" />
 
-	<form class="{card} mt-8 space-y-5" onsubmit={(event) => event.preventDefault()}>
+<section class="mx-auto max-w-xl px-5 pt-6 pb-20 sm:px-8">
+	<form class="{card} space-y-5" onsubmit={(event) => event.preventDefault()}>
 		<div>
 			<label for="country" class={label}>Country</label>
 			<SearchableSelect
