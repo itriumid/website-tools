@@ -444,12 +444,22 @@ end of the page. Hidden from 1024 px, where the split has its own column.
 ### The split (signature)
 
 What each person hands over comes first and largest: one row per person, the name in medium
-weight with a muted line under it ("To Budi", "Paid the bill", or what they ordered), and the
-amount in bold 1.5rem tabular figures, right-aligned. Then two radio groups, "Who paid?" and
+weight with a muted line under it ("To Budi", or what they ordered), and the amount in bold
+1.5rem tabular figures, right-aligned. Whoever paid hands nothing over, so their big number is what
+comes back to them, with "Paid the bill, gets this back" and their own share in the muted line.
+The "Not in anyone's share" note is gray until anything is tagged, and pink once tagging has begun
+and something is still left out: a state isn't an error before anyone has started. Then two radio groups, "Who paid?" and
 "Round shares up" (to two steps people actually hand over, Rp 500 and Rp 1.000 for rupiah), with
 a muted line saying what rounding added and whose part it came off. The breakdown (subtotal,
 charges, total) comes last, in an inset list: it's how the answer was reached, not the answer. A
 shared link opens with the split's heading focused, scrolled to on a phone.
+
+### More on the receipt
+
+The Charges card shows the two rates. What only some receipts say (prices that include tax or
+service, tax on service, discounts and rounding) waits behind a disclosure, "More on the receipt",
+with the drawn arrow turning down when open. It opens itself when a scan, a link or a choice puts
+any of it on the bill.
 
 ### Undo line
 
