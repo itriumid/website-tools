@@ -495,6 +495,14 @@
 			reviewTotal !== undefined &&
 			Math.abs(reviewTotal - reviewed.total) >= coin / 2
 	);
+	const unpriced = (line: ReviewLine) => {
+		const price = priceOf(line);
+		return price === null || !(price > 0);
+	};
+	/** Lines without a price are often not items at all (a heading, a note): one press drops them. */
+	function removeUnpriced() {
+		reviewLines = reviewLines.filter((line) => !unpriced(line));
+	}
 	const pricesMissing = $derived(
 		reviewLines.some((line) => {
 			const price = priceOf(line);
@@ -1142,6 +1150,11 @@
 							disabled={pricesMissing || reviewLines.length === 0}
 							class={primaryButton}>{SPLIT_BILL.scanning.add}</button
 						>
+						{#if pricesMissing && reviewLines.length}
+							<button type="button" onclick={removeUnpriced} class={secondaryButton}
+								>{SPLIT_BILL.scanning.removeUnpriced}</button
+							>
+						{/if}
 						<button type="button" onclick={closeScan} class={secondaryButton}
 							>{SPLIT_BILL.scanning.cancel}</button
 						>

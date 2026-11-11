@@ -246,6 +246,38 @@ describe('readReceipt, the odd ones', () => {
 		expect(receipt.items).toEqual([{ name: 'Es Jeruk', quantity: 1, price: 18000, unsure: true }]);
 	});
 
+	it("skips the place's name at the top, and reads a quantity in the middle of a line", () => {
+		const receipt = readReceipt(
+			[
+				'WARUNG CONTOH',
+				'Nasi Goreng 45.000',
+				'Es Teh 2 x 8.000 16.000',
+				'Sate Ayam 52.000',
+				'Subtotal 113.000',
+				'Service 5% 5.650',
+				'Tax 10% 11.865',
+				'Total 130.515'
+			].join('\n'),
+			'IDR'
+		);
+		expect(receipt.items).toEqual([
+			{ name: 'Nasi Goreng', quantity: 1, price: 45000, unsure: false },
+			{ name: 'Es Teh', quantity: 2, price: 16000, unsure: false },
+			{ name: 'Sate Ayam', quantity: 1, price: 52000, unsure: false }
+		]);
+		expect(receipt.itemsGap).toBeUndefined();
+		expect(receiptTotal(receipt, 'IDR')).toBe(130515);
+	});
+
+	it('keeps a line without a price below the first item, and marks it', () => {
+		const receipt = readReceipt('Kopi 20.000\nAir Putih\nTeh 10.000\nTotal 30.000', 'IDR');
+		expect(receipt.items).toEqual([
+			{ name: 'Kopi', quantity: 1, price: 20000, unsure: false },
+			{ name: 'Air Putih', quantity: 1, price: undefined, unsure: true },
+			{ name: 'Teh', quantity: 1, price: 10000, unsure: false }
+		]);
+	});
+
 	it('marks a line whose unit price and quantity disagree with its total', () => {
 		const receipt = readReceipt('Sate\n3 x 10.000 25.000\nTotal 25.000', 'IDR');
 		expect(receipt.items[0].unsure).toBe(true);

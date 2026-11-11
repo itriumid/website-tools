@@ -140,7 +140,8 @@ export const SPLIT_BILL = {
 			`The items add up to ${difference} ${less ? 'less' : 'more'} than the receipt's subtotal. Check the marked prices.`,
 		totalOff: (ours: string, theirs: string) =>
 			`This comes to ${ours}, but the receipt says ${theirs}.`,
-		missingPrice: 'Fill in every price first.',
+		missingPrice: 'Fill in every price first, or remove the lines that have none.',
+		removeUnpriced: 'Remove the lines without a price',
 		add: 'Add to the bill'
 	},
 	// Shown only when someone asks, behind an ⓘ next to the setting they explain.
