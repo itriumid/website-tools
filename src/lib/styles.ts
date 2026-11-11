@@ -22,3 +22,7 @@ export const checkRow =
 export const checkbox = 'size-5 shrink-0 accent-accent-edge disabled:cursor-not-allowed';
 export const card = 'rounded-2xl border border-border bg-surface p-5 sm:p-6';
 export const cardHeading = 'mb-4 text-lg font-semibold';
+/** A section's heading: a real heading in sentence case, a clear size step above the text under it. */
+export const sectionHeading = 'text-3xl font-bold tracking-tight sm:text-4xl';
+/** A link's way onward, in pink text with the drawn arrow, which moves right when hovered. */
+export const actionLine = 'inline-flex items-center gap-1.5 font-medium text-accent-text';

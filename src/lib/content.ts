@@ -13,11 +13,24 @@ export const DESCRIPTION =
 	'Small, free web tools from Itrium. No account, no advertisements, and what you type stays on your device unless you share it.';
 
 export const HEADING = 'Free tools';
-export const INTRODUCTION =
-	"Small tools for small jobs. They are free, they need no account, and they run in your browser. What you type isn't sent to us, and a bill you share reaches us only encrypted, so we can't read it.";
+export const TAGLINE = 'Small tools for small jobs.';
+export const INTRODUCTION = 'They are free, they need no account, and they run in your browser.';
+
+// The index's closing panel: what happens to what people type, said plainly, with the source as
+// the proof.
+export const PROMISE_HEADING = 'What stays on your device';
+export const PROMISE = [
+	"What you type stays in your browser. It isn't sent to us.",
+	"A bill you share reaches us encrypted, with a key that's only in the link, so we can't read it. We delete it 30 days after it was last shared.",
+	'No cookies, no analytics, no trackers, and nothing loaded from anywhere else.'
+];
+export const SOURCE_LABEL = 'Read the source';
 
 export const NO_TRACKING =
 	'This site has no cookies, no analytics and no trackers. What you type stays in your browser, unless you share a bill, and then we only ever see it encrypted.';
+
+/** Lines that show what a tool makes, on the index: an optional name, then the value. */
+type Sample = { label?: string; value: string }[];
 
 export const WHATSAPP = {
 	path: '/whatsapp-click-to-chat' as const,
@@ -28,6 +41,8 @@ export const WHATSAPP = {
 		'Make a WhatsApp click-to-chat link from any phone number, with a message already typed if you like. Spaces and symbols are removed for you.',
 	introduction:
 		'Enter a phone number and we build the link that opens a chat with it. Spaces, dashes and brackets are taken out, so you can paste a number as it is.',
+	/** On the index, a glimpse of what the tool makes. */
+	sample: [{ value: 'wa.me/6281200000000' }] as Sample,
 	problems: {
 		'too-short': "That's too short for a phone number. Check you have every digit.",
 		'too-long': "That's too long for a phone number. Check the country code isn't in it twice.",
@@ -44,6 +59,12 @@ export const SPLIT_BILL = {
 		'Split a bill fairly: add the people and the items, tag who had what, add tax and service, and share the result as a short link. Shared bills are encrypted, and only people with the link can open them.',
 	introduction:
 		'Add the people and the items, tag each item to the people who had it, and we work out a fair share for each person, tax and service included.',
+	/** On the index, a glimpse of what the tool makes: each person's share. */
+	sample: [
+		{ label: 'Ayu', value: 'Rp 86.500' },
+		{ label: 'Budi', value: 'Rp 112.000' },
+		{ label: 'Citra', value: 'Rp 64.500' }
+	] as Sample,
 	privacy:
 		"A shared bill waits on our server for 30 days after it was last shared, encrypted with a key that is only in the link, so we can't read it. Whoever shared it can update it or delete it, on the same device.",
 	sharing: {
@@ -137,11 +158,12 @@ export const SPLIT_BILL = {
 	}
 };
 
-export const TOOLS = [WHATSAPP, SPLIT_BILL];
+// Split bill first: it's the one people come for.
+export const TOOLS = [SPLIT_BILL, WHATSAPP];
 
 // Bigger things from us that run in the browser too, on sites of their own: their data lives
 // in the browser, and a site of its own keeps it apart from everything else.
-export const ELSEWHERE_HEADING = 'On sites of their own';
+export const ELSEWHERE_HEADING = 'Bigger tools, on sites of their own';
 export const ELSEWHERE = [
 	{
 		name: 'Amber',

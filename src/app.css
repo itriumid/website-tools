@@ -20,6 +20,8 @@
 	/* The edge of a field or button, which people need to see to find it: 3:1 against both the page
 	   and a card. The softer --border is for dividing lines that nothing depends on. */
 	--control-border: #8a8a8a;
+	/* Pink as text: pastel on graphite, rose on light backgrounds (4.8:1 on the page, 5.4:1 on white). */
+	--accent-text: #febfca;
 	/* The focus outline: pink on graphite, graphite on light backgrounds, where pink is 1.5:1. */
 	--focus: #febfca;
 	color-scheme: dark;
@@ -34,6 +36,7 @@
 		/* #AAAAAA is too faint to read on white, so light mode uses a darker gray. */
 		--muted: #6b6b6b;
 		--accent-edge: #c46475;
+		--accent-text: #a84d60;
 		--control-border: #767676;
 		--focus: #2b2b2b;
 		color-scheme: light;
@@ -50,6 +53,7 @@
 	--color-accent: var(--accent);
 	--color-on-accent: var(--on-accent);
 	--color-accent-edge: var(--accent-edge);
+	--color-accent-text: var(--accent-text);
 	--color-control-border: var(--control-border);
 }
 
@@ -76,6 +80,19 @@ html {
 		outline: 2px solid var(--focus);
 		outline-offset: 3px;
 		border-radius: 4px;
+	}
+
+	/* No paragraph ends on a single stranded word, and headings balance their lines. */
+	p,
+	li,
+	dd {
+		text-wrap: pretty;
+	}
+
+	h1,
+	h2,
+	h3 {
+		text-wrap: balance;
 	}
 }
 

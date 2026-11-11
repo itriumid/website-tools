@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import Arrow from '#lib/Arrow.svelte';
 	import Seo from '#lib/Seo.svelte';
 	import {
 		DESCRIPTION,
@@ -7,54 +8,96 @@
 		ELSEWHERE_HEADING,
 		HEADING,
 		INTRODUCTION,
+		PROMISE,
+		PROMISE_HEADING,
+		SOURCE_LABEL,
+		SOURCE_URL,
+		TAGLINE,
 		TITLE,
 		TOOLS
 	} from '#lib/content.js';
+	import { actionLine, secondaryButton, sectionHeading } from '#lib/styles.js';
+
+	// A card that is a link: it lifts and takes a pink edge when a pointer touches it, and its
+	// arrow moves on. The lift and the move wait for people who haven't asked for less motion.
+	const cardLink =
+		'group block h-full rounded-2xl border border-border bg-surface p-6 transition duration-200 hover:border-accent-edge motion-safe:hover:-translate-y-1';
+	const arrowMove = 'transition-transform duration-200 motion-safe:group-hover:translate-x-1';
 </script>
 
 <Seo title={TITLE} description={DESCRIPTION} path="/" />
 
-<section class="mx-auto max-w-5xl px-5 pt-10 pb-20 sm:px-8">
-	<h1 class="text-4xl font-bold tracking-tight sm:text-5xl">{HEADING}</h1>
-	<p class="mt-5 max-w-2xl text-lg text-muted">{INTRODUCTION}</p>
+<section class="px-3 sm:px-5">
+	<div class="band mx-auto max-w-6xl rounded-3xl">
+		<div class="mx-auto max-w-5xl px-6 py-14 sm:px-8 sm:py-20">
+			<h1 class="text-5xl font-bold tracking-tight sm:text-7xl">{HEADING}</h1>
+			<p class="mt-5 max-w-2xl text-2xl leading-snug font-medium text-accent-text sm:text-3xl">
+				{TAGLINE}
+			</p>
+			<p class="mt-5 max-w-2xl text-lg leading-relaxed text-muted">{INTRODUCTION}</p>
+		</div>
+	</div>
+</section>
 
-	<ul class="mt-12 grid gap-5 sm:grid-cols-2">
+<div class="mx-auto max-w-5xl px-5 py-16 sm:px-8 sm:py-20">
+	<ul class="grid gap-5 sm:grid-cols-2">
 		{#each TOOLS as tool (tool.path)}
 			<li>
-				<a
-					href={resolve(tool.path)}
-					class="block h-full rounded-2xl border border-border bg-surface p-6 transition-colors hover:border-accent-edge"
-				>
+				<a href={resolve(tool.path)} class={cardLink}>
 					<h2 class="text-xl font-semibold">{tool.name}</h2>
 					<p class="mt-2 text-muted">{tool.summary}</p>
-					<span class="mt-5 inline-block font-medium underline underline-offset-4"
-						>Open the tool</span
+					<!-- What the tool makes, as it looks in the tool. It's a picture, so screen readers
+					     skip it: the summary already says it. -->
+					<div
+						class="mt-5 divide-y divide-border rounded-xl bg-bg px-4 text-sm tabular-nums"
+						aria-hidden="true"
+					>
+						{#each tool.sample as line (line.value)}
+							<div class="flex justify-between gap-4 py-2">
+								{#if line.label}<span>{line.label}</span>{/if}
+								<span class={line.label ? 'font-semibold' : 'min-w-0 truncate'}>{line.value}</span>
+							</div>
+						{/each}
+					</div>
+					<span class="mt-5 {actionLine}" aria-hidden="true"
+						>Open {tool.name}<Arrow class={arrowMove} /></span
 					>
 				</a>
 			</li>
 		{/each}
 	</ul>
 
-	<h2 class="mt-16 text-sm font-semibold tracking-widest text-muted uppercase">
-		{ELSEWHERE_HEADING}
-	</h2>
-	<ul class="mt-6 grid gap-5 sm:grid-cols-2">
+	<h2 class="mt-20 {sectionHeading}">{ELSEWHERE_HEADING}</h2>
+	<ul class="mt-8 grid gap-5 sm:grid-cols-2">
 		{#each ELSEWHERE as app (app.url)}
 			<li>
-				<a
-					href={app.url}
-					rel="external"
-					class="block h-full rounded-2xl border border-border bg-surface p-6 transition-colors hover:border-accent-edge"
-				>
+				<a href={app.url} rel="external" class={cardLink}>
 					<h3 class="text-xl font-semibold">{app.name}</h3>
 					<p class="mt-2 text-muted">{app.summary}</p>
-					<span class="mt-5 inline-block font-medium underline underline-offset-4"
+					<span class="mt-5 {actionLine}"
 						><span aria-hidden="true">{app.label}</span><span class="sr-only"
 							>{app.label} at {new URL(app.url).host}</span
-						></span
+						><Arrow class={arrowMove} /></span
 					>
 				</a>
 			</li>
 		{/each}
 	</ul>
+</div>
+
+<!-- The closing panel: the promise, and the source that proves it. -->
+<section class="px-3 pb-16 sm:px-5 sm:pb-20">
+	<div class="band mx-auto max-w-6xl rounded-3xl">
+		<div class="mx-auto max-w-5xl px-6 py-14 sm:px-8 sm:py-20">
+			<h2 class={sectionHeading}>{PROMISE_HEADING}</h2>
+			<ul class="mt-8 max-w-2xl divide-y divide-border border-y border-border text-lg">
+				{#each PROMISE as line (line)}
+					<li class="py-4 leading-relaxed">{line}</li>
+				{/each}
+			</ul>
+			<a href={SOURCE_URL} rel="external" class="group mt-10 {secondaryButton}"
+				>{SOURCE_LABEL}<Arrow class={arrowMove} /></a
+			>
+		</div>
+	</div>
 </section>
