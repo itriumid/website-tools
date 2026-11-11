@@ -11,6 +11,9 @@ import {
 	formatMoney,
 	missingForItem,
 	parseAmount,
+	readBill,
+	roundingSteps,
+	settleBill,
 	taxOnServiceByDefault,
 	type BillItem,
 	type BillState
@@ -1000,6 +1003,91 @@ describe('the split as text', () => {
 		);
 		expect(text).toBe(
 			"Ayu: Rp 30.000\nBudi: Rp 0\nNot in anyone's share: Rp 5.000\nTotal: Rp 35.000"
+		);
+	});
+});
+
+describe('settling up: who paid, and rounding', () => {
+	// Ayu Rp 100.000, Budi Rp 33.333, Citra Rp 10.001: shares that don't end in round numbers.
+	const three = (overrides: Partial<BillState> = {}) =>
+		bill({
+			people: [
+				{ id: 'a', name: 'Ayu' },
+				{ id: 'b', name: 'Budi' },
+				{ id: 'c', name: 'Citra' }
+			],
+			items: [
+				{ id: '1', name: 'Ikan', price: 100000, assignedPersonIds: ['a'] },
+				{ id: '2', name: 'Sate', price: 33333, assignedPersonIds: ['b'] },
+				{ id: '3', name: 'Teh', price: 10001, assignedPersonIds: ['c'] }
+			],
+			...overrides
+		});
+	const amounts = (state: BillState) =>
+		settleBill(state).settlements.map((settlement) => settlement.amount);
+
+	it('leaves every share as it is, without rounding', () => {
+		expect(amounts(three())).toEqual([100000, 33333, 10001]);
+		expect(amounts(three({ paidBy: 'a' }))).toEqual([100000, 33333, 10001]);
+		expect(settleBill(three()).extra).toBe(0);
+	});
+
+	it("rounds everyone else's share up, and takes what that adds off the payer's part", () => {
+		const state = three({ paidBy: 'a', roundTo: 500 });
+		const settled = settleBill(state);
+		expect(settled.settlements).toEqual([
+			{ personId: 'a', amount: 99334, paidTheBill: true },
+			{ personId: 'b', amount: 33500, paidTheBill: false },
+			{ personId: 'c', amount: 10500, paidTheBill: false }
+		]);
+		expect(settled.extra).toBe(666);
+		// Still the whole bill, to the rupiah.
+		expect(amounts(state).reduce((sum, amount) => sum + amount, 0)).toBe(
+			calculateBill(state).grandTotal
+		);
+	});
+
+	it('rounds every share up when nobody is marked as the payer, and says by how much', () => {
+		const settled = settleBill(three({ roundTo: 1000 }));
+		expect(settled.settlements.map((settlement) => settlement.amount)).toEqual([
+			100000, 34000, 11000
+		]);
+		expect(settled.extra).toBe(1666);
+	});
+
+	it('leaves a share of nothing at nothing', () => {
+		const state = three({ roundTo: 500 });
+		state.items[2].assignedPersonIds = [];
+		expect(amounts(state)[2]).toBe(0);
+	});
+
+	it('rounds to cents in a currency that has them', () => {
+		const state = bill({
+			currencyCode: 'USD',
+			items: [{ id: '1', name: 'Fries', price: 7.2, assignedPersonIds: ['a', 'b'] }],
+			paidBy: 'a',
+			roundTo: 0.5
+		});
+		expect(amounts(state)).toEqual([3.2, 4]);
+	});
+
+	it('offers steps people actually hand over, by currency', () => {
+		expect(roundingSteps('IDR')).toEqual([500, 1000]);
+		expect(roundingSteps('JPY')).toEqual([10, 100]);
+		expect(roundingSteps('USD')).toEqual([0.5, 1]);
+	});
+
+	it('keeps who paid and the rounding in a link, and only when they make sense', () => {
+		const state = three({ paidBy: 'b', roundTo: 500 });
+		expect(billFromHash(billToHash(state))).toEqual(state);
+		expect(readBill({ ...state, paidBy: 'nobody' })?.paidBy).toBeUndefined();
+		expect(readBill({ ...state, roundTo: -500 })?.roundTo).toBeUndefined();
+		expect(readBill({ ...state, roundTo: 1e12 })?.roundTo).toBeUndefined();
+	});
+
+	it('says who to pay in the text, when someone paid', () => {
+		expect(billAsText(three({ paidBy: 'a', roundTo: 500 }))).toBe(
+			'Ayu: Rp 99.334 (paid the bill)\nBudi: Rp 33.500 to Ayu\nCitra: Rp 10.500 to Ayu\nTotal: Rp 143.334'
 		);
 	});
 });

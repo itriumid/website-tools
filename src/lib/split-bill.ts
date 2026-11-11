@@ -71,6 +71,13 @@ export interface BillState {
 	/** Tax is charged on the subtotal plus service. Meaningless once tax is included: ignored then. */
 	taxOnService?: boolean;
 	adjustments?: BillAdjustment[];
+	/** The person who paid the bill: everyone else pays them. */
+	paidBy?: string;
+	/**
+	 * Every share but the payer's rounds up to a multiple of this, so it's an amount people can
+	 * hand over. What that adds comes off the payer's part.
+	 */
+	roundTo?: number;
 }
 
 export const DEFAULT_TAX_PERCENTAGE = 10;
@@ -210,8 +217,22 @@ export function readBill(value: unknown): BillState | undefined {
 	if (value.serviceIncluded === true) state.serviceIncluded = true;
 	if (value.taxOnService === true && !state.taxIncluded) state.taxOnService = true;
 	if (adjustments.length) state.adjustments = adjustments;
+	if (typeof value.paidBy === 'string' && people.some((person) => person.id === value.paidBy)) {
+		state.paidBy = value.paidBy;
+	}
+	if (
+		typeof value.roundTo === 'number' &&
+		Number.isFinite(value.roundTo) &&
+		value.roundTo > 0 &&
+		value.roundTo <= MAX_ROUNDING
+	) {
+		state.roundTo = value.roundTo;
+	}
 	return state;
 }
+
+/** No step is ever this big: anything above it in a link is someone's mischief, not a bill. */
+const MAX_ROUNDING = 1_000_000;
 
 /* ─── Money ─── */
 
@@ -612,6 +633,74 @@ export function calculateBill(state: BillState): BillTotals {
 	};
 }
 
+/* ─── Settling up ─── */
+
+// The steps a share can round up to, by currency: amounts people actually hand over. A rupiah
+// share rounds to Rp 500 or Rp 1.000, a dollar share to 50 cents or a dollar.
+const ROUNDING_STEPS: Record<string, [number, number]> = {
+	IDR: [500, 1000],
+	VND: [1000, 5000],
+	KRW: [100, 1000],
+	GNF: [500, 1000],
+	PYG: [500, 1000],
+	UGX: [500, 1000]
+};
+
+/** The two steps a share in this currency can round up to, smaller first. */
+export function roundingSteps(currencyCode: string): [number, number] {
+	return ROUNDING_STEPS[currencyCode] ?? (decimalPlaces(currencyCode) === 0 ? [10, 100] : [0.5, 1]);
+}
+
+export interface Settlement {
+	personId: string;
+	/** What they hand over, rounded up when the bill rounds; for whoever paid, their own part. */
+	amount: number;
+	paidTheBill: boolean;
+}
+
+export interface SettledBill {
+	settlements: Settlement[];
+	/** What rounding up added to the shares, together: it comes off the payer's part. */
+	extra: number;
+}
+
+/**
+ * Who pays what, once the bill is divided. Without rounding, everyone's amount is their share.
+ * With it, every share but the payer's rounds up to the step, and the payer's own part goes down
+ * by what that added, so everything still adds up to the bill. With nobody marked as the payer,
+ * every share rounds up and the extra is on top. A share of nothing stays nothing.
+ */
+export function settleBill(state: BillState, totals = calculateBill(state)): SettledBill {
+	const coins = 10 ** decimalPlaces(state.currencyCode);
+	const toCoins = (value: number) => Math.round(Math.round(value * coins * 1e6) / 1e6);
+	const step = state.roundTo ? Math.max(1, toCoins(state.roundTo)) : 0;
+	const payer = state.people.some((person) => person.id === state.paidBy)
+		? state.paidBy
+		: undefined;
+
+	let extra = 0;
+	const settlements = totals.shares.map((share) => {
+		const own = toCoins(share.total);
+		const paidTheBill = share.personId === payer;
+		if (!step || paidTheBill || own === 0) return { personId: share.personId, own, paidTheBill };
+		const rounded = Math.ceil(own / step) * step;
+		extra += rounded - own;
+		return { personId: share.personId, own: rounded, paidTheBill };
+	});
+	if (payer && extra) {
+		const paying = settlements.find((settlement) => settlement.paidTheBill)!;
+		paying.own = Math.max(0, paying.own - extra);
+	}
+	return {
+		settlements: settlements.map(({ personId, own, paidTheBill }) => ({
+			personId,
+			amount: own / coins,
+			paidTheBill
+		})),
+		extra: extra / coins
+	};
+}
+
 /* ─── Changing what's on the bill ─── */
 
 /**
@@ -656,15 +745,21 @@ export function missingForItem(
 /* ─── The split as text ─── */
 
 /**
- * The split as plain text for a group chat: one line per person with what they owe, what's in
- * nobody's share when there's some, the total, and the link when there is one.
+ * The split as plain text for a group chat: one line per person with what they owe (and who to,
+ * when someone paid), what's in nobody's share when there's some, the total, and the link when
+ * there is one.
  */
 export function billAsText(state: BillState, link?: string): string {
 	const totals = calculateBill(state);
+	const { settlements } = settleBill(state, totals);
 	const money = (amount: number) => formatMoney(amount, state.currencyCode);
-	const lines = state.people.map(
-		(person, index) => `${person.name}: ${money(totals.shares[index].total)}`
-	);
+	const payer = state.people.find((person) => person.id === state.paidBy);
+	const lines = state.people.map((person, index) => {
+		const { amount, paidTheBill } = settlements[index];
+		const line = `${person.name}: ${money(amount)}`;
+		if (!payer) return line;
+		return `${line} ${paidTheBill ? SPLIT_BILL.text.paidTheBill : SPLIT_BILL.text.to(payer.name)}`;
+	});
 	if (totals.unshared > 0) lines.push(`${SPLIT_BILL.text.unshared}: ${money(totals.unshared)}`);
 	lines.push(`${SPLIT_BILL.text.total}: ${money(totals.grandTotal)}`);
 	if (link) lines.push(link);

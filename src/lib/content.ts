@@ -94,7 +94,9 @@ export const SPLIT_BILL = {
 	// The split as text, for a group chat.
 	text: {
 		total: 'Total',
-		unshared: "Not in anyone's share"
+		unshared: "Not in anyone's share",
+		to: (name: string) => `to ${name}`,
+		paidTheBill: '(paid the bill)'
 	},
 	// Next to a button that can't be pressed yet: why.
 	missing: {
