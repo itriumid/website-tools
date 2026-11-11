@@ -1,6 +1,6 @@
 {
 	"schemaVersion": 2,
-	"generatedAt": "2026-11-11T07:30:28.291Z",
+	"generatedAt": "2026-11-11T08:08:02.735Z",
 	"title": "Design System: tools.itrium.id",
 	"extensions": {
 		"colorMeta": {
@@ -451,6 +451,11 @@
 			{
 				"name": "The First Screen Rule",
 				"body": "On a phone, the first field of a tool is visible without scrolling. If a new element would push it down, it belongs lower on the page.",
+				"section": "layout"
+			},
+			{
+				"name": "The Answer In Reach Rule",
+				"body": "Wherever a tool is being filled in, its answer is one glance or one tap away: the running total below 1024 px, the split's own column above. Someone opening a shared result lands on it, not on the form that made it.",
 				"section": "layout"
 			},
 			{
