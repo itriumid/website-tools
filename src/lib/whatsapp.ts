@@ -15,13 +15,18 @@ export interface ChatTarget {
 	display: string;
 	/** The link that opens the chat, with the message typed in if there is one. */
 	link: string;
+	/** Letters were typed with the number and left out: the person should check what's left. */
+	lettersDropped: boolean;
+	/** An extension typed after the number ("ext 5"), left off: WhatsApp can't dial one. */
+	extension?: string;
 }
 
 /**
- * Why there's no chat to open: the number is too short or too long to be a phone number, or it's
- * a seven-digit North American number without its area code.
+ * Why there's no chat to open: the number is too short or too long to be a phone number (in the
+ * country it's for, where we know how long numbers there are), it's a seven-digit North American
+ * number without its area code, there's more than one number, or nothing typed was a digit.
  */
-export type ChatProblem = 'too-short' | 'too-long' | 'area-code';
+export type ChatProblem = 'too-short' | 'too-long' | 'area-code' | 'several' | 'no-digits';
 
 /** A full number, country code included, has 8 to 15 digits (E.164 allows at most 15). */
 export const SHORTEST_NUMBER = 8;
@@ -45,8 +50,12 @@ const TRUNK_PREFIXES: Record<string, string[]> = {
 const trunkPrefixes = (code: string) => TRUNK_PREFIXES[code] ?? ['0'];
 
 // How many digits a number has after the country code, by country code, for the countries where
-// people most often paste a number with its code but without the "+". Countries not listed here
-// take anything from 7 digits up to what E.164 leaves after the code.
+// people most often paste a number with its code but without the "+". It says whether a number
+// was pasted with its code, and whether it can be a number there at all: a link to a number too
+// short to exist fails in WhatsApp, after it's been printed on a card. So the shortest is the
+// shortest real number, landlines included: Seoul's are 8 digits after +82 (02 123 4567), and so
+// are Malaysia's outside Kuala Lumpur (04 123 4567, Penang). Countries not listed here take
+// anything from 7 digits up to what E.164 leaves after the code.
 const NATIONAL_LENGTHS: Record<string, [shortest: number, longest: number]> = {
 	'1': [10, 10],
 	'7': [10, 10],
@@ -55,14 +64,14 @@ const NATIONAL_LENGTHS: Record<string, [shortest: number, longest: number]> = {
 	'33': [9, 9],
 	'36': [8, 9],
 	'44': [9, 10],
-	'60': [9, 10],
+	'60': [8, 10],
 	'61': [9, 9],
 	'62': [9, 12],
 	'63': [8, 10],
 	'65': [8, 8],
 	'66': [8, 9],
 	'81': [9, 10],
-	'82': [9, 10],
+	'82': [8, 10],
 	'84': [9, 10],
 	'86': [10, 11],
 	'91': [10, 10],
@@ -130,11 +139,16 @@ function withoutTrunkPrefix(code: string, national: string): string {
  */
 export function chatTarget(
 	countryCode: string,
-	typed: string,
+	original: string,
 	message: string
 ): ChatTarget | { problem: ChatProblem } | undefined {
+	// An extension at the end ("ext 5", "x5", "#5") isn't part of the number WhatsApp dials.
+	const extensionMatch = EXTENSION.exec(asciiDigits(original));
+	const typed = extensionMatch ? original.slice(0, extensionMatch.index) : original;
 	const digits = digitsOnly(typed);
-	if (!digits) return undefined;
+	if (!digits) return /\p{L}/u.test(original) ? { problem: 'no-digits' } : undefined;
+	if (severalNumbers(typed)) return { problem: 'several' };
+	const lettersDropped = /\p{L}/u.test(asciiDigits(typed));
 	let international = asciiDigits(typed).trim().startsWith('+') || digits.startsWith('00');
 	let code = countryCode;
 	let national: string;
@@ -161,16 +175,34 @@ export function chatTarget(
 	// North American numbers are always ten digits after the 1: a three-digit area code first.
 	if (code === '1' && national.length === 7) return { problem: 'area-code' };
 	const number = `${code}${national}`;
-	if (number.length < SHORTEST_NUMBER || (code === '1' && national.length < 10)) {
+	// Where we know how long numbers are, a number has to be one of those lengths; elsewhere, 8 to
+	// 15 digits with the code, as E.164 allows.
+	const lengths = NATIONAL_LENGTHS[code];
+	if (number.length < SHORTEST_NUMBER || (lengths && national.length < lengths[0])) {
 		return { problem: 'too-short' };
 	}
-	if (number.length > LONGEST_NUMBER || (code === '1' && national.length > 10)) {
+	if (number.length > LONGEST_NUMBER || (lengths && national.length > lengths[1])) {
 		return { problem: 'too-long' };
 	}
 	const text = message.trim();
-	return {
+	const target: ChatTarget = {
 		number,
-		display: international ? `+${number}` : `+${code} ${national}`,
-		link: `https://wa.me/${number}${text ? `?text=${encodeURIComponent(text)}` : ''}`
+		display: code ? `+${code} ${national}` : `+${number}`,
+		link: `https://wa.me/${number}${text ? `?text=${encodeURIComponent(text)}` : ''}`,
+		lettersDropped
 	};
+	if (extensionMatch) target.extension = extensionMatch[1];
+	return target;
+}
+
+// "ext 5", "ext. 12", "x5", "#5" at the end of what was typed: an extension, not more digits.
+const EXTENSION = /\s*(?:ext\.?|extension|x|#)\s*(\d{1,6})\s*$/i;
+
+/**
+ * Whether what was typed holds more than one number: two runs of digits long enough to be numbers
+ * on their own, with a comma, slash, semicolon, "or" or a new line between them.
+ */
+function severalNumbers(typed: string): boolean {
+	const parts = asciiDigits(typed).split(/[,;/\n]|\bor\b|\batau\b/i);
+	return parts.filter((part) => digitsOnly(part).length >= 7).length >= 2;
 }
