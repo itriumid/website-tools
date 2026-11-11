@@ -13,8 +13,8 @@ export const DESCRIPTION =
 	'Small, free web tools from Itrium. No account, no advertisements, and what you type stays on your device unless you share it.';
 
 export const HEADING = 'Free tools';
-export const TAGLINE = 'Small tools for small jobs.';
-export const INTRODUCTION = 'They are free, they need no account, and they run in your browser.';
+// The two jobs, said plainly: what's free and private is the closing panel's to say.
+export const TAGLINE = "Split a bill fairly, or message a number you haven't saved.";
 
 // The index's closing panel: what happens to what people type, said plainly, with the source as
 // the proof.
@@ -43,6 +43,7 @@ export const WHATSAPP = {
 		'Enter a phone number and we build the link that opens a chat with it. Spaces, dashes and brackets are taken out, so you can paste a number as it is.',
 	/** On the index, a glimpse of what the tool makes. */
 	sample: [{ value: 'wa.me/6281200000000' }] as Sample,
+	sampleCaption: 'The link it makes',
 	hint: 'A number that starts with + or 00 already has its country, so we use it as it is.',
 	problems: {
 		'too-short': "That's too short for a phone number there. Check you have every digit.",
@@ -76,6 +77,7 @@ export const SPLIT_BILL = {
 		{ label: 'Budi', value: 'Rp 112.000' },
 		{ label: 'Citra', value: 'Rp 64.500' }
 	] as Sample,
+	sampleCaption: "Each person's share",
 	privacy:
 		"A shared bill waits on our server for 30 days after it was last shared, encrypted with a key that is only in the link, so we can't read it. Whoever shared it can update it or delete it, on the same device.",
 	sharing: {
