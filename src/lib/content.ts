@@ -43,10 +43,21 @@ export const WHATSAPP = {
 		'Enter a phone number and we build the link that opens a chat with it. Spaces, dashes and brackets are taken out, so you can paste a number as it is.',
 	/** On the index, a glimpse of what the tool makes. */
 	sample: [{ value: 'wa.me/6281200000000' }] as Sample,
+	hint: 'A number that starts with + or 00 already has its country, so we use it as it is.',
 	problems: {
-		'too-short': "That's too short for a phone number. Check you have every digit.",
-		'too-long': "That's too long for a phone number. Check the country code isn't in it twice.",
-		'area-code': 'Add the area code too.'
+		'too-short': "That's too short for a phone number there. Check you have every digit.",
+		'too-long':
+			"That's too long for a phone number there. Check the country code isn't in it twice.",
+		'area-code': 'Add the area code too.',
+		several: 'That looks like more than one number. Make a link for one at a time.',
+		'no-digits': "There's no number here yet. Type the phone number's digits."
+	},
+	result: {
+		heading: 'Your link',
+		empty: 'Enter a phone number and the link appears here.',
+		lettersDropped: 'We left out the letters and kept the digits: check this is the number.',
+		extension: (extension: string) =>
+			`We left off the extension (${extension}): WhatsApp can't dial one.`
 	}
 };
 

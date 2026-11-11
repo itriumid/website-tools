@@ -434,6 +434,15 @@ toggletip uses the same form with a gray hairline.
 A round ⓘ button (2rem, 2.75rem on touch screens) beside the setting it explains. Pressed, it
 opens the explanation as a gray-barred note on the next line, never as a floating bubble.
 
+### Chat result (WhatsApp click-to-chat)
+
+The answer is the number, as people read it: "+62 8119710096" in bold 1.5rem, in an inset with a
+hairline, then the message as plain text, then anything that was left out of what was typed
+("We left out the letters…", an extension WhatsApp can't dial), then the raw link in small muted
+monospace, selectable. Below 640 px, "Open in WhatsApp" and "Copy link" stay in a bar at the
+bottom of the screen while there's a link, as the running total does in Split bill. A number too
+short or too long for its country is a problem in words, never a link.
+
 ### Running total (signature)
 
 Split bill's bar at the bottom of a phone screen while items exist: the surface color, a hairline
