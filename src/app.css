@@ -69,10 +69,14 @@ html {
 	color: var(--on-accent);
 }
 
-:focus-visible {
-	outline: 2px solid var(--focus);
-	outline-offset: 3px;
-	border-radius: 4px;
+@layer base {
+	/* In the base layer, so an element's own rounding (a pill, a card) wins over the 4px here: the
+	   outline follows the element's shape instead of squaring it off. */
+	:focus-visible {
+		outline: 2px solid var(--focus);
+		outline-offset: 3px;
+		border-radius: 4px;
+	}
 }
 
 /* Split bill's running total stays at the bottom of a phone's screen: whatever has focus scrolls
