@@ -4,6 +4,7 @@ import { server } from '../../share/testing';
 import {
 	codeFromHash,
 	deleteBill,
+	isBrokenLink,
 	forget,
 	LIFETIME,
 	openBill,
@@ -15,7 +16,7 @@ import {
 	updateBill,
 	type Shared
 } from './share';
-import type { BillState } from './split-bill';
+import { billToHash, type BillState } from './split-bill';
 
 const bill: BillState = {
 	people: [
@@ -197,6 +198,17 @@ describe('short links', () => {
 		expect(codeFromHash('#bill=ILOUILOUILOUILOU')).toBeUndefined();
 		expect(codeFromHash('#data=0123456789ABCDEF')).toBeUndefined();
 		expect(codeFromHash('#bill=0123456789abcdef')).toBe('0123456789ABCDEF');
+	});
+
+	it('tell a link that was cut off from no link at all', () => {
+		expect(isBrokenLink('#bill=0123456789ABC')).toBe(true);
+		expect(isBrokenLink('#bill=ILOUILOUILOUILOU')).toBe(true);
+		expect(isBrokenLink('#bill=0123456789ABCDEF')).toBe(false);
+		const whole = billToHash(bill);
+		expect(isBrokenLink(whole)).toBe(false);
+		expect(isBrokenLink(whole.slice(0, -12))).toBe(true);
+		expect(isBrokenLink('')).toBe(false);
+		expect(isBrokenLink('#main')).toBe(false);
 	});
 
 	it("don't open a bill that was tampered with", async () => {

@@ -45,6 +45,7 @@
 		SHORT_PREFIX,
 		codeFromHash,
 		deleteBill,
+		isBrokenLink,
 		forget,
 		openBill,
 		remember,
@@ -625,6 +626,7 @@
 		| { kind: 'opened'; version?: Version }
 		| { kind: 'gone' }
 		| { kind: 'unreachable' }
+		| { kind: 'broken' }
 		| { kind: 'copied' }
 		| { kind: 'copied-updated' }
 		| { kind: 'copied-new' }
@@ -686,6 +688,7 @@
 		if (!code) {
 			const shared = billFromHash(location.hash);
 			if (shared) open(shared);
+			else if (isBrokenLink(location.hash)) status = { kind: 'broken' };
 			settled = true;
 			if (shared) await landOnSplit();
 			return;
@@ -724,6 +727,8 @@
 		}
 		open(draft);
 		if (code) deletable = sharedHere(code);
+		// The draft was this tab's own; the link it came with still says it didn't open.
+		if (isBrokenLink(location.hash)) status = { kind: 'broken' };
 		settled = true;
 	}
 
@@ -956,12 +961,14 @@
 			<p>{SPLIT_BILL.sharing.gone}</p>
 		{:else if status?.kind === 'unreachable'}
 			<p>{SPLIT_BILL.sharing.unreachable}</p>
+		{:else if status?.kind === 'broken'}
+			<p>{SPLIT_BILL.sharing.broken}</p>
 		{/if}
 	</div>
-	{#if status?.kind === 'gone' || status?.kind === 'unreachable'}
-		<div class="mt-3 flex flex-wrap gap-3">
+	{#if status?.kind === 'gone' || status?.kind === 'unreachable' || status?.kind === 'broken'}
+		<div class="mt-3 mb-6 flex flex-wrap gap-3">
 			<!-- When the server can't be reached, trying again is the way forward: the bill is still
-			     there. Starting a new one is only for a bill that's gone. -->
+			     there. Starting a new one is for a bill that's gone, or a link that can't open one. -->
 			{#if status.kind === 'unreachable'}
 				<button type="button" onclick={readLink} class={smallButton}
 					>{SPLIT_BILL.sharing.retry}</button

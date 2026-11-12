@@ -99,7 +99,7 @@ export function taxOnServiceByDefault(currencyCode: string): boolean {
 // A bill travels in the part of the address after the "#", compressed. Browsers never send that
 // part to a server, so nobody but the people given the link sees the bill. Links made before this
 // site moved to tools.itrium.id use the same format and still open: keep it exactly as it is.
-const HASH_PREFIX = '#data=';
+export const HASH_PREFIX = '#data=';
 
 /** The address fragment that holds `state`, to put after the page's address. */
 export function billToHash(state: BillState): string {

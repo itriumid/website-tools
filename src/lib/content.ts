@@ -106,6 +106,8 @@ export const SPLIT_BILL = {
 		updatedAt: (when: string) => `Updated ${when}`,
 		unreachable:
 			"We couldn't reach our server to open this bill. Check your connection, then try again.",
+		broken:
+			"This link looks incomplete, so we can't open the bill. Ask whoever sent it to copy it again.",
 		retry: 'Try again',
 		startNew: 'Start a new bill',
 		copied: 'Link copied. Anyone with it can open this bill for 30 days.',

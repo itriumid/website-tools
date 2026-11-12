@@ -497,6 +497,11 @@ tap brings it back. The split repeats the line, with its Undo, under its heading
 changes it and on a wide screen it's in the other column; only the card's own line is a live
 region, so it's announced once.
 
+### Links that can't open
+
+A shared link cut off when it was pasted, or changed on the way, says so ("This link looks
+incomplete…") with "Start a new bill", rather than opening an empty bill as if nothing were wrong.
+
 ### Graphite panel and title band
 
 The `.band` from itrium.id: the dark tokens in either theme (stepping up to graphite surface in
