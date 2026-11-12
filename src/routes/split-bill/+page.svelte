@@ -1083,7 +1083,7 @@
 							accept="image/*"
 							aria-describedby="receipt-photo-hint"
 							onchange={(event) => showPhoto(event.currentTarget.files?.[0])}
-							class="block w-full text-sm text-muted file:mr-3 file:min-h-9 file:cursor-pointer file:rounded-full file:border file:border-control-border file:bg-transparent file:px-4 file:text-sm file:font-medium file:text-text hover:file:bg-bg"
+							class="block w-full text-sm text-muted file:mr-3 file:min-h-9 file:cursor-pointer file:rounded-full file:border file:border-control-border file:bg-transparent file:px-4 file:text-sm file:font-medium file:text-text hover:file:bg-bg pointer-coarse:file:min-h-11"
 						/>
 						{#if photoUrl}
 							<img
@@ -1696,7 +1696,7 @@
 										<button
 											type="button"
 											onclick={() => stopCounting(item)}
-											class="mt-1 min-h-9 text-sm text-muted underline underline-offset-4 hover:text-text"
+											class="mt-1 min-h-9 text-sm text-muted underline underline-offset-4 hover:text-text pointer-coarse:min-h-11"
 											>Share evenly instead</button
 										>
 									</fieldset>
@@ -1730,7 +1730,7 @@
 												<button
 													type="button"
 													onclick={() => startCounting(item)}
-													class="min-h-9 text-sm text-muted underline underline-offset-4 hover:text-text"
+													class="min-h-9 text-sm text-muted underline underline-offset-4 hover:text-text pointer-coarse:min-h-11"
 													>Count who had how many</button
 												>
 												<Toggletip
@@ -1987,7 +1987,7 @@
 												<button
 													type="button"
 													onclick={() => shareWithEveryone(adjustment)}
-													class="mt-1 min-h-9 text-muted underline underline-offset-4 hover:text-text"
+													class="mt-1 min-h-9 text-muted underline underline-offset-4 hover:text-text pointer-coarse:min-h-11"
 													>Share with everyone again</button
 												>
 											</fieldset>
@@ -1995,7 +1995,7 @@
 											<button
 												type="button"
 												onclick={() => (choosing = [...choosing, adjustment.id])}
-												class="min-h-9 text-muted underline underline-offset-4 hover:text-text"
+												class="min-h-9 text-muted underline underline-offset-4 hover:text-text pointer-coarse:min-h-11"
 												>Just for some people</button
 											>
 										{/if}
@@ -2361,7 +2361,7 @@
 							<button
 								type="button"
 								onclick={() => (confirmingDelete = true)}
-								class="mt-2 min-h-9 text-sm text-muted underline underline-offset-4 hover:text-text"
+								class="mt-2 min-h-9 text-sm text-muted underline underline-offset-4 hover:text-text pointer-coarse:min-h-11"
 								>Delete the shared copy</button
 							>
 						{/if}
