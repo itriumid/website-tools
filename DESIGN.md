@@ -541,7 +541,9 @@ the text color on hover. On the index, "Free tools" carries `aria-current="page"
 the text color. It's the way back from a tool. The lockup leads to itrium.id and is named
 "Itrium's main site". A pink skip link sits off screen and drops in from the top on focus. The footer is muted
 small text: the no-tracking promise on the left (except on the index, where the closing panel
-says it in full), contact and source links on the right.
+says it in full; only Split bill's mentions sharing a bill, the one thing that reaches us), contact
+and source links on the right. The header's and footer's links stay small text but are 2.75rem
+tall on touch screens, like every other control: "Free tools" is the only way back from a tool.
 
 ## Do's and Don'ts
 

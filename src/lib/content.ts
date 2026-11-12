@@ -40,6 +40,9 @@ export const PROMISE = [
 export const SOURCE_LABEL = 'Read the source';
 
 export const NO_TRACKING =
+	'This site has no cookies, no analytics and no trackers. What you type stays in your browser.';
+// On Split bill, where sharing a bill is the one thing that reaches us.
+export const NO_TRACKING_BILLS =
 	'This site has no cookies, no analytics and no trackers. What you type stays in your browser, unless you share a bill, and then we only ever see it encrypted.';
 
 /** Lines that show what a tool makes, on the index: an optional name, then the value. */
@@ -86,7 +89,7 @@ export const SPLIT_BILL = {
 	path: '/split-bill' as const,
 	name: 'Split bill',
 	summary:
-		'Split a bill fairly: tag each item to the people who had it, add tax and service, and share the result as a link.',
+		'Tag each item to the people who had it, add tax and service, and send everyone their share as a link.',
 	description:
 		'Split a bill fairly: add the people and the items, tag who had what, add tax and service, and share the result as a short link. Shared bills are encrypted, and only people with the link can open them.',
 	introduction:
