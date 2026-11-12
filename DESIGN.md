@@ -391,8 +391,9 @@ The people on a bill, tapped to say who had what.
   color.
 - **Selected:** pastel pink fill, graphite text, medium weight, a deep-rose edge on light
   backgrounds, and a leading check mark. `aria-pressed` carries the state.
-- **Counting:** when people had different numbers of an item, the chip holds round minus and plus
-  buttons (2rem, or 2.75rem on touch screens) around a tabular count.
+- **Counting:** when people had different numbers of an item, a counted chip looks like a
+  selected one (pink, with the check mark) and holds round buttons with a drawn minus and plus
+  (2rem, or 2.75rem on touch screens) around a tabular count.
 
 ### Fields
 
@@ -489,7 +490,9 @@ any of it on the bill.
 After removing a person or an item, the card it was removed from says so in one line, "Removed
 Citra.", with an underlined "Undo" beside it at touch-target height. It stays until the bill
 changes some other way. There's no countdown and no confirmation dialog: one tap took it, one
-tap brings it back.
+tap brings it back. The split repeats the line, with its Undo, under its heading, since a removal
+changes it and on a wide screen it's in the other column; only the card's own line is a live
+region, so it's announced once.
 
 ### Graphite panel and title band
 
