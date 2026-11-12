@@ -9,6 +9,9 @@
 
 	const { children } = $props();
 
+	/** The header's and footer's links: small text, but 44px tall to a finger. */
+	const link = 'inline-flex items-center transition-colors hover:text-text pointer-coarse:min-h-11';
+
 	// Pages cross-fade into each other, like itrium.id's, for people who haven't asked for less
 	// motion and in browsers that can.
 	onNavigate((navigation) => {
@@ -44,10 +47,10 @@
 				<a
 					href={resolve('/')}
 					aria-current={page.url.pathname === '/' ? 'page' : undefined}
-					class="transition-colors hover:text-text aria-[current=page]:text-text">Free tools</a
+					class="{link} aria-[current=page]:text-text">Free tools</a
 				>
 			</li>
-			<li><a href={MAIN_SITE_URL} class="transition-colors hover:text-text">About Itrium</a></li>
+			<li><a href={MAIN_SITE_URL} class={link}>About Itrium</a></li>
 		</ul>
 	</nav>
 </header>
@@ -66,14 +69,12 @@
 			{#if page.url.pathname !== '/'}<p>{NO_TRACKING}</p>{/if}
 		</div>
 		<ul class="flex shrink-0 gap-5 sm:flex-col sm:gap-2 sm:text-right">
-			<li><a href="mailto:{EMAIL}" class="transition-colors hover:text-text">{EMAIL}</a></li>
+			<li><a href="mailto:{EMAIL}" class={link}>{EMAIL}</a></li>
 			<li>
-				<a href={GITHUB_URL} rel="external" class="transition-colors hover:text-text">GitHub</a>
+				<a href={GITHUB_URL} rel="external" class={link}>GitHub</a>
 			</li>
 			<li>
-				<a href={SOURCE_URL} rel="external" class="transition-colors hover:text-text">
-					This site's source
-				</a>
+				<a href={SOURCE_URL} rel="external" class={link}> This site's source </a>
 			</li>
 		</ul>
 	</div>
