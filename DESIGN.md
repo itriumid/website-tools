@@ -298,7 +298,12 @@ small uppercase heading or back link sits above it. Nothing here is set in upper
 - **Index:** the opening slab (the title and a tagline naming the two jobs, in the text color), then the tool cards in
   one column, two from 640 px, Split bill first. Then a section heading and the cards for tools on
   sites of their own. A closing slab ends it: what stays on the device as a ruled list, and the
-  source as a secondary button.
+  source as a secondary button. On a screen under 44rem tall the panel and the gap under it tighten, so the first
+  card's action line stays on a 390x667 phone's first screen. Above the cards, for someone in the
+  middle of a bill, one line from what the browser already keeps (the draft in this tab, or the
+  bills this device shared) with an action line to it: shown after the page loads, never stored
+  or sent. The section heading over tools on sites of their own is a step smaller than the
+  closing panel's, which is the page's last word.
 - **Tool page:** a slim title band (title and introduction only, about 2rem of padding on phones),
   then the tool immediately. No closing panel, because the running total owns the bottom of the
   screen.
