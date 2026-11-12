@@ -153,6 +153,9 @@
 						</button>
 					</div>
 					<p class="mt-3 font-mono text-xs break-all text-muted select-all">{target.link}</p>
+					<!-- For someone making a link for their own number: where it goes, and a check before
+					     it's printed, since a printed mistake can't be fixed. -->
+					<p class="mt-3 text-sm text-muted">{WHATSAPP.result.useIt}</p>
 				</div>
 			{:else}
 				<p class="rounded-xl border border-dashed border-control-border p-4 text-sm text-muted">
