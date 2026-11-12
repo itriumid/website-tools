@@ -449,11 +449,12 @@ opens the explanation as a gray-barred note on the next line, never as a floatin
 The answer is the number, as people read it: "+62 8119710096" in bold 1.5rem, in an inset with a
 hairline, with the country it's for in muted text under it. Then the message as plain text, then
 anything decided on the person's behalf, each with the drawn warning sign in medium weight (letters
-left out, an extension WhatsApp can't dial, a number at the short end for its country). Then
-"Open in WhatsApp" and "Copy link" side by side, and the raw link in small muted monospace,
-selectable. Everything about the answer sits together, right under the field it comes from:
-nothing floats over it, so nothing can cover it on a short phone. A number too short or too long
-for its country is a problem in words, never a link.
+left out, an extension WhatsApp can't dial, a number at the short end for its country). Then "Open
+in WhatsApp" and "Copy link" side by side, and the raw link in small muted monospace, selectable.
+Under it, one muted line on using the link: in a profile or a message, or as a QR code checked once
+before it's printed. Everything about the answer sits together, right under the field it comes from:
+nothing floats over it, so nothing can cover it on a short phone. A number too short or too long for
+its country is a problem in words, never a link.
 
 ### Running total (signature)
 

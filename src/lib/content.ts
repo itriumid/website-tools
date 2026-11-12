@@ -74,7 +74,9 @@ export const WHATSAPP = {
 		lettersDropped: 'We left out the letters and kept the digits: check this is the number.',
 		extension: (extension: string) =>
 			`We left off the extension (${extension}): WhatsApp can't dial one.`,
-		short: "That's shorter than most numbers there. Check you have every digit."
+		short: "That's shorter than most numbers there. Check you have every digit.",
+		useIt:
+			'Put the link in a profile or a message. To print it, make it into a QR code, and scan the QR code once to check it opens this chat.'
 	}
 };
 
