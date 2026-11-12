@@ -170,6 +170,8 @@ export const SPLIT_BILL = {
 		}
 		return `Removed ${name}.`;
 	},
+	// Once the bill has items, the form for one more waits behind this.
+	addByHand: 'Add an item by hand',
 	// Behind it in the Charges card: what only some receipts say.
 	moreOnReceipt: 'More on the receipt',
 	moreOnReceiptHint: 'Prices with tax, discounts, rounding',

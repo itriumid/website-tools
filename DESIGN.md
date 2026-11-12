@@ -486,7 +486,8 @@ with the split's heading focused, scrolled to on a phone.
 The Charges card shows the two rates. What only some receipts say (prices that include tax or
 service, tax on service, discounts and rounding) waits behind a disclosure, "More on the receipt",
 with the drawn arrow turning down when open. It opens itself when a scan, a link or a choice puts
-any of it on the bill.
+any of it on the bill, and only then: tax on service counts only when there's service and it isn't
+the currency's usual way.
 
 ### Undo line
 
@@ -505,6 +506,13 @@ drops a keyboard or a screen reader at the top of the page). Opening the scan fo
 first field, reading the receipt its review heading, adding it the People field when there's nobody
 yet (scrolled to), or else the Items heading; removing focuses the Undo, and Undo the person or
 item brought back.
+
+### Adding an item
+
+With no items, the Items card is the form. Once there are items, they come first, and the form
+waits under them behind "Add an item by hand": after a receipt is read, the items are what's next,
+not an empty form above them. Items typed in by hand keep the form open under the list, for the
+next.
 
 ### Links that can't open
 

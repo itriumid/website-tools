@@ -124,7 +124,12 @@
 	const money = (amount: number) => formatMoney(amount, currencyCode);
 	const nameOf = (id: string) => people.find((person) => person.id === id)?.name ?? '';
 	$effect(() => {
-		if (taxIncluded || serviceIncluded || taxOnServiceChosen || adjustments.length) moreOpen = true;
+		// Tax on service only says something when there's service to charge it on, and it isn't the
+		// currency's usual way: a receipt read with neither has nothing behind this to show.
+		const unusualTaxOnService =
+			percentage(serviceInput) > 0 && taxOnService !== taxOnServiceByDefault(currencyCode);
+		if (taxIncluded || serviceIncluded || unusualTaxOnService || adjustments.length)
+			moreOpen = true;
 	});
 	const anyTagged = $derived(
 		items.some(
@@ -302,6 +307,13 @@
 			? Math.min(MAX_QUANTITY, Math.max(1, Math.round(value)))
 			: 1;
 	const canAddItem = $derived(newItem.trim() !== '' && newPrice !== null && newPrice > 0);
+	// Once there are items read from a receipt, the form for another waits behind a button, under
+	// the list: the items are what's next, not an empty form above them. Typed in, it stays open.
+	let addingByHand = $state(false);
+	async function startAddingByHand() {
+		addingByHand = true;
+		await focusAfter('item');
+	}
 
 	function addItem() {
 		if (!canAddItem || newPrice === null) return;
@@ -317,6 +329,8 @@
 		newItem = '';
 		newPriceText = '';
 		newQuantity = 1;
+		// Someone typing the items in has more to come: the form stays open under them.
+		addingByHand = true;
 	}
 
 	const nameWithQuantity = (item: BillItem) =>
@@ -934,6 +948,7 @@
 		paidBy = undefined;
 		roundTo = undefined;
 		removal = undefined;
+		addingByHand = false;
 		choosing = [];
 		renaming = undefined;
 		editing = undefined;
@@ -1486,63 +1501,6 @@
 				<h2 id="items-heading" tabindex="-1" class={cardHeading}>
 					Items {#if items.length}<span class="font-normal text-muted">({items.length})</span>{/if}
 				</h2>
-				<form
-					class="grid grid-cols-[6rem_1fr] gap-3 sm:grid-cols-[1fr_6rem_9rem_auto] sm:items-end"
-					onsubmit={(event) => {
-						event.preventDefault();
-						addItem();
-					}}
-				>
-					<div class="col-span-2 sm:col-span-1">
-						<label for="item" class={label}>Item</label>
-						<input id="item" type="text" autocomplete="off" bind:value={newItem} class={field} />
-					</div>
-					<div>
-						<label for="quantity" class={label}>Quantity</label>
-						<input
-							id="quantity"
-							type="number"
-							inputmode="numeric"
-							min="1"
-							max={MAX_QUANTITY}
-							step="1"
-							bind:value={newQuantity}
-							class={field}
-						/>
-					</div>
-					<div>
-						<!-- People know a menu's price for one, so with several it asks for that. -->
-						<label for="price" class={label}
-							>{quantityOf(newQuantity) > 1 ? 'Price each' : 'Price'}</label
-						>
-						<input
-							id="price"
-							type="text"
-							inputmode={amountKeypad}
-							autocomplete="off"
-							bind:value={newPriceText}
-							aria-describedby="price-note"
-							aria-invalid={newPriceNote?.problem ? true : undefined}
-							class={field}
-						/>
-					</div>
-					<button
-						type="submit"
-						disabled={!canAddItem}
-						aria-describedby="add-item-reason price-note"
-						class="{smallButton} {besideField} col-span-2 sm:col-span-1">Add item</button
-					>
-				</form>
-				<p
-					id="price-note"
-					role="status"
-					class="mt-2 text-sm empty:mt-0 {newPriceNote?.problem ? 'font-medium' : 'text-muted'}"
-				>
-					{#if newPriceNote}{newPriceNote.text}{/if}
-				</p>
-				<p id="add-item-reason" role="status" class="mt-2 text-sm text-muted empty:mt-0">
-					{#if addItemReason}{addItemReason}{/if}
-				</p>
 
 				{#if items.length}
 					<ul class="mt-5 space-y-3">
@@ -1806,6 +1764,79 @@
 							>{SPLIT_BILL.undo}</button
 						>{/if}
 				</p>
+				<!-- One more item: the form, while there are none or once asked for; otherwise the button
+				     that opens it, under the list. -->
+				{#if items.length === 0 || addingByHand}
+					<div class={items.length ? 'mt-5 border-t border-border pt-5' : 'mt-5'}>
+						<form
+							class="grid grid-cols-[6rem_1fr] gap-3 sm:grid-cols-[1fr_6rem_9rem_auto] sm:items-end"
+							onsubmit={(event) => {
+								event.preventDefault();
+								addItem();
+							}}
+						>
+							<div class="col-span-2 sm:col-span-1">
+								<label for="item" class={label}>Item</label>
+								<input
+									id="item"
+									type="text"
+									autocomplete="off"
+									bind:value={newItem}
+									class={field}
+								/>
+							</div>
+							<div>
+								<label for="quantity" class={label}>Quantity</label>
+								<input
+									id="quantity"
+									type="number"
+									inputmode="numeric"
+									min="1"
+									max={MAX_QUANTITY}
+									step="1"
+									bind:value={newQuantity}
+									class={field}
+								/>
+							</div>
+							<div>
+								<!-- People know a menu's price for one, so with several it asks for that. -->
+								<label for="price" class={label}
+									>{quantityOf(newQuantity) > 1 ? 'Price each' : 'Price'}</label
+								>
+								<input
+									id="price"
+									type="text"
+									inputmode={amountKeypad}
+									autocomplete="off"
+									bind:value={newPriceText}
+									aria-describedby="price-note"
+									aria-invalid={newPriceNote?.problem ? true : undefined}
+									class={field}
+								/>
+							</div>
+							<button
+								type="submit"
+								disabled={!canAddItem}
+								aria-describedby="add-item-reason price-note"
+								class="{smallButton} {besideField} col-span-2 sm:col-span-1">Add item</button
+							>
+						</form>
+						<p
+							id="price-note"
+							role="status"
+							class="mt-2 text-sm empty:mt-0 {newPriceNote?.problem ? 'font-medium' : 'text-muted'}"
+						>
+							{#if newPriceNote}{newPriceNote.text}{/if}
+						</p>
+						<p id="add-item-reason" role="status" class="mt-2 text-sm text-muted empty:mt-0">
+							{#if addItemReason}{addItemReason}{/if}
+						</p>
+					</div>
+				{:else}
+					<button type="button" onclick={startAddingByHand} class="{secondaryButton} mt-5 w-full"
+						>{SPLIT_BILL.addByHand}</button
+					>
+				{/if}
 			</section>
 
 			<!-- Charges and adjustments, in the order a receipt prints them: after the items -->
