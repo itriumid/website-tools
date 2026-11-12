@@ -978,12 +978,15 @@ describe('the split as text', () => {
 	});
 
 	it('writes money with the symbol, the way the currency is written', () => {
-		expect(formatMoney(115500, 'IDR')).toBe('Rp 115.500');
-		expect(formatMoney(12.5, 'USD')).toBe('$ 12.50');
+		// The space doesn't break: a line never ends on the symbol.
+		expect(formatMoney(115500, 'IDR')).toBe('Rp\u00a0115.500');
+		expect(formatMoney(12.5, 'USD')).toBe('$\u00a012.50');
 	});
 
 	it('gives a line per person, then the total', () => {
-		expect(billAsText(state)).toBe('Ayu: Rp 57.750\nBudi: Rp 57.750\nTotal: Rp 115.500');
+		expect(billAsText(state)).toBe(
+			'Ayu: Rp\u00a057.750\nBudi: Rp\u00a057.750\nTotal: Rp\u00a0115.500'
+		);
 	});
 
 	it('ends with the link when there is one', () => {
@@ -1002,7 +1005,7 @@ describe('the split as text', () => {
 			})
 		);
 		expect(text).toBe(
-			"Ayu: Rp 30.000\nBudi: Rp 0\nNot in anyone's share: Rp 5.000\nTotal: Rp 35.000"
+			"Ayu: Rp\u00a030.000\nBudi: Rp\u00a00\nNot in anyone's share: Rp\u00a05.000\nTotal: Rp\u00a035.000"
 		);
 	});
 });
@@ -1090,7 +1093,7 @@ describe('settling up: who paid, and rounding', () => {
 
 	it('says who to pay in the text, when someone paid', () => {
 		expect(billAsText(three({ paidBy: 'a', roundTo: 500 }))).toBe(
-			'Ayu: paid the bill, gets Rp 44.000 back\nBudi: Rp 33.500 to Ayu\nCitra: Rp 10.500 to Ayu\nTotal: Rp 143.334'
+			'Ayu: paid the bill, gets Rp\u00a044.000 back\nBudi: Rp\u00a033.500 to Ayu\nCitra: Rp\u00a010.500 to Ayu\nTotal: Rp\u00a0143.334'
 		);
 	});
 });
