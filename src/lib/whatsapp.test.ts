@@ -16,7 +16,7 @@ function chat(...input: Parameters<typeof chatTarget>): ChatTarget | undefined {
 
 describe('digitsOnly', () => {
 	it('keeps the digits and drops everything else', () => {
-		expect(digitsOnly('+62 (811) 971-0096')).toBe('628119710096');
+		expect(digitsOnly('+62 (811) 234-5678')).toBe('628112345678');
 	});
 });
 
@@ -28,13 +28,13 @@ describe('chatTarget', () => {
 	});
 
 	it('puts the chosen country in front of a local number', () => {
-		const target = chat('62', '8119710096', '');
-		expect(target?.link).toBe('https://wa.me/628119710096');
-		expect(target?.display).toBe('+62 811-9710-096');
+		const target = chat('62', '8112345678', '');
+		expect(target?.link).toBe('https://wa.me/628112345678');
+		expect(target?.display).toBe('+62 811-2345-678');
 	});
 
 	it('drops the leading 0 of a local number', () => {
-		expect(chat('62', '0811 9710 096', '')?.number).toBe('628119710096');
+		expect(chat('62', '0811 2345 678', '')?.number).toBe('628112345678');
 	});
 
 	it('takes a number that starts with + as it is, whatever country is chosen', () => {
@@ -45,24 +45,24 @@ describe('chatTarget', () => {
 	});
 
 	it('adds the message, trimmed and escaped', () => {
-		const target = chat('62', '8119710096', '  Hi! Can we talk & meet?  ');
+		const target = chat('62', '8112345678', '  Hi! Can we talk & meet?  ');
 		expect(target?.link).toBe(
-			'https://wa.me/628119710096?text=Hi!%20Can%20we%20talk%20%26%20meet%3F'
+			'https://wa.me/628112345678?text=Hi!%20Can%20we%20talk%20%26%20meet%3F'
 		);
 	});
 
 	it('leaves the text off when the message is only spaces', () => {
-		expect(chat('62', '8119710096', '   ')?.link).toBe('https://wa.me/628119710096');
+		expect(chat('62', '8112345678', '   ')?.link).toBe('https://wa.me/628112345678');
 	});
 
 	it('takes 00 as the + of dialing abroad', () => {
-		expect(chat('62', '0062 811 9710 096', '')?.link).toBe('https://wa.me/628119710096');
+		expect(chat('62', '0062 811 2345 678', '')?.link).toBe('https://wa.me/628112345678');
 		expect(chat('62', '00 1 415 555 0132', '')?.link).toBe('https://wa.me/14155550132');
 	});
 
 	it('drops a trunk 0 typed after the country code', () => {
-		expect(chat('62', '+62 0811 9710 096', '')?.link).toBe('https://wa.me/628119710096');
-		expect(chat('62', '0062 0811 9710 096', '')?.link).toBe('https://wa.me/628119710096');
+		expect(chat('62', '+62 0811 2345 678', '')?.link).toBe('https://wa.me/628112345678');
+		expect(chat('62', '0062 0811 2345 678', '')?.link).toBe('https://wa.me/628112345678');
 		expect(chat('62', '+44 07700 900123', '')?.link).toBe('https://wa.me/447700900123');
 	});
 
@@ -73,10 +73,10 @@ describe('chatTarget', () => {
 	});
 
 	it("doesn't add the country code again to a number pasted with it", () => {
-		const target = chat('62', '628119710096', '');
-		expect(target?.link).toBe('https://wa.me/628119710096');
-		expect(target?.display).toBe('+62 811-9710-096');
-		expect(chat('62', '62 0811 9710 096', '')?.link).toBe('https://wa.me/628119710096');
+		const target = chat('62', '628112345678', '');
+		expect(target?.link).toBe('https://wa.me/628112345678');
+		expect(target?.display).toBe('+62 811-2345-678');
+		expect(chat('62', '62 0811 2345 678', '')?.link).toBe('https://wa.me/628112345678');
 		expect(chat('65', '6591234567', '')?.link).toBe('https://wa.me/6591234567');
 		expect(chat('1', '14155550132', '')?.link).toBe('https://wa.me/14155550132');
 	});
@@ -106,10 +106,10 @@ describe('chatTarget', () => {
 	});
 
 	it('says a number is too long instead of building a link', () => {
-		expect(chatTarget('62', '0811 9710 0961 23', '')).toEqual({ problem: 'too-long' });
-		expect(chatTarget('62', '+62 811 9710 0961 23', '')).toEqual({ problem: 'too-long' });
+		expect(chatTarget('62', '0811 2345 6781 23', '')).toEqual({ problem: 'too-long' });
+		expect(chatTarget('62', '+62 811 2345 6781 23', '')).toEqual({ problem: 'too-long' });
 		// More than 15 digits isn't a phone number anywhere: a different problem from a code twice.
-		expect(chatTarget('62', '0811 9710 0961 2345', '')).toEqual({ problem: 'too-many-digits' });
+		expect(chatTarget('62', '0811 2345 6781 2345', '')).toEqual({ problem: 'too-many-digits' });
 	});
 
 	it('takes 8 to 15 digits, country code included', () => {
@@ -154,19 +154,19 @@ describe('chatTarget', () => {
 	});
 
 	it('takes a + before the trunk prefix as a local number', () => {
-		const target = chat('62', '+0811 9710 096', '');
-		expect(target?.link).toBe('https://wa.me/628119710096');
-		expect(target?.display).toBe('+62 811-9710-096');
+		const target = chat('62', '+0811 2345 678', '');
+		expect(target?.link).toBe('https://wa.me/628112345678');
+		expect(target?.display).toBe('+62 811-2345-678');
 		expect(chat('7', '+8 912 345 67 89', '')?.link).toBe('https://wa.me/79123456789');
 		// A real country code after the + still wins: 81 is Japan.
 		expect(chat('7', '+81 90 1234 5678', '')?.link).toBe('https://wa.me/819012345678');
 	});
 
 	it('reads Arabic, Persian and full-width digits', () => {
-		expect(chat('62', '٠٨١١ ٩٧١٠ ٠٩٦', '')?.link).toBe('https://wa.me/628119710096');
-		expect(chat('62', '۰۸۱۱۹۷۱۰۰۹۶', '')?.link).toBe('https://wa.me/628119710096');
-		expect(chat('62', '＋６２ ８１１ ９７１０ ０９６', '')?.link).toBe(
-			'https://wa.me/628119710096'
+		expect(chat('62', '٠٨١١ ٢٣٤٥ ٦٧٨', '')?.link).toBe('https://wa.me/628112345678');
+		expect(chat('62', '۰۸۱۱۲۳۴۵۶۷۸', '')?.link).toBe('https://wa.me/628112345678');
+		expect(chat('62', '＋６２ ８１１ ２３４５ ６７８', '')?.link).toBe(
+			'https://wa.me/628112345678'
 		);
 		expect(chat('966', '٠٥٠ ١٢٣ ٤٥٦٧', '')?.link).toBe('https://wa.me/966501234567');
 	});
@@ -176,8 +176,8 @@ describe('chatTarget', () => {
 		expect(chatTarget('81', '090 1234', '')).toEqual({ problem: 'too-short' });
 		expect(chat('81', '090 1234 5678', '')?.link).toBe('https://wa.me/819012345678');
 		// Indonesia: 9 to 12 digits after +62.
-		expect(chatTarget('62', '811 970', '')).toEqual({ problem: 'too-short' });
-		expect(chatTarget('62', '+62 811 9710 0961 23', '')).toEqual({ problem: 'too-long' });
+		expect(chatTarget('62', '811 234', '')).toEqual({ problem: 'too-short' });
+		expect(chatTarget('62', '+62 811 2345 6781 23', '')).toEqual({ problem: 'too-long' });
 		// Singapore: always 8.
 		expect(chatTarget('65', '9123 456', '')).toEqual({ problem: 'too-short' });
 	});
@@ -188,32 +188,32 @@ describe('chatTarget', () => {
 	});
 
 	it('leaves out letters, and says so', () => {
-		const target = chat('62', 'WA: 0811 9710 096', '');
-		expect(target?.link).toBe('https://wa.me/628119710096');
+		const target = chat('62', 'WA: 0811 2345 678', '');
+		expect(target?.link).toBe('https://wa.me/628112345678');
 		expect(target?.lettersDropped).toBe(true);
-		expect(chat('62', '0811 9710 096', '')?.lettersDropped).toBe(false);
+		expect(chat('62', '0811 2345 678', '')?.lettersDropped).toBe(false);
 		expect(chatTarget('62', 'abc', '')).toEqual({ problem: 'no-digits' });
 		expect(chatTarget('62', ' - ', '')).toBeUndefined();
 	});
 
 	it("leaves off an extension, which WhatsApp can't dial", () => {
-		for (const typed of ['0811 9710 096 ext 5', '0811 9710 096 ext. 5', '0811 9710 096 x5']) {
+		for (const typed of ['0811 2345 678 ext 5', '0811 2345 678 ext. 5', '0811 2345 678 x5']) {
 			const target = chat('62', typed, '');
-			expect(target?.link).toBe('https://wa.me/628119710096');
+			expect(target?.link).toBe('https://wa.me/628112345678');
 			expect(target?.extension).toBe('5');
 		}
 	});
 
 	it('says when there is more than one number', () => {
-		expect(chatTarget('62', '0811 9710 096 / 0812 3456 789', '')).toEqual({ problem: 'several' });
-		expect(chatTarget('62', '08119710096, 08123456789', '')).toEqual({ problem: 'several' });
-		expect(chatTarget('62', '0811 9710 096 atau 0812 3456 789', '')).toEqual({
+		expect(chatTarget('62', '0811 2345 678 / 0812 3456 789', '')).toEqual({ problem: 'several' });
+		expect(chatTarget('62', '08112345678, 08123456789', '')).toEqual({ problem: 'several' });
+		expect(chatTarget('62', '0811 2345 678 atau 0812 3456 789', '')).toEqual({
 			problem: 'several'
 		});
 	});
 
 	it('says which country code it read the number with, and the countries that use it', () => {
-		expect(chat('62', '0811 9710 096', '')?.countryCode).toBe('62');
+		expect(chat('62', '0811 2345 678', '')?.countryCode).toBe('62');
 		expect(chat('62', '+44 7911 123456', '')?.countryCode).toBe('44');
 		expect(countriesWithCode('62')).toEqual(['Indonesia']);
 		expect(countriesWithCode('7')).toEqual(['Kazakhstan', 'Russia']);
@@ -234,7 +234,7 @@ describe('chatTarget', () => {
 describe('grouped', () => {
 	it('writes Indonesian mobile numbers the way they are written there', () => {
 		expect(grouped('62', '81234567890')).toBe('812-3456-7890');
-		expect(grouped('62', '8119710096')).toBe('811-9710-096');
+		expect(grouped('62', '8112345678')).toBe('811-2345-678');
 		expect(grouped('62', '812345678901')).toBe('812-3456-78901');
 	});
 

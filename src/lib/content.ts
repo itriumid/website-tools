@@ -61,6 +61,11 @@ export const WHATSAPP = {
 	sample: [{ value: 'wa.me/6281200000000' }] as Sample,
 	sampleCaption: 'The link it makes',
 	hint: 'A number that starts with + or 00 already has its country, so we use it as it is.',
+	/**
+	 * In the empty number field, for Indonesia: the shape people write, leading 0 included (it can
+	 * stay), with x for the digits so it's plainly an example and nobody's number.
+	 */
+	placeholder: '0812-xxxx-xxxx',
 	problems: {
 		'too-short': "That's too short for a phone number there. Check you have every digit.",
 		'too-long':

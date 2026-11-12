@@ -11,7 +11,7 @@ export function digitsOnly(text: string): string {
 export interface ChatTarget {
 	/** The full number as WhatsApp wants it: country code and number, digits only. */
 	number: string;
-	/** The same number, for people to read, in groups: "+62 811-9710-096". */
+	/** The same number, for people to read, in groups: "+62 811-2345-678". */
 	display: string;
 	/** The country code it was read with, so the page can say which country that is. */
 	countryCode: string;
@@ -142,7 +142,7 @@ function withoutTrunkPrefix(code: string, national: string): string {
  *   is a local one: the prefix goes and the country's code goes in front, so "0811 …" in
  *   Indonesia is "+62 811 …". So is one typed with a "+" in front of that prefix, "+0811 …".
  * - A number that starts with the chosen country's code was most likely pasted without its "+",
- *   so the code isn't added again: "628119710096" is "+62 8119710096". Some countries' own
+ *   so the code isn't added again: "628112345678" is "+62 8112345678". Some countries' own
  *   numbers start with the digits of their code, though (Indian mobiles can start with 91), so it
  *   counts as pasted with its code only when what follows the code is as long as a number there.
  *   "9198765432" in India is ten digits, a whole Indian number, and the eight after its 91 aren't,
