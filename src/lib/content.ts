@@ -139,7 +139,7 @@ export const SPLIT_BILL = {
 	// The split: what each person hands over, and to whom.
 	split: {
 		paidBy: 'Who paid?',
-		nobody: 'Not set',
+		nobody: 'No one yet',
 		paidTheBill: 'Paid the bill',
 		comesBack: 'comes back',
 		nothingTagged: 'Nothing tagged yet',
@@ -149,7 +149,7 @@ export const SPLIT_BILL = {
 		noRounding: 'No',
 		roundTo: (amount: string) => `To ${amount}`,
 		extraToPayer: (extra: string, name: string) =>
-			`Rounding up adds ${extra}, which comes off ${name}'s part.`,
+			`Rounding up adds ${extra}, which ${name} gets back.`,
 		extraOnTop: (extra: string) => `Rounding up adds ${extra} on top of the total.`,
 		empty: 'Add the items from the bill, and the split shows here as you go.'
 	},

@@ -477,7 +477,7 @@ tagged, and pink once tagging has begun and something is still left out: a state
 before anyone has started. The two lines under the rounding choice are kept even when empty, so
 picking a step never shifts what's below it. Then two radio groups, "Who paid?" and "Round shares
 up" (to two steps people actually hand over, Rp 500 and Rp 1.000 for rupiah), with a muted line
-saying what rounding added and whose part it came off. The breakdown (subtotal, charges, total)
+saying what rounding added and who gets it back. The breakdown (subtotal, charges, total)
 comes last, in an inset list: it's how the answer was reached, not the answer. A shared link opens
 with the split's heading focused, scrolled to on a phone.
 
