@@ -36,6 +36,14 @@ export interface ChatTarget {
 export type ChatProblem =
 	'too-short' | 'too-long' | 'too-many-digits' | 'area-code' | 'several' | 'no-digits';
 
+/**
+ * Whether a problem is true of every number halfway typed ("too short", "add the area code"), so
+ * it waits until the typing stops. The others can't be right however the number ends.
+ */
+export function waitsForTyping(problem: ChatProblem): boolean {
+	return problem === 'too-short' || problem === 'area-code';
+}
+
 /** A full number, country code included, has 8 to 15 digits (E.164 allows at most 15). */
 export const SHORTEST_NUMBER = 8;
 export const LONGEST_NUMBER = 15;

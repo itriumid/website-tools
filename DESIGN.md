@@ -457,7 +457,8 @@ in WhatsApp" and "Copy link" side by side, and the raw link in small muted monos
 Under it, one muted line on using the link: in a profile or a message, or as a QR code checked once
 before it's printed. Everything about the answer sits together, right under the field it comes from:
 nothing floats over it, so nothing can cover it on a short phone. A number too short or too long for
-its country is a problem in words, never a link.
+its country is a problem in words, never a link. "Too short" and "add the area code" wait until the
+typing stops: every number is too short halfway through it.
 
 ### Running total (signature)
 

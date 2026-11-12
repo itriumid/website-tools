@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { chatTarget, countriesWithCode, digitsOnly, grouped, type ChatTarget } from './whatsapp';
+import {
+	chatTarget,
+	countriesWithCode,
+	digitsOnly,
+	grouped,
+	waitsForTyping,
+	type ChatTarget
+} from './whatsapp';
 
 /** The chat to open, when there is one: undefined for nothing yet and for a problem alike. */
 function chat(...input: Parameters<typeof chatTarget>): ChatTarget | undefined {
@@ -245,6 +252,17 @@ describe('grouped', () => {
 	it('never changes the digits, only where the gaps are', () => {
 		for (const national of ['1', '12345', '123456789012345']) {
 			expect(grouped('49', national).replaceAll('-', '')).toBe(national);
+		}
+	});
+});
+
+describe('waitsForTyping', () => {
+	it('holds back what every number is halfway through, and nothing else', () => {
+		const halfway = chatTarget('62', '08', '');
+		expect(halfway && 'problem' in halfway && waitsForTyping(halfway.problem)).toBe(true);
+		expect(waitsForTyping('area-code')).toBe(true);
+		for (const problem of ['too-long', 'too-many-digits', 'several', 'no-digits'] as const) {
+			expect(waitsForTyping(problem)).toBe(false);
 		}
 	});
 });

@@ -5,7 +5,7 @@
 	import { WHATSAPP } from '#lib/content.js';
 	import { COUNTRIES, DEFAULT_COUNTRY_NAME } from '#lib/countries.js';
 	import { card, field, label, primaryButton, secondaryButton } from '#lib/styles.js';
-	import { chatTarget, countriesWithCode } from '#lib/whatsapp.js';
+	import { chatTarget, countriesWithCode, waitsForTyping } from '#lib/whatsapp.js';
 	import Caution from '#lib/Caution.svelte';
 
 	// Chosen by name, since countries share codes: the United States and Canada are both +1, and
@@ -29,7 +29,24 @@
 	// The example number is Indonesian: shown only for Indonesia, where it's a real shape.
 	const placeholder = $derived(countryName === DEFAULT_COUNTRY_NAME ? '811 9710 096' : '');
 	const target = $derived(result && 'link' in result ? result : undefined);
-	const problem = $derived(result && 'problem' in result ? result.problem : undefined);
+	// A problem every number has halfway through waits until the typing stops, or the field is
+	// left; one that can't come right however the number ends is said at once.
+	const WAIT_FOR = 800;
+	let typingStopped = $state(true);
+	let typingTimer: ReturnType<typeof setTimeout> | undefined;
+	function typing() {
+		typingStopped = false;
+		clearTimeout(typingTimer);
+		typingTimer = setTimeout(stoppedTyping, WAIT_FOR);
+	}
+	function stoppedTyping() {
+		clearTimeout(typingTimer);
+		typingStopped = true;
+	}
+	const problem = $derived.by(() => {
+		const found = result && 'problem' in result ? result.problem : undefined;
+		return found && waitsForTyping(found) && !typingStopped ? undefined : found;
+	});
 	// Which country the number is for: the one chosen, or, for a number typed with its own code,
 	// the countries that code belongs to.
 	const countryOfTarget = $derived.by(() => {
@@ -102,6 +119,8 @@
 				inputmode="tel"
 				autocomplete="off"
 				bind:value={typed}
+				oninput={typing}
+				onblur={stoppedTyping}
 				{placeholder}
 				aria-describedby="number-hint number-reads number-problem"
 				aria-invalid={problem ? true : undefined}
