@@ -74,7 +74,7 @@ not just taken on trust.
 ## Brand Commitments
 
 - Itrium's own site: Rhodonite palette only, with no palette picker. Pink marks the primary
-  action and focus, nothing else. Rules in `.handbook/conventions/reference/brand.md`.
+  action and focus, nothing else. Rules in `.handbook/itrium/brand.md`.
 - Plus Jakarta Sans, served from the site itself.
 - Logo and brand files are copies from `~/Itrium/Assets`; they are regenerated there, never
   edited here.

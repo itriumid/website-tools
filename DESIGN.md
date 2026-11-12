@@ -201,7 +201,7 @@ Rhodonite, as itrium.id applies it, plus the two edge grays that the tools' cont
 tokens live in `src/app.css` as `--bg`, `--surface`, `--border`, `--text`, `--muted`, `--accent`,
 `--on-accent`, `--accent-edge`, `--control-border` and `--focus`. Each swaps value between the
 dark default and `prefers-color-scheme: light`. The binding rules are in the handbook's
-`conventions/reference/brand.md`.
+`itrium/brand.md`.
 
 ### Primary
 
