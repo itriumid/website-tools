@@ -165,16 +165,23 @@
 							{/each}
 						</ul>
 					{/if}
-					<div class="mt-4 flex gap-3">
+					<!-- Side by side, each as wide as its words need, with less padding than a button on its
+					     own (px-4! wins over the shared px-6) so both fit a phone; on the narrowest phones
+					     Copy moves under Open rather than either breaking onto two lines. -->
+					<div class="mt-4 flex flex-wrap gap-3">
 						<a
 							href={target.link}
 							target="_blank"
 							rel="external noopener noreferrer"
-							class="{primaryButton} flex-1 px-4"
+							class="{primaryButton} grow px-4! whitespace-nowrap"
 						>
 							Open in WhatsApp<span class="sr-only"> (opens in a new tab)</span>
 						</a>
-						<button type="button" onclick={copyLink} class="{secondaryButton} flex-1 px-4">
+						<button
+							type="button"
+							onclick={copyLink}
+							class="{secondaryButton} grow px-4! whitespace-nowrap"
+						>
 							Copy link
 						</button>
 					</div>
