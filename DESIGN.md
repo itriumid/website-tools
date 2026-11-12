@@ -295,15 +295,17 @@ small uppercase heading or back link sits above it. Nothing here is set in upper
 - **Gutters:** 1.25rem on phones (`gutter-phone`), 2rem from 640 px (`gutter-wide`).
 - **Rhythm:** a page ends with 5rem of space (`section`). Within a tool, cards stack 1.25 to 1.5rem
   apart, and fields and their hints step in 0.5rem to 1rem.
-- **Index:** the opening slab (the title and a tagline naming the two jobs, in the text color), then the tool cards in
-  one column, two from 640 px, Split bill first. Then a section heading and the cards for tools on
-  sites of their own. A closing slab ends it: what stays on the device as a ruled list, and the
-  source as a secondary button. On a screen under 44rem tall the panel and the gap under it tighten, so the first
-  card's action line stays on a 390x667 phone's first screen. Above the cards, for someone in the
-  middle of a bill, one line from what the browser already keeps (the draft in this tab, or the
-  bills this device shared) with an action line to it: shown after the page loads, never stored
-  or sent. The section heading over tools on sites of their own is a step smaller than the
-  closing panel's, which is the page's last word.
+- **Index:** the opening slab (the title and a tagline naming the two jobs, in the text color), then
+  the tool cards in one column, two from 640 px, Split bill first. Then a section heading and the
+  cards for tools on sites of their own. A closing slab ends it: what stays on the device as a ruled
+  list, and the source as a secondary button. On a screen under 44rem tall the panel and the gap
+  under it tighten, so the first card's action line stays on a 390x667 phone's first screen. Above
+  the cards, for someone in the middle of a bill, one line from what the browser already keeps (the
+  draft in this tab, or the bills this device shared) with an action line to it: shown after the
+  page loads, never stored or sent. While there's only one tool on a site of its own, its card takes
+  the whole row from 640 px, text on the left and the action line on the right. The section heading
+  over tools on sites of their own is a step smaller than the closing panel's, which is the page's
+  last word.
 - **Tool page:** a slim title band (title and introduction only, about 2rem of padding on phones),
   then the tool immediately. No closing panel, because the running total owns the bottom of the
   screen.
