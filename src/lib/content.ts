@@ -157,10 +157,19 @@ export const SPLIT_BILL = {
 	},
 	// After removing someone or something: one tap took it, one tap brings it back.
 	removed: (name: string) => `Removed ${name}.`,
-	removedPerson: (name: string, shared: number) =>
-		shared === 0
-			? `Removed ${name}.`
-			: `Removed ${name}. ${shared === 1 ? 'The item they shared is' : `The ${shared} items they shared are`} now split among the others.`,
+	// What only they had leaves the split, and that's money someone has to notice.
+	removedPerson: (name: string, shared: number, alone?: string) => {
+		const theShared =
+			shared === 1 ? 'the item they shared is' : `the ${shared} items they shared are`;
+		if (alone && shared) {
+			return `Removed ${name}. What only they had, ${alone}, isn't in anyone's share now, and ${theShared} split among the others.`;
+		}
+		if (alone) return `Removed ${name}. What only they had, ${alone}, isn't in anyone's share now.`;
+		if (shared) {
+			return `Removed ${name}. ${theShared.charAt(0).toUpperCase()}${theShared.slice(1)} now split among the others.`;
+		}
+		return `Removed ${name}.`;
+	},
 	// Behind it in the Charges card: what only some receipts say.
 	moreOnReceipt: 'More on the receipt',
 	moreOnReceiptHint: 'Prices with tax, discounts, rounding',

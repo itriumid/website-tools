@@ -495,7 +495,8 @@ Citra.", with an underlined "Undo" beside it at touch-target height. It stays un
 changes some other way. There's no countdown and no confirmation dialog: one tap took it, one
 tap brings it back. The split repeats the line, with its Undo, under its heading, since a removal
 changes it and on a wide screen it's in the other column; only the card's own line is a live
-region, so it's announced once.
+region, so it's announced once. Removing someone who had items alone says what's no longer in
+anyone's share, as an amount: money leaving the split is the one thing that line must not hide.
 
 ### Where focus goes
 

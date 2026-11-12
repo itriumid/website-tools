@@ -221,6 +221,8 @@
 		name: string;
 		/** For a person: how many items they shared with others, now split among fewer. */
 		shared?: number;
+		/** For a person: what only they had, now in nobody's share. */
+		alone?: number;
 		before: Pick<BillState, 'people' | 'items'> & {
 			adjustments: BillAdjustment[];
 			paidBy?: string;
@@ -262,8 +264,14 @@
 				item.assignedPersonIds.includes(id) &&
 				item.assignedPersonIds.some((other) => other !== id && people.some((p) => p.id === other))
 		).length;
+		const unsharedBefore = totals.unshared;
 		undoable('people', id, nameOf(id), () => forgetPerson(id));
-		if (removal) removal.shared = shared;
+		if (removal) {
+			removal.shared = shared;
+			// Read after the change: the split as it is without them.
+			const alone = totals.unshared - unsharedBefore;
+			if (alone >= coin / 2) removal.alone = alone;
+		}
 	}
 
 	function forgetPerson(id: string) {
@@ -1461,7 +1469,8 @@
 				>
 					{#if removal?.from === 'people'}{SPLIT_BILL.removedPerson(
 							removal.name,
-							removal.shared ?? 0
+							removal.shared ?? 0,
+							removal.alone ? money(removal.alone) : undefined
 						)}<button
 							id="undo-people"
 							type="button"
@@ -2084,7 +2093,11 @@
 					{#if removal}
 						<p class="-mt-2 mb-3 flex flex-wrap items-center gap-x-3 text-sm">
 							{removal.from === 'people'
-								? SPLIT_BILL.removedPerson(removal.name, removal.shared ?? 0)
+								? SPLIT_BILL.removedPerson(
+										removal.name,
+										removal.shared ?? 0,
+										removal.alone ? money(removal.alone) : undefined
+									)
 								: SPLIT_BILL.removed(removal.name)}<button
 								type="button"
 								onclick={undoRemoval}
