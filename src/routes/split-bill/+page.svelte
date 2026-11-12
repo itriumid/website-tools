@@ -2035,6 +2035,21 @@
 			{#if items.length}
 				<section class={card} aria-labelledby="split-heading">
 					<h2 id="split-heading" tabindex="-1" class={cardHeading}>The split</h2>
+					<!-- A removal changes the split, so it says so here too, with the way back: on a wide
+					     screen the card it was made in is in the other column. Not a second live region:
+					     the card's own line already announces it. -->
+					{#if removal}
+						<p class="-mt-2 mb-3 flex flex-wrap items-center gap-x-3 text-sm">
+							{removal.from === 'people'
+								? SPLIT_BILL.removedPerson(removal.name, removal.shared ?? 0)
+								: SPLIT_BILL.removed(removal.name)}<button
+								type="button"
+								onclick={undoRemoval}
+								class="min-h-11 font-medium underline underline-offset-4 hover:text-accent-text"
+								>{SPLIT_BILL.undo}</button
+							>
+						</p>
+					{/if}
 
 					{#if people.length}
 						<!-- What each person hands over comes first, and largest: it's what the table asked. -->
