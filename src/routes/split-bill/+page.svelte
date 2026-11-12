@@ -1231,6 +1231,12 @@
 										scanned.taxPercentage,
 										scanned.taxOnService
 									)}
+									{#if scanned.servicePercentage !== percentage(serviceInput) || scanned.taxPercentage !== percentage(taxInput)}
+										{SPLIT_BILL.scanning.ratesUntilNow(
+											percentage(serviceInput),
+											percentage(taxInput)
+										)}
+									{/if}
 								</p>
 							{:else if reviewLines.length}
 								<p>{SPLIT_BILL.scanning.noRates}</p>
@@ -2036,21 +2042,34 @@
 								<li class="flex items-center justify-between gap-4 py-3">
 									<div class="min-w-0">
 										<p class="font-medium break-words">{nameOf(settlement.personId)}</p>
-										{#if settlement.paidTheBill}
-											<p class="text-sm text-muted">
-												{SPLIT_BILL.split.getsBack(money(settlement.amount))}
-											</p>
-										{:else if payerName}
-											<p class="text-sm text-muted">{SPLIT_BILL.split.to(payerName)}</p>
-										{:else if share.base !== share.total}
-											<p class="text-sm text-muted">
-												{SPLIT_BILL.split.ordered(money(share.base))}
-											</p>
-										{/if}
+										<!-- Every row keeps one short line here, even an empty one, so choosing who paid
+										     never changes a row's height and moves the choices below. -->
+										<p class="min-h-5 text-sm text-muted">
+											{#if settlement.paidTheBill}{SPLIT_BILL.split
+													.paidTheBill}{:else if settlement.amount === 0}{SPLIT_BILL.split
+													.nothingTagged}{:else if payerName}{SPLIT_BILL.split.to(
+													payerName
+												)}{:else if share.base !== share.total}{SPLIT_BILL.split.ordered(
+													money(share.base)
+												)}{/if}
+										</p>
 									</div>
-									<!-- Whoever paid hands nothing over: their big number is what comes back. -->
-									<p class="shrink-0 text-2xl font-bold tracking-tight tabular-nums">
-										{money(settlement.paidTheBill ? settledUp.back : settlement.amount)}
+									<!-- Whoever paid hands nothing over: their big number is what comes back, and says so
+									     beside it, so it can't be read as what they owe. -->
+									<!-- "comes back" sits beside the number, not under it: choosing who paid mustn't make the
+									     row taller and move the choices below it under someone's thumb. -->
+									<p class="flex shrink-0 items-baseline gap-2">
+										{#if settlement.paidTheBill}<span class="text-sm text-muted"
+												>{SPLIT_BILL.split.comesBack}</span
+											>{/if}
+										<span
+											class="text-2xl font-bold tracking-tight tabular-nums {settlement.amount ===
+												0 && !settlement.paidTheBill
+												? 'text-muted'
+												: ''}"
+										>
+											{money(settlement.paidTheBill ? settledUp.back : settlement.amount)}
+										</span>
 									</p>
 								</li>
 							{/each}
@@ -2110,13 +2129,12 @@
 									</label>
 								{/each}
 							</div>
-							{#if settledUp.extra > 0}
-								<p class="mt-1 text-sm text-muted">
-									{payerName
+							<!-- Two lines are kept even when empty (the note wraps on a phone and in the side column), so choosing a step doesn't shift what's below. -->
+							<p class="mt-1 min-h-10 text-sm text-muted">
+								{#if settledUp.extra > 0}{payerName
 										? SPLIT_BILL.split.extraToPayer(money(settledUp.extra), payerName)
-										: SPLIT_BILL.split.extraOnTop(money(settledUp.extra))}
-								</p>
-							{/if}
+										: SPLIT_BILL.split.extraOnTop(money(settledUp.extra))}{/if}
+							</p>
 						</fieldset>
 					{/if}
 
