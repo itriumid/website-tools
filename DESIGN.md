@@ -497,6 +497,14 @@ tap brings it back. The split repeats the line, with its Undo, under its heading
 changes it and on a wide screen it's in the other column; only the card's own line is a live
 region, so it's announced once.
 
+### Where focus goes
+
+A press that removes or replaces the control it was made on never leaves focus on nothing (which
+drops a keyboard or a screen reader at the top of the page). Opening the scan form focuses its
+first field, reading the receipt its review heading, adding it the People field when there's nobody
+yet (scrolled to), or else the Items heading; removing focuses the Undo, and Undo the person or
+item brought back.
+
 ### Links that can't open
 
 A shared link cut off when it was pasted, or changed on the way, says so ("This link looks

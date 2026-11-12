@@ -164,6 +164,18 @@
 		return { text: SPLIT_BILL.amounts.reads(money(read.amount)), problem: false };
 	}
 
+	/**
+	 * Where focus goes once a change has drawn: the control that took the press is often gone (the
+	 * form it was in closed, the row it was on removed), and focus left on nothing falls back to
+	 * the top of the page, for a keyboard or a screen reader in the middle of the bill.
+	 */
+	async function focusAfter(id: string, scroll = false) {
+		await tick();
+		const element = document.getElementById(id);
+		element?.focus({ preventScroll: !scroll });
+		if (scroll) element?.scrollIntoView({ block: 'center' });
+	}
+
 	/* ─── People ─── */
 	let newPerson = $state('');
 
@@ -204,6 +216,8 @@
 	interface Removal {
 		/** Which card says so: the one the removal was made from. */
 		from: 'people' | 'items';
+		/** The person's or item's, so focus can go back to it when it's brought back. */
+		id: string;
 		name: string;
 		/** For a person: how many items they shared with others, now split among fewer. */
 		shared?: number;
@@ -216,7 +230,7 @@
 	}
 	let removal: Removal | undefined = $state();
 
-	function undoable(from: Removal['from'], name: string, change: () => void) {
+	function undoable(from: Removal['from'], id: string, name: string, change: () => void) {
 		const before = {
 			people: $state.snapshot(people),
 			items: $state.snapshot(items),
@@ -224,11 +238,13 @@
 			paidBy
 		};
 		change();
-		removal = { from, name, before, after: JSON.stringify(bill) };
+		removal = { from, id, name, before, after: JSON.stringify(bill) };
+		void focusAfter(`undo-${from}`);
 	}
 
 	function undoRemoval() {
 		if (!removal) return;
+		void focusAfter(removal.from === 'people' ? `rename-${removal.id}` : `edit-${removal.id}`);
 		people = removal.before.people;
 		items = removal.before.items;
 		adjustments = removal.before.adjustments;
@@ -246,7 +262,7 @@
 				item.assignedPersonIds.includes(id) &&
 				item.assignedPersonIds.some((other) => other !== id && people.some((p) => p.id === other))
 		).length;
-		undoable('people', nameOf(id), () => forgetPerson(id));
+		undoable('people', id, nameOf(id), () => forgetPerson(id));
 		if (removal) removal.shared = shared;
 	}
 
@@ -385,7 +401,7 @@
 
 	function removeItem(id: string) {
 		const name = items.find((item) => item.id === id)?.name ?? '';
-		undoable('items', name, () => {
+		undoable('items', id, name, () => {
 			items = items.filter((item) => item.id !== id);
 		});
 	}
@@ -528,7 +544,19 @@
 	let reviewLines: ReviewLine[] = $state([]);
 	let reviewAdjustments: ReviewAdjustment[] = $state([]);
 
+	function startScan() {
+		scanning = true;
+		// The photo comes first in the form: focusing it opens no keyboard over the rest.
+		void focusAfter('receipt-photo');
+	}
+
+	function cancelScan() {
+		closeScan();
+		void focusAfter('scan-open');
+	}
+
 	function readScan() {
+		void focusAfter('review-heading');
 		scanned = readReceipt(receiptText, currencyCode);
 		reviewLines = scanned.items.map((item) => ({
 			id: newId(),
@@ -618,6 +646,9 @@
 			taxOnServiceChosen = true;
 		}
 		closeScan();
+		// Tagging needs people: with nobody yet, that's the next thing to do.
+		if (people.length === 0) void focusAfter('person', true);
+		else void focusAfter('items-heading');
 	}
 
 	/* ─── Sharing ─── */
@@ -1006,8 +1037,9 @@
 
 				{#if !scanning}
 					<button
+						id="scan-open"
 						type="button"
-						onclick={() => (scanning = true)}
+						onclick={startScan}
 						class="{secondaryButton} mt-4 w-full">{SPLIT_BILL.scanning.open}</button
 					>
 				{:else if !scanned}
@@ -1050,7 +1082,7 @@
 							<button type="submit" disabled={!receiptText.trim()} class={smallButton}
 								>{SPLIT_BILL.scanning.read}</button
 							>
-							<button type="button" onclick={closeScan} class={smallButton}
+							<button type="button" onclick={cancelScan} class={smallButton}
 								>{SPLIT_BILL.scanning.cancel}</button
 							>
 						</div>
@@ -1058,7 +1090,9 @@
 				{:else}
 					<div class="mt-5 border-t border-border pt-5">
 						<div class="flex flex-wrap items-center gap-x-1">
-							<h3 class="text-base font-semibold">{SPLIT_BILL.scanning.review}</h3>
+							<h3 id="review-heading" tabindex="-1" class="text-base font-semibold">
+								{SPLIT_BILL.scanning.review}
+							</h3>
 							<Toggletip label="About what to check" text={SPLIT_BILL.explanations.unsure} />
 						</div>
 
@@ -1282,7 +1316,7 @@
 									>{SPLIT_BILL.scanning.removeUnpriced}</button
 								>
 							{/if}
-							<button type="button" onclick={closeScan} class={secondaryButton}
+							<button type="button" onclick={cancelScan} class={secondaryButton}
 								>{SPLIT_BILL.scanning.cancel}</button
 							>
 						</div>
@@ -1429,6 +1463,7 @@
 							removal.name,
 							removal.shared ?? 0
 						)}<button
+							id="undo-people"
 							type="button"
 							onclick={undoRemoval}
 							class="min-h-11 font-medium underline underline-offset-4 hover:text-accent-text"
@@ -1439,7 +1474,7 @@
 
 			<!-- Items -->
 			<section class={card} aria-labelledby="items-heading">
-				<h2 id="items-heading" class={cardHeading}>
+				<h2 id="items-heading" tabindex="-1" class={cardHeading}>
 					Items {#if items.length}<span class="font-normal text-muted">({items.length})</span>{/if}
 				</h2>
 				<form
@@ -1755,6 +1790,7 @@
 					role="status"
 				>
 					{#if removal?.from === 'items'}{SPLIT_BILL.removed(removal.name)}<button
+							id="undo-items"
 							type="button"
 							onclick={undoRemoval}
 							class="min-h-11 font-medium underline underline-offset-4 hover:text-accent-text"
