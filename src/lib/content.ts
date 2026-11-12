@@ -61,13 +61,15 @@ export const WHATSAPP = {
 	problems: {
 		'too-short': "That's too short for a phone number there. Check you have every digit.",
 		'too-long':
-			"That's too long for a phone number there. Check the country code isn't in it twice.",
+			"That's too long for a phone number there. Check the country is right, and its code isn't in the number twice.",
 		'too-many-digits':
 			"That's more digits than any phone number has: 15 at most, country code included.",
 		'area-code': 'Add the area code too.',
 		several: 'That looks like more than one number. Make a link for one at a time.',
 		'no-digits': "There's no number here yet. Type the phone number's digits."
 	},
+	/** Under the field, as soon as the number reads as one: the number, as the link will have it. */
+	reads: (number: string, country: string) => `= ${number}${country ? `, ${country}` : ''}`,
 	result: {
 		heading: 'Your link',
 		empty: 'Enter a phone number and the link appears here.',

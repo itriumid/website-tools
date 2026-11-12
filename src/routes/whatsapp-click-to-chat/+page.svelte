@@ -5,7 +5,7 @@
 	import { WHATSAPP } from '#lib/content.js';
 	import { COUNTRIES, DEFAULT_COUNTRY_NAME } from '#lib/countries.js';
 	import { card, field, label, primaryButton, secondaryButton } from '#lib/styles.js';
-	import { chatTarget, countriesWithCode } from '#lib/whatsapp.js';
+	import { chatTarget, countriesWithCode, waitsForTyping } from '#lib/whatsapp.js';
 	import Caution from '#lib/Caution.svelte';
 
 	// Chosen by name, since countries share codes: the United States and Canada are both +1, and
@@ -29,7 +29,24 @@
 	// The example number is Indonesian: shown only for Indonesia, where it's a real shape.
 	const placeholder = $derived(countryName === DEFAULT_COUNTRY_NAME ? '811 9710 096' : '');
 	const target = $derived(result && 'link' in result ? result : undefined);
-	const problem = $derived(result && 'problem' in result ? result.problem : undefined);
+	// A problem every number has halfway through waits until the typing stops, or the field is
+	// left; one that can't come right however the number ends is said at once.
+	const WAIT_FOR = 800;
+	let typingStopped = $state(true);
+	let typingTimer: ReturnType<typeof setTimeout> | undefined;
+	function typing() {
+		typingStopped = false;
+		clearTimeout(typingTimer);
+		typingTimer = setTimeout(stoppedTyping, WAIT_FOR);
+	}
+	function stoppedTyping() {
+		clearTimeout(typingTimer);
+		typingStopped = true;
+	}
+	const problem = $derived.by(() => {
+		const found = result && 'problem' in result ? result.problem : undefined;
+		return found && waitsForTyping(found) && !typingStopped ? undefined : found;
+	});
 	// Which country the number is for: the one chosen, or, for a number typed with its own code,
 	// the countries that code belongs to.
 	const countryOfTarget = $derived.by(() => {
@@ -102,14 +119,23 @@
 				inputmode="tel"
 				autocomplete="off"
 				bind:value={typed}
+				oninput={typing}
+				onblur={stoppedTyping}
 				{placeholder}
-				aria-describedby="number-hint number-problem"
+				aria-describedby="number-hint number-reads number-problem"
 				aria-invalid={problem ? true : undefined}
 				class={field}
 			/>
 			<!-- Before anything's typed, how a number with its country is read; after, what's wrong. -->
 			{#if !typed.trim()}
 				<p id="number-hint" class="mt-1.5 text-sm text-muted">{WHATSAPP.hint}</p>
+			{/if}
+			<!-- What the number reads as, right under it: on a phone the keyboard covers the result
+			     below, and this is the line to check against what was typed. -->
+			{#if target}
+				<p id="number-reads" class="mt-1.5 text-sm text-muted tabular-nums">
+					{WHATSAPP.reads(target.display, countryOfTarget)}
+				</p>
 			{/if}
 			<p id="number-problem" class="mt-1.5 text-sm font-medium empty:mt-0" role="status">
 				{#if problem}{WHATSAPP.problems[problem]}{/if}
@@ -139,16 +165,23 @@
 							{/each}
 						</ul>
 					{/if}
-					<div class="mt-4 flex gap-3">
+					<!-- Side by side, each as wide as its words need, with less padding than a button on its
+					     own (px-4! wins over the shared px-6) so both fit a phone; on the narrowest phones
+					     Copy moves under Open rather than either breaking onto two lines. -->
+					<div class="mt-4 flex flex-wrap gap-3">
 						<a
 							href={target.link}
 							target="_blank"
 							rel="external noopener noreferrer"
-							class="{primaryButton} flex-1 px-4"
+							class="{primaryButton} grow px-4! whitespace-nowrap"
 						>
 							Open in WhatsApp<span class="sr-only"> (opens in a new tab)</span>
 						</a>
-						<button type="button" onclick={copyLink} class="{secondaryButton} flex-1 px-4">
+						<button
+							type="button"
+							onclick={copyLink}
+							class="{secondaryButton} grow px-4! whitespace-nowrap"
+						>
 							Copy link
 						</button>
 					</div>

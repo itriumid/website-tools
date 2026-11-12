@@ -371,7 +371,8 @@ Pressable pills, soft and sure-footed. There are three kinds, and pink is the ma
 - **Shape:** fully rounded (`full`), 0.75rem by 1.5rem of padding, label and icon centered with a
   0.5rem gap.
 - **Primary:** pastel pink with graphite text, semibold. One per view: "Read the receipt", "Add to
-  the bill", "Copy link".
+  the bill", "Open in WhatsApp" (messaging a number is the job most people come for; "Copy link"
+  beside it is secondary).
 - **Secondary:** transparent, with a 1 px control-edge border and medium weight. Every other
   action beside the primary.
 - **Small:** the secondary's look at 2.25rem tall with 1rem of padding (2.75rem on touch screens).
@@ -446,15 +447,20 @@ opens the explanation as a gray-barred note on the next line, never as a floatin
 
 ### Chat result (WhatsApp click-to-chat)
 
-The answer is the number, as people read it: "+62 8119710096" in bold 1.5rem, in an inset with a
-hairline, with the country it's for in muted text under it. Then the message as plain text, then
+The answer is the number, as people read it, in groups: "+62 811-9710-096" in bold 1.5rem, in an
+inset with a hairline, with the country it's for in muted text under it. The same number is read
+back in one muted line right under the field ("= +62 811-9710-096, Indonesia"), like an amount in
+Split bill: on a phone the keyboard covers the result while the number is typed, and this is the
+line to check it against. Then the message as plain text, then
 anything decided on the person's behalf, each with the drawn warning sign in medium weight (letters
 left out, an extension WhatsApp can't dial, a number at the short end for its country). Then "Open
-in WhatsApp" and "Copy link" side by side, and the raw link in small muted monospace, selectable.
+in WhatsApp" and "Copy link" side by side, neither ever breaking onto two lines (on the narrowest
+phones Copy moves under Open), and the raw link in small muted monospace, selectable.
 Under it, one muted line on using the link: in a profile or a message, or as a QR code checked once
 before it's printed. Everything about the answer sits together, right under the field it comes from:
 nothing floats over it, so nothing can cover it on a short phone. A number too short or too long for
-its country is a problem in words, never a link.
+its country is a problem in words, never a link. "Too short" and "add the area code" wait until the
+typing stops: every number is too short halfway through it.
 
 ### Running total (signature)
 
