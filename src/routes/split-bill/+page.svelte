@@ -3,6 +3,7 @@
 	import SearchableSelect, { type Choice } from '#lib/SearchableSelect.svelte';
 	import Arrow from '#lib/Arrow.svelte';
 	import Check from '#lib/Check.svelte';
+	import Step from '#lib/Step.svelte';
 	import Seo from '#lib/Seo.svelte';
 	import TitleBand from '#lib/TitleBand.svelte';
 	import Toggletip from '#lib/Toggletip.svelte';
@@ -1650,13 +1651,14 @@
 														aria-label={person.name}
 														class="inline-flex min-h-9 items-center gap-0.5 rounded-full border border-accent-edge bg-accent py-0.5 pr-0.5 pl-3.5 text-sm font-medium text-on-accent pointer-coarse:py-0"
 													>
-														{person.name}
+														<!-- Counted shows like tagged: the check mark, not only the pink. -->
+														<Check class="mr-1 align-[-0.125em]" />{person.name}
 														<button
 															type="button"
 															onclick={() => changeCount(item, person.id, -1)}
 															aria-label="One fewer for {person.name}"
 															class="ml-1.5 inline-flex size-8 items-center justify-center rounded-full text-base hover:bg-on-accent/10 pointer-coarse:size-11"
-															>−</button
+															><Step kind="fewer" /></button
 														>
 														<span class="min-w-5 text-center tabular-nums">{count}</span>
 														<button
@@ -1664,7 +1666,7 @@
 															onclick={() => changeCount(item, person.id, 1)}
 															aria-label="One more for {person.name}"
 															class="inline-flex size-8 items-center justify-center rounded-full text-base hover:bg-on-accent/10 pointer-coarse:size-11"
-															>+</button
+															><Step kind="more" /></button
 														>
 													</span>
 												{:else}
@@ -2033,6 +2035,21 @@
 			{#if items.length}
 				<section class={card} aria-labelledby="split-heading">
 					<h2 id="split-heading" tabindex="-1" class={cardHeading}>The split</h2>
+					<!-- A removal changes the split, so it says so here too, with the way back: on a wide
+					     screen the card it was made in is in the other column. Not a second live region:
+					     the card's own line already announces it. -->
+					{#if removal}
+						<p class="-mt-2 mb-3 flex flex-wrap items-center gap-x-3 text-sm">
+							{removal.from === 'people'
+								? SPLIT_BILL.removedPerson(removal.name, removal.shared ?? 0)
+								: SPLIT_BILL.removed(removal.name)}<button
+								type="button"
+								onclick={undoRemoval}
+								class="min-h-11 font-medium underline underline-offset-4 hover:text-accent-text"
+								>{SPLIT_BILL.undo}</button
+							>
+						</p>
+					{/if}
 
 					{#if people.length}
 						<!-- What each person hands over comes first, and largest: it's what the table asked. -->
