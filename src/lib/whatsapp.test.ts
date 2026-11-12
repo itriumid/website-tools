@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chatTarget, digitsOnly, type ChatTarget } from './whatsapp';
+import { chatTarget, countriesWithCode, digitsOnly, type ChatTarget } from './whatsapp';
 
 /** The chat to open, when there is one: undefined for nothing yet and for a problem alike. */
 function chat(...input: Parameters<typeof chatTarget>): ChatTarget | undefined {
@@ -99,8 +99,10 @@ describe('chatTarget', () => {
 	});
 
 	it('says a number is too long instead of building a link', () => {
-		expect(chatTarget('62', '0811 9710 0961 2345', '')).toEqual({ problem: 'too-long' });
-		expect(chatTarget('62', '+62 811 9710 0961 2345', '')).toEqual({ problem: 'too-long' });
+		expect(chatTarget('62', '0811 9710 0961 23', '')).toEqual({ problem: 'too-long' });
+		expect(chatTarget('62', '+62 811 9710 0961 23', '')).toEqual({ problem: 'too-long' });
+		// More than 15 digits isn't a phone number anywhere: a different problem from a code twice.
+		expect(chatTarget('62', '0811 9710 0961 2345', '')).toEqual({ problem: 'too-many-digits' });
 	});
 
 	it('takes 8 to 15 digits, country code included', () => {
@@ -108,7 +110,7 @@ describe('chatTarget', () => {
 		expect(chatTarget('', '+30 12345', '')).toEqual({ problem: 'too-short' });
 		expect(chat('', '+30 123456', '')?.number).toBe('30123456');
 		expect(chat('', '+30 1234567890123', '')?.number).toBe('301234567890123');
-		expect(chatTarget('', '+30 12345678901234', '')).toEqual({ problem: 'too-long' });
+		expect(chatTarget('', '+30 12345678901234', '')).toEqual({ problem: 'too-many-digits' });
 	});
 
 	it("drops the trunk prefix of countries where it isn't 0", () => {
@@ -201,5 +203,23 @@ describe('chatTarget', () => {
 		expect(chatTarget('62', '0811 9710 096 atau 0812 3456 789', '')).toEqual({
 			problem: 'several'
 		});
+	});
+
+	it('says which country code it read the number with, and the countries that use it', () => {
+		expect(chat('62', '0811 9710 096', '')?.countryCode).toBe('62');
+		expect(chat('62', '+44 7911 123456', '')?.countryCode).toBe('44');
+		expect(countriesWithCode('62')).toEqual(['Indonesia']);
+		expect(countriesWithCode('7')).toEqual(['Kazakhstan', 'Russia']);
+		expect(countriesWithCode('1')).toEqual(['Canada', 'United States']);
+	});
+
+	it('marks a number at the short end, where most there are longer', () => {
+		// A UK mobile is 10 digits after +44; 9 is a landline length, or a mobile missing one.
+		expect(chat('44', '07911 12345', '')?.short).toBe(true);
+		expect(chat('44', '07911 123456', '')?.short).toBe(false);
+		// Singapore's numbers are all 8: nothing to mark.
+		expect(chat('65', '9123 4567', '')?.short).toBe(false);
+		// Where we don't know the lengths, nothing is marked either.
+		expect(chat('49', '0151 23456789', '')?.short).toBe(false);
 	});
 });

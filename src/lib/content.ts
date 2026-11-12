@@ -49,6 +49,8 @@ export const WHATSAPP = {
 		'too-short': "That's too short for a phone number there. Check you have every digit.",
 		'too-long':
 			"That's too long for a phone number there. Check the country code isn't in it twice.",
+		'too-many-digits':
+			"That's more digits than any phone number has: 15 at most, country code included.",
 		'area-code': 'Add the area code too.',
 		several: 'That looks like more than one number. Make a link for one at a time.',
 		'no-digits': "There's no number here yet. Type the phone number's digits."
@@ -58,7 +60,8 @@ export const WHATSAPP = {
 		empty: 'Enter a phone number and the link appears here.',
 		lettersDropped: 'We left out the letters and kept the digits: check this is the number.',
 		extension: (extension: string) =>
-			`We left off the extension (${extension}): WhatsApp can't dial one.`
+			`We left off the extension (${extension}): WhatsApp can't dial one.`,
+		short: "That's shorter than most numbers there. Check you have every digit."
 	}
 };
 

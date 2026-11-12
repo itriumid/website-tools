@@ -5,7 +5,8 @@
 	import { WHATSAPP } from '#lib/content.js';
 	import { COUNTRIES, DEFAULT_COUNTRY_NAME } from '#lib/countries.js';
 	import { card, field, label, primaryButton, secondaryButton } from '#lib/styles.js';
-	import { chatTarget } from '#lib/whatsapp.js';
+	import { chatTarget, countriesWithCode } from '#lib/whatsapp.js';
+	import Caution from '#lib/Caution.svelte';
 
 	// Chosen by name, since countries share codes: the United States and Canada are both +1, and
 	// people look for their country, not its code.
@@ -29,6 +30,23 @@
 	const placeholder = $derived(countryName === DEFAULT_COUNTRY_NAME ? '811 9710 096' : '');
 	const target = $derived(result && 'link' in result ? result : undefined);
 	const problem = $derived(result && 'problem' in result ? result.problem : undefined);
+	// Which country the number is for: the one chosen, or, for a number typed with its own code,
+	// the countries that code belongs to.
+	const countryOfTarget = $derived.by(() => {
+		if (!target) return '';
+		if (target.countryCode === countryCode) return countryName;
+		return countriesWithCode(target.countryCode).join(' or ');
+	});
+	// What was decided on the person's behalf, for them to check.
+	const notes = $derived(
+		target
+			? [
+					target.lettersDropped && WHATSAPP.result.lettersDropped,
+					target.extension && WHATSAPP.result.extension(target.extension),
+					target.short && WHATSAPP.result.short
+				].filter((note): note is string => Boolean(note))
+			: []
+	);
 
 	async function copyLink() {
 		if (!target) return;
@@ -98,8 +116,9 @@
 			</p>
 		</div>
 
-		<!-- The result: who the chat is with, as people read a number, then what was left out of
-		     what was typed, then the link itself, small. -->
+		<!-- The result: who the chat is with, as people read a number, and which country that is;
+		     anything to check; the two actions; then the link itself, small. Everything about the
+		     answer sits together, right under the field it comes from. -->
 		<section aria-labelledby="result-heading">
 			<h2 id="result-heading" class={label}>{WHATSAPP.result.heading}</h2>
 			{#if target}
@@ -107,17 +126,32 @@
 					<p class="text-2xl font-bold tracking-tight break-words tabular-nums">
 						{target.display}
 					</p>
+					{#if countryOfTarget}<p class="text-sm text-muted">{countryOfTarget}</p>{/if}
 					{#if message.trim()}
 						<p class="mt-2 text-sm break-words whitespace-pre-line text-muted">
 							{message.trim()}
 						</p>
 					{/if}
-					{#if target.lettersDropped || target.extension}
-						<ul class="mt-3 space-y-1 text-sm">
-							{#if target.lettersDropped}<li>{WHATSAPP.result.lettersDropped}</li>{/if}
-							{#if target.extension}<li>{WHATSAPP.result.extension(target.extension)}</li>{/if}
+					{#if notes.length}
+						<ul class="mt-3 space-y-1.5 text-sm font-medium">
+							{#each notes as note (note)}
+								<li class="flex gap-2"><Caution class="mt-0.5" />{note}</li>
+							{/each}
 						</ul>
 					{/if}
+					<div class="mt-4 flex gap-3">
+						<a
+							href={target.link}
+							target="_blank"
+							rel="external noopener noreferrer"
+							class="{primaryButton} flex-1 px-4"
+						>
+							Open in WhatsApp<span class="sr-only"> (opens in a new tab)</span>
+						</a>
+						<button type="button" onclick={copyLink} class="{secondaryButton} flex-1 px-4">
+							Copy link
+						</button>
+					</div>
 					<p class="mt-3 font-mono text-xs break-all text-muted select-all">{target.link}</p>
 				</div>
 			{:else}
@@ -126,6 +160,10 @@
 				</p>
 			{/if}
 		</section>
+		<p class="-mt-2 min-h-5 text-sm" role="status">
+			{#if copied === 'yes'}Link copied.{:else if copied === 'failed'}We couldn't copy it. Select
+				the link above and copy it yourself.{/if}
+		</p>
 
 		<div>
 			<label for="message" class={label}>Message <span class="text-muted">(optional)</span></label>
@@ -136,31 +174,5 @@
 				placeholder="Hi! I'd like to ask about…"
 				class="{field} resize-y"></textarea>
 		</div>
-
-		<!-- On a phone the actions stay at the bottom of the screen while the message is typed, so
-		     the link is always one tap away. -->
-		<div
-			class="sticky bottom-0 -mx-5 flex flex-col gap-3 border-t border-border bg-surface px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:static sm:mx-0 sm:flex-row sm:border-0 sm:p-0"
-		>
-			{#if target}
-				<a
-					href={target.link}
-					target="_blank"
-					rel="external noopener noreferrer"
-					class="{primaryButton} flex-1"
-				>
-					Open in WhatsApp<span class="sr-only"> (opens in a new tab)</span>
-				</a>
-			{:else}
-				<button type="button" disabled class="{primaryButton} flex-1">Open in WhatsApp</button>
-			{/if}
-			<button type="button" disabled={!target} onclick={copyLink} class="{secondaryButton} flex-1">
-				Copy link
-			</button>
-		</div>
-		<p class="min-h-5 text-sm" role="status">
-			{#if copied === 'yes'}Link copied.{:else if copied === 'failed'}We couldn't copy it. Select
-				the link above and copy it yourself.{/if}
-		</p>
 	</form>
 </section>

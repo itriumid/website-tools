@@ -13,6 +13,13 @@ export interface ChatTarget {
 	number: string;
 	/** The same number, for people to read: "+62 8119710096". */
 	display: string;
+	/** The country code it was read with, so the page can say which country that is. */
+	countryCode: string;
+	/**
+	 * As short as a number there can be, where most are longer: a mobile number missing a digit
+	 * can look like a landline. Worth a second look, not a stop.
+	 */
+	short: boolean;
 	/** The link that opens the chat, with the message typed in if there is one. */
 	link: string;
 	/** Letters were typed with the number and left out: the person should check what's left. */
@@ -26,7 +33,8 @@ export interface ChatTarget {
  * country it's for, where we know how long numbers there are), it's a seven-digit North American
  * number without its area code, there's more than one number, or nothing typed was a digit.
  */
-export type ChatProblem = 'too-short' | 'too-long' | 'area-code' | 'several' | 'no-digits';
+export type ChatProblem =
+	'too-short' | 'too-long' | 'too-many-digits' | 'area-code' | 'several' | 'no-digits';
 
 /** A full number, country code included, has 8 to 15 digits (E.164 allows at most 15). */
 export const SHORTEST_NUMBER = 8;
@@ -181,18 +189,31 @@ export function chatTarget(
 	if (number.length < SHORTEST_NUMBER || (lengths && national.length < lengths[0])) {
 		return { problem: 'too-short' };
 	}
-	if (number.length > LONGEST_NUMBER || (lengths && national.length > lengths[1])) {
-		return { problem: 'too-long' };
-	}
+	// More digits than any phone number anywhere has: not a doubled country code, just too many.
+	if (number.length > LONGEST_NUMBER) return { problem: 'too-many-digits' };
+	if (lengths && national.length > lengths[1]) return { problem: 'too-long' };
 	const text = message.trim();
 	const target: ChatTarget = {
 		number,
 		display: code ? `+${code} ${national}` : `+${number}`,
 		link: `https://wa.me/${number}${text ? `?text=${encodeURIComponent(text)}` : ''}`,
+		countryCode: code,
+		short: Boolean(lengths && lengths[0] < lengths[1] && national.length === lengths[0]),
 		lettersDropped
 	};
 	if (extensionMatch) target.extension = extensionMatch[1];
 	return target;
+}
+
+/**
+ * The countries a country code belongs to, by name: "Russia" and "Kazakhstan" for 7. For 1, only
+ * the United States and Canada: the other countries on it are told apart by area code, which the
+ * number itself carries.
+ */
+export function countriesWithCode(code: string): string[] {
+	return COUNTRIES.filter((country) => country.phoneCode === code && !country.areaCodes).map(
+		(country) => country.name
+	);
 }
 
 // "ext 5", "ext. 12", "x5", "#5" at the end of what was typed: an extension, not more digits.
