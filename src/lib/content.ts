@@ -68,6 +68,8 @@ export const WHATSAPP = {
 		several: 'That looks like more than one number. Make a link for one at a time.',
 		'no-digits': "There's no number here yet. Type the phone number's digits."
 	},
+	/** Under the field, as soon as the number reads as one: the number, as the link will have it. */
+	reads: (number: string, country: string) => `= ${number}${country ? `, ${country}` : ''}`,
 	result: {
 		heading: 'Your link',
 		empty: 'Enter a phone number and the link appears here.',

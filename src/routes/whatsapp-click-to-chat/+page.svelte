@@ -103,13 +103,20 @@
 				autocomplete="off"
 				bind:value={typed}
 				{placeholder}
-				aria-describedby="number-hint number-problem"
+				aria-describedby="number-hint number-reads number-problem"
 				aria-invalid={problem ? true : undefined}
 				class={field}
 			/>
 			<!-- Before anything's typed, how a number with its country is read; after, what's wrong. -->
 			{#if !typed.trim()}
 				<p id="number-hint" class="mt-1.5 text-sm text-muted">{WHATSAPP.hint}</p>
+			{/if}
+			<!-- What the number reads as, right under it: on a phone the keyboard covers the result
+			     below, and this is the line to check against what was typed. -->
+			{#if target}
+				<p id="number-reads" class="mt-1.5 text-sm text-muted tabular-nums">
+					{WHATSAPP.reads(target.display, countryOfTarget)}
+				</p>
 			{/if}
 			<p id="number-problem" class="mt-1.5 text-sm font-medium empty:mt-0" role="status">
 				{#if problem}{WHATSAPP.problems[problem]}{/if}

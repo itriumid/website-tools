@@ -11,7 +11,7 @@ export function digitsOnly(text: string): string {
 export interface ChatTarget {
 	/** The full number as WhatsApp wants it: country code and number, digits only. */
 	number: string;
-	/** The same number, for people to read: "+62 8119710096". */
+	/** The same number, for people to read, in groups: "+62 811-9710-096". */
 	display: string;
 	/** The country code it was read with, so the page can say which country that is. */
 	countryCode: string;
@@ -195,7 +195,7 @@ export function chatTarget(
 	const text = message.trim();
 	const target: ChatTarget = {
 		number,
-		display: code ? `+${code} ${national}` : `+${number}`,
+		display: code ? `+${code} ${grouped(code, national)}` : `+${number}`,
 		link: `https://wa.me/${number}${text ? `?text=${encodeURIComponent(text)}` : ''}`,
 		countryCode: code,
 		short: Boolean(lengths && lengths[0] < lengths[1] && national.length === lengths[0]),
@@ -203,6 +203,32 @@ export function chatTarget(
 	};
 	if (extensionMatch) target.extension = extensionMatch[1];
 	return target;
+}
+
+/**
+ * A number after its country code, in groups, so it can be checked against what was typed: a run
+ * of eleven digits is the hardest thing to compare. Indonesian mobile numbers are written
+ * 812-3456-7890, and North American ones 415-555-0132; elsewhere, blocks of three with four at
+ * the end, the way most numbers are read out, and never a digit on its own. Only for reading: the link keeps the digits alone.
+ */
+export function grouped(code: string, national: string): string {
+	if (code === '1' && national.length === 10) {
+		return `${national.slice(0, 3)}-${national.slice(3, 6)}-${national.slice(6)}`;
+	}
+	if (code === '62' && national.startsWith('8') && national.length >= 9) {
+		return `${national.slice(0, 3)}-${national.slice(3, 7)}-${national.slice(7)}`;
+	}
+	if (national.length <= 4) return national;
+	const groups = [national.slice(-4)];
+	let rest = national.slice(0, -4);
+	while (rest.length > 3) {
+		groups.unshift(rest.slice(-3));
+		rest = rest.slice(0, -3);
+	}
+	// A digit on its own reads as a slip: it joins the block after it instead.
+	if (rest.length === 1) groups[0] = rest + groups[0];
+	else if (rest) groups.unshift(rest);
+	return groups.join('-');
 }
 
 /**

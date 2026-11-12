@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chatTarget, countriesWithCode, digitsOnly, type ChatTarget } from './whatsapp';
+import { chatTarget, countriesWithCode, digitsOnly, grouped, type ChatTarget } from './whatsapp';
 
 /** The chat to open, when there is one: undefined for nothing yet and for a problem alike. */
 function chat(...input: Parameters<typeof chatTarget>): ChatTarget | undefined {
@@ -23,7 +23,7 @@ describe('chatTarget', () => {
 	it('puts the chosen country in front of a local number', () => {
 		const target = chat('62', '8119710096', '');
 		expect(target?.link).toBe('https://wa.me/628119710096');
-		expect(target?.display).toBe('+62 8119710096');
+		expect(target?.display).toBe('+62 811-9710-096');
 	});
 
 	it('drops the leading 0 of a local number', () => {
@@ -34,7 +34,7 @@ describe('chatTarget', () => {
 		const target = chat('62', '+1 (415) 555-0132', '');
 		expect(target?.number).toBe('14155550132');
 		// Written the same way as a local one: the code, a space, then the number.
-		expect(target?.display).toBe('+1 4155550132');
+		expect(target?.display).toBe('+1 415-555-0132');
 	});
 
 	it('adds the message, trimmed and escaped', () => {
@@ -68,7 +68,7 @@ describe('chatTarget', () => {
 	it("doesn't add the country code again to a number pasted with it", () => {
 		const target = chat('62', '628119710096', '');
 		expect(target?.link).toBe('https://wa.me/628119710096');
-		expect(target?.display).toBe('+62 8119710096');
+		expect(target?.display).toBe('+62 811-9710-096');
 		expect(chat('62', '62 0811 9710 096', '')?.link).toBe('https://wa.me/628119710096');
 		expect(chat('65', '6591234567', '')?.link).toBe('https://wa.me/6591234567');
 		expect(chat('1', '14155550132', '')?.link).toBe('https://wa.me/14155550132');
@@ -137,7 +137,7 @@ describe('chatTarget', () => {
 		expect(chat('1', '(829) 555-1234', '')?.link).toBe('https://wa.me/18295551234');
 		expect(chat('1', '1 809 555 1234', '')?.link).toBe('https://wa.me/18095551234');
 		expect(chat('62', '+1 876 555 1234', '')?.link).toBe('https://wa.me/18765551234');
-		expect(chat('1', '876-555-1234', '')?.display).toBe('+1 8765551234');
+		expect(chat('1', '876-555-1234', '')?.display).toBe('+1 876-555-1234');
 	});
 
 	it('asks for the area code of a seven-digit North American number', () => {
@@ -149,7 +149,7 @@ describe('chatTarget', () => {
 	it('takes a + before the trunk prefix as a local number', () => {
 		const target = chat('62', '+0811 9710 096', '');
 		expect(target?.link).toBe('https://wa.me/628119710096');
-		expect(target?.display).toBe('+62 8119710096');
+		expect(target?.display).toBe('+62 811-9710-096');
 		expect(chat('7', '+8 912 345 67 89', '')?.link).toBe('https://wa.me/79123456789');
 		// A real country code after the + still wins: 81 is Japan.
 		expect(chat('7', '+81 90 1234 5678', '')?.link).toBe('https://wa.me/819012345678');
@@ -221,5 +221,30 @@ describe('chatTarget', () => {
 		expect(chat('65', '9123 4567', '')?.short).toBe(false);
 		// Where we don't know the lengths, nothing is marked either.
 		expect(chat('49', '0151 23456789', '')?.short).toBe(false);
+	});
+});
+
+describe('grouped', () => {
+	it('writes Indonesian mobile numbers the way they are written there', () => {
+		expect(grouped('62', '81234567890')).toBe('812-3456-7890');
+		expect(grouped('62', '8119710096')).toBe('811-9710-096');
+		expect(grouped('62', '812345678901')).toBe('812-3456-78901');
+	});
+
+	it('writes North American numbers as area code, exchange and line', () => {
+		expect(grouped('1', '4155550132')).toBe('415-555-0132');
+	});
+
+	it('elsewhere, reads in threes with four at the end', () => {
+		expect(grouped('62', '215550123')).toBe('21-555-0123');
+		expect(grouped('44', '7700900123')).toBe('770-090-0123');
+		expect(grouped('65', '91234567')).toBe('9123-4567');
+		expect(grouped('49', '15123456789')).toBe('1512-345-6789');
+	});
+
+	it('never changes the digits, only where the gaps are', () => {
+		for (const national of ['1', '12345', '123456789012345']) {
+			expect(grouped('49', national).replaceAll('-', '')).toBe(national);
+		}
 	});
 });
