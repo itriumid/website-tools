@@ -16,6 +16,19 @@ export const HEADING = 'Free tools';
 // The two jobs, said plainly: what's free and private is the closing panel's to say.
 export const TAGLINE = "Split a bill fairly, or message a number you haven't saved.";
 
+// Above the tools, for someone who was in the middle of a bill: from what this browser already
+// keeps (the draft in this tab, the bills this device shared). Nothing new is kept.
+export const IN_PROGRESS = {
+	draft: 'You have a bill in progress in this tab.',
+	carryOn: 'Carry on',
+	shared: (count: number) =>
+		count === 1
+			? 'You shared a bill from this device in the last 30 days.'
+			: `You shared ${count} bills from this device in the last 30 days.`,
+	openIt: 'Open it',
+	openLatest: 'Open the latest'
+};
+
 // The index's closing panel: what happens to what people type, said plainly, with the source as
 // the proof.
 export const PROMISE_HEADING = 'What stays on your device';

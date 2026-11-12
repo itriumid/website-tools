@@ -1,9 +1,11 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import Arrow from '#lib/Arrow.svelte';
 	import Seo from '#lib/Seo.svelte';
 	import {
 		DESCRIPTION,
+		IN_PROGRESS,
 		ELSEWHERE,
 		ELSEWHERE_HEADING,
 		HEADING,
@@ -16,6 +18,31 @@
 		TOOLS
 	} from '#lib/content.js';
 	import { actionLine, secondaryButton, sectionHeading } from '#lib/styles.js';
+	import { loadDraft } from '#lib/draft.js';
+	import { sharedFromHere } from '#lib/share.js';
+
+	// A bill this visitor was in the middle of: the draft in this tab, or else the bills this
+	// device shared. Read from what the browser already keeps, after the page loads: nothing new is
+	// kept, and nothing is sent anywhere. The page is the same for everyone until then.
+	let inProgress: { text: string; action: string; href: string } | undefined = $state();
+	onMount(() => {
+		if (loadDraft()) {
+			inProgress = {
+				text: IN_PROGRESS.draft,
+				action: IN_PROGRESS.carryOn,
+				href: resolve('/split-bill')
+			};
+			return;
+		}
+		const shared = sharedFromHere();
+		if (shared.length) {
+			inProgress = {
+				text: IN_PROGRESS.shared(shared.length),
+				action: shared.length === 1 ? IN_PROGRESS.openIt : IN_PROGRESS.openLatest,
+				href: `${resolve('/split-bill')}#bill=${shared[0]}`
+			};
+		}
+	});
 
 	// A card that is a link: it lifts and takes a pink edge when a pointer touches it, and its
 	// arrow moves on. The lift and the move wait for people who haven't asked for less motion.
@@ -28,15 +55,29 @@
 
 <section class="px-3 sm:px-5">
 	<div class="band mx-auto max-w-6xl rounded-3xl">
-		<div class="mx-auto max-w-5xl px-6 py-10 sm:px-8 sm:py-16">
+		<!-- On a short phone (667px tall) the panel and the gap under it tighten, so the first card's
+		     action is still on the first screen. -->
+		<div class="mx-auto max-w-5xl px-6 py-10 sm:px-8 sm:py-16 [@media(max-height:44rem)]:py-6">
 			<h1 class="text-5xl font-bold tracking-tight sm:text-7xl">{HEADING}</h1>
 			<!-- The two jobs, in the text color: the first pink a visitor meets is something to press. -->
-			<p class="mt-5 max-w-2xl text-2xl leading-snug font-medium sm:text-3xl">{TAGLINE}</p>
+			<p
+				class="mt-5 max-w-2xl text-2xl leading-snug font-medium sm:text-3xl [@media(max-height:44rem)]:mt-3"
+			>
+				{TAGLINE}
+			</p>
 		</div>
 	</div>
 </section>
 
-<div class="mx-auto max-w-5xl px-5 py-16 sm:px-8 sm:py-20">
+<div class="mx-auto max-w-5xl px-5 py-16 sm:px-8 sm:py-20 [@media(max-height:44rem)]:pt-8">
+	{#if inProgress}
+		<p class="mb-5 flex flex-wrap items-center gap-x-3 gap-y-1">
+			{inProgress.text}
+			<a href={inProgress.href} class="group {actionLine}"
+				>{inProgress.action}<Arrow class={arrowMove} /></a
+			>
+		</p>
+	{/if}
 	<ul class="grid gap-5 sm:grid-cols-2">
 		{#each TOOLS as tool (tool.path)}
 			<li>
@@ -65,7 +106,7 @@
 		{/each}
 	</ul>
 
-	<h2 class="mt-20 {sectionHeading}">{ELSEWHERE_HEADING}</h2>
+	<h2 class="mt-20 text-2xl font-bold tracking-tight sm:text-3xl">{ELSEWHERE_HEADING}</h2>
 	<ul class="mt-8 grid gap-5 sm:grid-cols-2">
 		{#each ELSEWHERE as app (app.url)}
 			<li>
