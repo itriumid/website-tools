@@ -122,6 +122,14 @@ export const SPLIT_BILL = {
 		textCopyFailed: "We couldn't copy it. Copy the text below instead.",
 		shareFailed: "We couldn't share it. Use Copy as text instead."
 	},
+	// For someone who opened a bill shared with them: their share first, the editor one press away.
+	sharedWithYou: {
+		line: 'This is the bill as it was shared with you. Find your name for your share.',
+		makeChanges: 'Make changes',
+		note: 'Changes stay on this device until you share the bill again.',
+		copyLink: 'Copy the link',
+		copied: 'Link copied.'
+	},
 	// The split as text, for a group chat.
 	text: {
 		total: 'Total',

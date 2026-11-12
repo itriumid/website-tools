@@ -634,7 +634,8 @@
 		| { kind: 'delete-failed' }
 		| { kind: 'text-copied' }
 		| { kind: 'text-copy-failed'; text: string }
-		| { kind: 'share-failed' };
+		| { kind: 'share-failed' }
+		| { kind: 'link-copied' };
 	let status: Status | undefined = $state();
 	let sharing = $state(false);
 	// The bill as it was last shared from here, so sharing it again unchanged reuses its link.
@@ -707,10 +708,39 @@
 		await landOnSplit();
 	}
 
+	// Someone who opened a bill shared with them, not from this device, sees the split on its own:
+	// they came for their share, and the editor (with a pink button that would make a new link) isn't
+	// theirs until they ask for it.
+	let viewing = $state(false);
+
 	/** Whoever opens a shared bill came for their share: take them to it. */
 	async function landOnSplit() {
+		viewing = !deletable && items.length > 0;
 		await tick();
-		if (items.length) showSplit();
+		if (!items.length) return;
+		// Seen on its own, the split is already at the top, under the line that says what this is.
+		if (viewing) document.getElementById('split-heading')?.focus({ preventScroll: true });
+		else showSplit();
+	}
+
+	/** The editor, for someone who opened a shared bill and wants to change it. */
+	async function makeChanges() {
+		viewing = false;
+		await tick();
+		const heading = document.getElementById('bill-heading');
+		heading?.focus({ preventScroll: true });
+		heading?.scrollIntoView({ block: 'start' });
+	}
+
+	/** The link that was opened, as it is: copying it shares nothing new. */
+	async function copyOpenedLink() {
+		status = undefined;
+		try {
+			await navigator.clipboard.writeText(location.href);
+			status = { kind: 'link-copied' };
+		} catch {
+			status = { kind: 'copy-failed' };
+		}
 	}
 
 	/** A link in the address wins over the draft, unless the draft is that link's bill, changed. */
@@ -895,6 +925,7 @@
 		editing = undefined;
 		history.replaceState(null, '', location.pathname);
 		confirmingClear = false;
+		viewing = false;
 		deletable = undefined;
 		confirmingDelete = false;
 		status = undefined;
@@ -978,16 +1009,18 @@
 	<!-- From 1024px the split sits beside the bill and stays in view while it's made; below that it
 	     follows the bill, and the running total keeps the answer in reach. -->
 	<div
-		class="space-y-6 motion-safe:transition-opacity lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] lg:items-start lg:space-y-0 lg:gap-x-10 {opening
+		class="space-y-6 motion-safe:transition-opacity {viewing
+			? 'mx-auto max-w-2xl'
+			: 'lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] lg:items-start lg:space-y-0 lg:gap-x-10'} {opening
 			? 'opacity-50'
 			: ''}"
 		aria-busy={opening}
 		inert={opening}
 	>
-		<div class="space-y-6">
+		<div class="space-y-6 {viewing ? 'hidden' : ''}">
 			<!-- The bill: what's decided before any price is typed -->
 			<section class={card} aria-labelledby="bill-heading">
-				<h2 id="bill-heading" class={cardHeading}>The bill</h2>
+				<h2 id="bill-heading" tabindex="-1" class={cardHeading}>The bill</h2>
 				<label for="currency" class={label}>Currency</label>
 				<SearchableSelect
 					id="currency"
@@ -2031,6 +2064,15 @@
 		<div
 			class="space-y-6 lg:sticky lg:top-6 lg:-m-2 lg:max-h-[calc(100dvh-3rem)] lg:overflow-y-auto lg:overscroll-contain lg:p-2"
 		>
+			{#if viewing}
+				<div>
+					<p>{SPLIT_BILL.sharedWithYou.line}</p>
+					<button type="button" onclick={makeChanges} class="{smallButton} mt-3"
+						>{SPLIT_BILL.sharedWithYou.makeChanges}</button
+					>
+					<p class="mt-2 text-sm text-muted">{SPLIT_BILL.sharedWithYou.note}</p>
+				</div>
+			{/if}
 			<!-- The split -->
 			{#if items.length}
 				<section class={card} aria-labelledby="split-heading">
@@ -2092,67 +2134,71 @@
 							{/each}
 						</ul>
 
-						<fieldset class="mt-5">
-							<legend class="mb-1 text-sm font-medium">{SPLIT_BILL.split.paidBy}</legend>
-							<div class="flex flex-wrap gap-x-5">
-								<label class={checkRow}>
-									<input
-										type="radio"
-										name="paid-by"
-										checked={!payerName}
-										onchange={() => (paidBy = undefined)}
-										class={checkbox}
-									/>
-									{SPLIT_BILL.split.nobody}
-								</label>
-								{#each people as person (person.id)}
-									<label class="{checkRow} break-all">
+						<!-- Who paid and rounding are the bill's maker's choices: shown as their result in the
+						     rows above, and changed only after "Make changes". -->
+						{#if !viewing}
+							<fieldset class="mt-5">
+								<legend class="mb-1 text-sm font-medium">{SPLIT_BILL.split.paidBy}</legend>
+								<div class="flex flex-wrap gap-x-5">
+									<label class={checkRow}>
 										<input
 											type="radio"
 											name="paid-by"
-											checked={paidBy === person.id}
-											onchange={() => (paidBy = person.id)}
+											checked={!payerName}
+											onchange={() => (paidBy = undefined)}
 											class={checkbox}
 										/>
-										{person.name}
+										{SPLIT_BILL.split.nobody}
 									</label>
-								{/each}
-							</div>
-						</fieldset>
+									{#each people as person (person.id)}
+										<label class="{checkRow} break-all">
+											<input
+												type="radio"
+												name="paid-by"
+												checked={paidBy === person.id}
+												onchange={() => (paidBy = person.id)}
+												class={checkbox}
+											/>
+											{person.name}
+										</label>
+									{/each}
+								</div>
+							</fieldset>
 
-						<fieldset class="mt-3">
-							<legend class="mb-1 text-sm font-medium">{SPLIT_BILL.split.roundUp}</legend>
-							<div class="flex flex-wrap gap-x-5">
-								<label class={checkRow}>
-									<input
-										type="radio"
-										name="round-to"
-										checked={!roundTo}
-										onchange={() => (roundTo = undefined)}
-										class={checkbox}
-									/>
-									{SPLIT_BILL.split.noRounding}
-								</label>
-								{#each steps as step (step)}
+							<fieldset class="mt-3">
+								<legend class="mb-1 text-sm font-medium">{SPLIT_BILL.split.roundUp}</legend>
+								<div class="flex flex-wrap gap-x-5">
 									<label class={checkRow}>
 										<input
 											type="radio"
 											name="round-to"
-											checked={roundTo === step}
-											onchange={() => (roundTo = step)}
+											checked={!roundTo}
+											onchange={() => (roundTo = undefined)}
 											class={checkbox}
 										/>
-										{SPLIT_BILL.split.roundTo(money(step))}
+										{SPLIT_BILL.split.noRounding}
 									</label>
-								{/each}
-							</div>
-							<!-- Two lines are kept even when empty (the note wraps on a phone and in the side column), so choosing a step doesn't shift what's below. -->
-							<p class="mt-1 min-h-10 text-sm text-muted">
-								{#if settledUp.extra > 0}{payerName
-										? SPLIT_BILL.split.extraToPayer(money(settledUp.extra), payerName)
-										: SPLIT_BILL.split.extraOnTop(money(settledUp.extra))}{/if}
-							</p>
-						</fieldset>
+									{#each steps as step (step)}
+										<label class={checkRow}>
+											<input
+												type="radio"
+												name="round-to"
+												checked={roundTo === step}
+												onchange={() => (roundTo = step)}
+												class={checkbox}
+											/>
+											{SPLIT_BILL.split.roundTo(money(step))}
+										</label>
+									{/each}
+								</div>
+								<!-- Two lines are kept even when empty (the note wraps on a phone and in the side column), so choosing a step doesn't shift what's below. -->
+								<p class="mt-1 min-h-10 text-sm text-muted">
+									{#if settledUp.extra > 0}{payerName
+											? SPLIT_BILL.split.extraToPayer(money(settledUp.extra), payerName)
+											: SPLIT_BILL.split.extraOnTop(money(settledUp.extra))}{/if}
+								</p>
+							</fieldset>
+						{/if}
 					{/if}
 
 					{#if totals.unassigned > 0}
@@ -2221,12 +2267,21 @@
 			{#if items.length || people.length}
 				<div>
 					<div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap lg:flex-col">
-						<button
-							type="button"
-							onclick={copyLink}
-							disabled={sharing}
-							class="{primaryButton} sm:flex-[2_1_auto]">Copy a link to this bill</button
-						>
+						{#if viewing}
+							<button
+								type="button"
+								onclick={copyOpenedLink}
+								class="{primaryButton} sm:flex-[2_1_auto]"
+								>{SPLIT_BILL.sharedWithYou.copyLink}</button
+							>
+						{:else}
+							<button
+								type="button"
+								onclick={copyLink}
+								disabled={sharing}
+								class="{primaryButton} sm:flex-[2_1_auto]">Copy a link to this bill</button
+							>
+						{/if}
 						{#if items.length && people.length}
 							<button type="button" onclick={copyText} class="{secondaryButton} sm:flex-1"
 								>Copy as text</button
@@ -2249,7 +2304,8 @@
 								.deleteFailed}{:else if status?.kind === 'text-copied'}{SPLIT_BILL.sharing
 								.textCopied}{:else if status?.kind === 'text-copy-failed'}{SPLIT_BILL.sharing
 								.textCopyFailed}{:else if status?.kind === 'share-failed'}{SPLIT_BILL.sharing
-								.shareFailed}{/if}
+								.shareFailed}{:else if status?.kind === 'link-copied'}{SPLIT_BILL.sharedWithYou
+								.copied}{/if}
 					</p>
 					{#if status?.kind === 'text-copy-failed'}
 						<label for="split-text" class="sr-only">The split as text</label>
@@ -2279,7 +2335,7 @@
 							>
 						{/if}
 					{/if}
-					<div class="mt-4">
+					<div class="mt-4 {viewing ? 'hidden' : ''}">
 						{#if confirmingClear}
 							<div
 								class="flex flex-wrap items-center gap-2"
@@ -2309,8 +2365,9 @@
 
 		<!-- On a phone the split is far below the tagging: the total and what isn't in anyone's share
 		     stay at the bottom while the bill is made. It's sticky, not fixed, so it takes its own
-		     space at the end of the page and never sits over the last of it. -->
-		{#if items.length}
+		     space at the end of the page and never sits over the last of it. Not while the split is
+		     seen on its own: it's already in view. -->
+		{#if items.length && !viewing}
 			<section
 				aria-label="The bill so far"
 				data-running-total
