@@ -108,12 +108,22 @@
 
 	<h2 class="mt-20 text-2xl font-bold tracking-tight sm:text-3xl">{ELSEWHERE_HEADING}</h2>
 	<ul class="mt-8 grid gap-5 sm:grid-cols-2">
+		<!-- While there's only one, it takes the whole row, text on one side and the way onward on the
+		     other, instead of leaving half the row empty. -->
 		{#each ELSEWHERE as app (app.url)}
-			<li>
-				<a href={app.url} rel="external" class={cardLink}>
-					<h3 class="text-xl font-semibold">{app.name}</h3>
-					<p class="mt-2 text-muted">{app.summary}</p>
-					<span class="mt-5 {actionLine}"
+			<li class={ELSEWHERE.length === 1 ? 'sm:col-span-2' : ''}>
+				<a
+					href={app.url}
+					rel="external"
+					class="{cardLink} {ELSEWHERE.length === 1
+						? 'sm:flex sm:items-end sm:justify-between sm:gap-10'
+						: ''}"
+				>
+					<div>
+						<h3 class="text-xl font-semibold">{app.name}</h3>
+						<p class="mt-2 max-w-2xl text-muted">{app.summary}</p>
+					</div>
+					<span class="mt-5 shrink-0 {actionLine} {ELSEWHERE.length === 1 ? 'sm:mt-0' : ''}"
 						><span aria-hidden="true">{app.label}</span><span class="sr-only"
 							>{app.label} at {new URL(app.url).host}</span
 						><Arrow class={arrowMove} /></span
