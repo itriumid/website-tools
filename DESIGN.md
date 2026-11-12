@@ -447,9 +447,9 @@ opens the explanation as a gray-barred note on the next line, never as a floatin
 
 ### Chat result (WhatsApp click-to-chat)
 
-The answer is the number, as people read it, in groups: "+62 811-9710-096" in bold 1.5rem, in an
+The answer is the number, as people read it, in groups: "+62 811-2345-678" in bold 1.5rem, in an
 inset with a hairline, with the country it's for in muted text under it. The same number is read
-back in one muted line right under the field ("= +62 811-9710-096, Indonesia"), like an amount in
+back in one muted line right under the field ("= +62 811-2345-678, Indonesia"), like an amount in
 Split bill: on a phone the keyboard covers the result while the number is typed, and this is the
 line to check it against. Then the message as plain text, then
 anything decided on the person's behalf, each with the drawn warning sign in medium weight (letters

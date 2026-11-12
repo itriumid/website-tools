@@ -28,8 +28,8 @@
 	let copiedTimer: ReturnType<typeof setTimeout> | undefined;
 
 	const result = $derived(chatTarget(countryCode, typed, message));
-	// The example number is Indonesian: shown only for Indonesia, where it's a real shape.
-	const placeholder = $derived(countryName === DEFAULT_COUNTRY_NAME ? '811 9710 096' : '');
+	// The example is Indonesian: shown only for Indonesia, where it's the shape people write.
+	const placeholder = $derived(countryName === DEFAULT_COUNTRY_NAME ? WHATSAPP.placeholder : '');
 	const target = $derived(result && 'link' in result ? result : undefined);
 	// A problem every number has halfway through waits until the typing stops, or the field is
 	// left; one that can't come right however the number ends is said at once.

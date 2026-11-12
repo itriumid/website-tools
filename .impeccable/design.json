@@ -356,7 +356,7 @@
 			"kind": "input",
 			"refersTo": "field",
 			"description": "A labelled text field, one tonal step back inside a card.",
-			"html": "<label class=\"ds-label\" for=\"ds-f\">Phone number</label><input id=\"ds-f\" class=\"ds-field\" placeholder=\"+62 811 970 0096\">",
+			"html": "<label class=\"ds-label\" for=\"ds-f\">Phone number</label><input id=\"ds-f\" class=\"ds-field\" placeholder=\"0812-xxxx-xxxx\">",
 			"css": ".ds-label{display:block;margin-bottom:.375rem;font:500 .875rem/1.43 'Plus Jakarta Sans Variable',ui-sans-serif,system-ui,sans-serif;color:var(--text)}.ds-field{width:100%;border:1px solid var(--control-border);border-radius:.5rem;background:var(--bg);color:var(--text);padding:.625rem .75rem;font:400 .875rem/1.43 'Plus Jakarta Sans Variable',ui-sans-serif,system-ui,sans-serif}.ds-field::placeholder{color:var(--muted)}.ds-field:focus-visible{outline:2px solid var(--focus);outline-offset:3px}@media (pointer:coarse){.ds-field{font-size:1rem}}"
 		},
 		{
