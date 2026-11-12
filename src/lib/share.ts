@@ -290,3 +290,13 @@ export function sharedHere(code: string, now = Date.now()): Shared | undefined {
 	const entry = readKept(now)[code];
 	return entry && { code, token: entry.token };
 }
+
+/**
+ * The codes of the bills this device shared that haven't expired, the one shared or updated most
+ * recently first: a bill's lifetime starts again each time it's shared, so the latest expires last.
+ */
+export function sharedFromHere(now = Date.now()): string[] {
+	return Object.entries(readKept(now))
+		.sort(([, a], [, b]) => b.expiresAt - a.expiresAt)
+		.map(([code]) => code);
+}

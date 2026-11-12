@@ -8,6 +8,7 @@ import {
 	LIFETIME,
 	openBill,
 	remember,
+	sharedFromHere,
 	shareBill,
 	sharedHere,
 	SHORT_PREFIX,
@@ -229,6 +230,18 @@ describe('what this device shared', () => {
 		forget('B', 1);
 		expect(sharedHere('B', 1)).toBeUndefined();
 		expect(sharedHere('A', 1)).toEqual({ code: 'A', token: 'one' });
+	});
+
+	it('lists the bills shared from here, the most recent first, until they expire', () => {
+		expect(sharedFromHere(0)).toEqual([]);
+		remember({ code: 'OLD', token: 'one' }, 0);
+		remember({ code: 'NEW', token: 'two' }, 1000);
+		expect(sharedFromHere(2000)).toEqual(['NEW', 'OLD']);
+		// Sharing the old one again starts its lifetime again: it's the latest now.
+		remember({ code: 'OLD', token: 'one' }, 3000);
+		expect(sharedFromHere(4000)).toEqual(['OLD', 'NEW']);
+		forget('OLD', 4000);
+		expect(sharedFromHere(4000)).toEqual(['NEW']);
 	});
 
 	it('shares without remembering when there is nowhere to keep it', () => {
