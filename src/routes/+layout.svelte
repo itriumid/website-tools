@@ -5,7 +5,14 @@
 	import { page } from '$app/state';
 	import lockupOnDark from '#lib/itrium-lockup-on-dark.svg';
 	import lockupOnLight from '#lib/itrium-lockup-on-light.svg';
-	import { EMAIL, GITHUB_URL, MAIN_SITE_URL, NO_TRACKING, SOURCE_URL } from '#lib/content.js';
+	import {
+		EMAIL,
+		GITHUB_URL,
+		MAIN_SITE_URL,
+		NO_TRACKING,
+		NO_TRACKING_BILLS,
+		SOURCE_URL
+	} from '#lib/content.js';
 
 	const { children } = $props();
 
@@ -66,7 +73,8 @@
 		<div class="space-y-2">
 			<p>© {new Date().getFullYear()} Itrium</p>
 			<!-- On the index, the closing panel says this in full, right above. -->
-			{#if page.url.pathname !== '/'}<p>{NO_TRACKING}</p>{/if}
+			{#if page.url.pathname === resolve('/split-bill')}<p>{NO_TRACKING_BILLS}</p>
+			{:else if page.url.pathname !== '/'}<p>{NO_TRACKING}</p>{/if}
 		</div>
 		<ul class="flex shrink-0 gap-5 sm:flex-col sm:gap-2 sm:text-right">
 			<li><a href="mailto:{EMAIL}" class={link}>{EMAIL}</a></li>
