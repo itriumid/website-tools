@@ -456,6 +456,14 @@ before it's printed. Everything about the answer sits together, right under the 
 nothing floats over it, so nothing can cover it on a short phone. A number too short or too long for
 its country is a problem in words, never a link.
 
+### QR code to print (WhatsApp click-to-chat)
+
+Under the line on using the link, "QR code to print" is a disclosure with the drawn arrow, closed by
+default since most people came to message a number. Open, it shows the code drawn in the browser
+(`src/lib/qr.ts`, encoded by qrcode-generator): graphite on white with its four-module margin in
+both themes, because scanners read dark on light and that's what prints. "Save the QR code" hands
+it over as a PNG made on the device. Nothing is sent anywhere to make either.
+
 ### Running total (signature)
 
 Split bill's bar at the bottom of a phone screen while items exist: the surface color, a hairline

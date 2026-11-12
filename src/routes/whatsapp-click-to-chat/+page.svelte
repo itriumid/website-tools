@@ -7,6 +7,8 @@
 	import { card, field, label, primaryButton, secondaryButton } from '#lib/styles.js';
 	import { chatTarget, countriesWithCode } from '#lib/whatsapp.js';
 	import Caution from '#lib/Caution.svelte';
+	import Arrow from '#lib/Arrow.svelte';
+	import { drawnSize, qrFileName, qrModules, qrPath } from '#lib/qr.js';
 
 	// Chosen by name, since countries share codes: the United States and Canada are both +1, and
 	// people look for their country, not its code.
@@ -47,6 +49,33 @@
 				].filter((note): note is string => Boolean(note))
 			: []
 	);
+
+	// The code is only drawn once someone opens it: most people came to message a number.
+	let qrOpen = $state(false);
+	const modules = $derived(qrOpen && target ? qrModules(target.link) : undefined);
+
+	/** The code as a PNG, drawn on a canvas here and handed over as a file: nothing is uploaded. */
+	function saveQr() {
+		if (!modules || !target) return;
+		const scale = 24;
+		const size = drawnSize(modules);
+		const canvas = document.createElement('canvas');
+		canvas.width = canvas.height = size * scale;
+		const context = canvas.getContext('2d');
+		if (!context) return;
+		context.fillStyle = '#ffffff';
+		context.fillRect(0, 0, canvas.width, canvas.height);
+		context.fillStyle = '#2b2b2b';
+		context.fill(new Path2D(qrPath(modules)));
+		const name = qrFileName(target.number);
+		canvas.toBlob((blob) => {
+			if (!blob) return;
+			const url = URL.createObjectURL(blob);
+			const link = Object.assign(document.createElement('a'), { href: url, download: name });
+			link.click();
+			setTimeout(() => URL.revokeObjectURL(url), 1000);
+		}, 'image/png');
+	}
 
 	async function copyLink() {
 		if (!target) return;
@@ -156,6 +185,29 @@
 					<!-- For someone making a link for their own number: where it goes, and a check before
 					     it's printed, since a printed mistake can't be fixed. -->
 					<p class="mt-3 text-sm text-muted">{WHATSAPP.result.useIt}</p>
+					<details bind:open={qrOpen} class="group mt-2">
+						<summary
+							class="flex min-h-11 cursor-pointer list-none items-center gap-2 text-sm font-medium [&::-webkit-details-marker]:hidden"
+						>
+							<Arrow class="group-open:rotate-90 motion-safe:transition-transform" />
+							{WHATSAPP.qr.heading}
+						</summary>
+						{#if modules}
+							<!-- Graphite on white in both themes: scanners read dark on light, and it's what prints. -->
+							<svg
+								viewBox="0 0 {drawnSize(modules)} {drawnSize(modules)}"
+								role="img"
+								aria-label={WHATSAPP.qr.alt(target.display)}
+								shape-rendering="crispEdges"
+								class="mt-2 w-full max-w-56 rounded-lg border border-border bg-white text-on-accent"
+							>
+								<path d={qrPath(modules)} fill="currentColor" />
+							</svg>
+							<button type="button" onclick={saveQr} class="{secondaryButton} mt-3"
+								>{WHATSAPP.qr.save}</button
+							>
+						{/if}
+					</details>
 				</div>
 			{:else}
 				<p class="rounded-xl border border-dashed border-control-border p-4 text-sm text-muted">

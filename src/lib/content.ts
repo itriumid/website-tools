@@ -49,7 +49,7 @@ export const WHATSAPP = {
 	path: '/whatsapp-click-to-chat' as const,
 	name: 'WhatsApp click-to-chat',
 	summary:
-		'Make a link that opens a WhatsApp chat with any phone number, with a message already typed if you like.',
+		'Paste a number as it is and get a link that opens a WhatsApp chat with it, and a QR code to print.',
 	description:
 		'Make a WhatsApp click-to-chat link from any phone number, with a message already typed if you like. Spaces and symbols are removed for you.',
 	introduction:
@@ -76,7 +76,13 @@ export const WHATSAPP = {
 			`We left off the extension (${extension}): WhatsApp can't dial one.`,
 		short: "That's shorter than most numbers there. Check you have every digit.",
 		useIt:
-			'Put the link in a profile or a message. To print it, make it into a QR code, and scan the QR code once to check it opens this chat.'
+			'Put the link in a profile or a message, or print the QR code. Scan it once before you print, to check it opens this chat.'
+	},
+	// The link as a QR code, drawn here, for a shop's counter or a card.
+	qr: {
+		heading: 'QR code to print',
+		save: 'Save the QR code',
+		alt: (number: string) => `QR code that opens a chat with ${number}`
 	}
 };
 
