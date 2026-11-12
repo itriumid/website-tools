@@ -45,6 +45,7 @@
 		SHORT_PREFIX,
 		codeFromHash,
 		deleteBill,
+		isBrokenLink,
 		forget,
 		openBill,
 		remember,
@@ -123,7 +124,12 @@
 	const money = (amount: number) => formatMoney(amount, currencyCode);
 	const nameOf = (id: string) => people.find((person) => person.id === id)?.name ?? '';
 	$effect(() => {
-		if (taxIncluded || serviceIncluded || taxOnServiceChosen || adjustments.length) moreOpen = true;
+		// Tax on service only says something when there's service to charge it on, and it isn't the
+		// currency's usual way: a receipt read with neither has nothing behind this to show.
+		const unusualTaxOnService =
+			percentage(serviceInput) > 0 && taxOnService !== taxOnServiceByDefault(currencyCode);
+		if (taxIncluded || serviceIncluded || unusualTaxOnService || adjustments.length)
+			moreOpen = true;
 	});
 	const anyTagged = $derived(
 		items.some(
@@ -161,6 +167,18 @@
 		}
 		if (read.amount === 0 && zeroIsProblem) return { text: SPLIT_BILL.amounts.zero, problem: true };
 		return { text: SPLIT_BILL.amounts.reads(money(read.amount)), problem: false };
+	}
+
+	/**
+	 * Where focus goes once a change has drawn: the control that took the press is often gone (the
+	 * form it was in closed, the row it was on removed), and focus left on nothing falls back to
+	 * the top of the page, for a keyboard or a screen reader in the middle of the bill.
+	 */
+	async function focusAfter(id: string, scroll = false) {
+		await tick();
+		const element = document.getElementById(id);
+		element?.focus({ preventScroll: !scroll });
+		if (scroll) element?.scrollIntoView({ block: 'center' });
 	}
 
 	/* ─── People ─── */
@@ -203,9 +221,13 @@
 	interface Removal {
 		/** Which card says so: the one the removal was made from. */
 		from: 'people' | 'items';
+		/** The person's or item's, so focus can go back to it when it's brought back. */
+		id: string;
 		name: string;
 		/** For a person: how many items they shared with others, now split among fewer. */
 		shared?: number;
+		/** For a person: what only they had, now in nobody's share. */
+		alone?: number;
 		before: Pick<BillState, 'people' | 'items'> & {
 			adjustments: BillAdjustment[];
 			paidBy?: string;
@@ -215,7 +237,7 @@
 	}
 	let removal: Removal | undefined = $state();
 
-	function undoable(from: Removal['from'], name: string, change: () => void) {
+	function undoable(from: Removal['from'], id: string, name: string, change: () => void) {
 		const before = {
 			people: $state.snapshot(people),
 			items: $state.snapshot(items),
@@ -223,11 +245,13 @@
 			paidBy
 		};
 		change();
-		removal = { from, name, before, after: JSON.stringify(bill) };
+		removal = { from, id, name, before, after: JSON.stringify(bill) };
+		void focusAfter(`undo-${from}`);
 	}
 
 	function undoRemoval() {
 		if (!removal) return;
+		void focusAfter(removal.from === 'people' ? `rename-${removal.id}` : `edit-${removal.id}`);
 		people = removal.before.people;
 		items = removal.before.items;
 		adjustments = removal.before.adjustments;
@@ -245,8 +269,14 @@
 				item.assignedPersonIds.includes(id) &&
 				item.assignedPersonIds.some((other) => other !== id && people.some((p) => p.id === other))
 		).length;
-		undoable('people', nameOf(id), () => forgetPerson(id));
-		if (removal) removal.shared = shared;
+		const unsharedBefore = totals.unshared;
+		undoable('people', id, nameOf(id), () => forgetPerson(id));
+		if (removal) {
+			removal.shared = shared;
+			// Read after the change: the split as it is without them.
+			const alone = totals.unshared - unsharedBefore;
+			if (alone >= coin / 2) removal.alone = alone;
+		}
 	}
 
 	function forgetPerson(id: string) {
@@ -277,6 +307,13 @@
 			? Math.min(MAX_QUANTITY, Math.max(1, Math.round(value)))
 			: 1;
 	const canAddItem = $derived(newItem.trim() !== '' && newPrice !== null && newPrice > 0);
+	// Once there are items read from a receipt, the form for another waits behind a button, under
+	// the list: the items are what's next, not an empty form above them. Typed in, it stays open.
+	let addingByHand = $state(false);
+	async function startAddingByHand() {
+		addingByHand = true;
+		await focusAfter('item');
+	}
 
 	function addItem() {
 		if (!canAddItem || newPrice === null) return;
@@ -292,6 +329,8 @@
 		newItem = '';
 		newPriceText = '';
 		newQuantity = 1;
+		// Someone typing the items in has more to come: the form stays open under them.
+		addingByHand = true;
 	}
 
 	const nameWithQuantity = (item: BillItem) =>
@@ -384,7 +423,7 @@
 
 	function removeItem(id: string) {
 		const name = items.find((item) => item.id === id)?.name ?? '';
-		undoable('items', name, () => {
+		undoable('items', id, name, () => {
 			items = items.filter((item) => item.id !== id);
 		});
 	}
@@ -527,7 +566,19 @@
 	let reviewLines: ReviewLine[] = $state([]);
 	let reviewAdjustments: ReviewAdjustment[] = $state([]);
 
+	function startScan() {
+		scanning = true;
+		// The photo comes first in the form: focusing it opens no keyboard over the rest.
+		void focusAfter('receipt-photo');
+	}
+
+	function cancelScan() {
+		closeScan();
+		void focusAfter('scan-open');
+	}
+
 	function readScan() {
+		void focusAfter('review-heading');
 		scanned = readReceipt(receiptText, currencyCode);
 		reviewLines = scanned.items.map((item) => ({
 			id: newId(),
@@ -617,6 +668,9 @@
 			taxOnServiceChosen = true;
 		}
 		closeScan();
+		// Tagging needs people: with nobody yet, that's the next thing to do.
+		if (people.length === 0) void focusAfter('person', true);
+		else void focusAfter('items-heading');
 	}
 
 	/* ─── Sharing ─── */
@@ -625,6 +679,7 @@
 		| { kind: 'opened'; version?: Version }
 		| { kind: 'gone' }
 		| { kind: 'unreachable' }
+		| { kind: 'broken' }
 		| { kind: 'copied' }
 		| { kind: 'copied-updated' }
 		| { kind: 'copied-new' }
@@ -686,6 +741,7 @@
 		if (!code) {
 			const shared = billFromHash(location.hash);
 			if (shared) open(shared);
+			else if (isBrokenLink(location.hash)) status = { kind: 'broken' };
 			settled = true;
 			if (shared) await landOnSplit();
 			return;
@@ -724,6 +780,8 @@
 		}
 		open(draft);
 		if (code) deletable = sharedHere(code);
+		// The draft was this tab's own; the link it came with still says it didn't open.
+		if (isBrokenLink(location.hash)) status = { kind: 'broken' };
 		settled = true;
 	}
 
@@ -890,6 +948,7 @@
 		paidBy = undefined;
 		roundTo = undefined;
 		removal = undefined;
+		addingByHand = false;
 		choosing = [];
 		renaming = undefined;
 		editing = undefined;
@@ -956,12 +1015,14 @@
 			<p>{SPLIT_BILL.sharing.gone}</p>
 		{:else if status?.kind === 'unreachable'}
 			<p>{SPLIT_BILL.sharing.unreachable}</p>
+		{:else if status?.kind === 'broken'}
+			<p>{SPLIT_BILL.sharing.broken}</p>
 		{/if}
 	</div>
-	{#if status?.kind === 'gone' || status?.kind === 'unreachable'}
-		<div class="mt-3 flex flex-wrap gap-3">
+	{#if status?.kind === 'gone' || status?.kind === 'unreachable' || status?.kind === 'broken'}
+		<div class="mt-3 mb-6 flex flex-wrap gap-3">
 			<!-- When the server can't be reached, trying again is the way forward: the bill is still
-			     there. Starting a new one is only for a bill that's gone. -->
+			     there. Starting a new one is for a bill that's gone, or a link that can't open one. -->
 			{#if status.kind === 'unreachable'}
 				<button type="button" onclick={readLink} class={smallButton}
 					>{SPLIT_BILL.sharing.retry}</button
@@ -999,8 +1060,9 @@
 
 				{#if !scanning}
 					<button
+						id="scan-open"
 						type="button"
-						onclick={() => (scanning = true)}
+						onclick={startScan}
 						class="{secondaryButton} mt-4 w-full">{SPLIT_BILL.scanning.open}</button
 					>
 				{:else if !scanned}
@@ -1021,7 +1083,7 @@
 							accept="image/*"
 							aria-describedby="receipt-photo-hint"
 							onchange={(event) => showPhoto(event.currentTarget.files?.[0])}
-							class="block w-full text-sm text-muted file:mr-3 file:min-h-9 file:cursor-pointer file:rounded-full file:border file:border-control-border file:bg-transparent file:px-4 file:text-sm file:font-medium file:text-text hover:file:bg-bg"
+							class="block w-full text-sm text-muted file:mr-3 file:min-h-9 file:cursor-pointer file:rounded-full file:border file:border-control-border file:bg-transparent file:px-4 file:text-sm file:font-medium file:text-text hover:file:bg-bg pointer-coarse:file:min-h-11"
 						/>
 						{#if photoUrl}
 							<img
@@ -1043,7 +1105,7 @@
 							<button type="submit" disabled={!receiptText.trim()} class={smallButton}
 								>{SPLIT_BILL.scanning.read}</button
 							>
-							<button type="button" onclick={closeScan} class={smallButton}
+							<button type="button" onclick={cancelScan} class={smallButton}
 								>{SPLIT_BILL.scanning.cancel}</button
 							>
 						</div>
@@ -1051,7 +1113,9 @@
 				{:else}
 					<div class="mt-5 border-t border-border pt-5">
 						<div class="flex flex-wrap items-center gap-x-1">
-							<h3 class="text-base font-semibold">{SPLIT_BILL.scanning.review}</h3>
+							<h3 id="review-heading" tabindex="-1" class="text-base font-semibold">
+								{SPLIT_BILL.scanning.review}
+							</h3>
 							<Toggletip label="About what to check" text={SPLIT_BILL.explanations.unsure} />
 						</div>
 
@@ -1275,7 +1339,7 @@
 									>{SPLIT_BILL.scanning.removeUnpriced}</button
 								>
 							{/if}
-							<button type="button" onclick={closeScan} class={secondaryButton}
+							<button type="button" onclick={cancelScan} class={secondaryButton}
 								>{SPLIT_BILL.scanning.cancel}</button
 							>
 						</div>
@@ -1420,8 +1484,10 @@
 				>
 					{#if removal?.from === 'people'}{SPLIT_BILL.removedPerson(
 							removal.name,
-							removal.shared ?? 0
+							removal.shared ?? 0,
+							removal.alone ? money(removal.alone) : undefined
 						)}<button
+							id="undo-people"
 							type="button"
 							onclick={undoRemoval}
 							class="min-h-11 font-medium underline underline-offset-4 hover:text-accent-text"
@@ -1432,66 +1498,9 @@
 
 			<!-- Items -->
 			<section class={card} aria-labelledby="items-heading">
-				<h2 id="items-heading" class={cardHeading}>
+				<h2 id="items-heading" tabindex="-1" class={cardHeading}>
 					Items {#if items.length}<span class="font-normal text-muted">({items.length})</span>{/if}
 				</h2>
-				<form
-					class="grid grid-cols-[6rem_1fr] gap-3 sm:grid-cols-[1fr_6rem_9rem_auto] sm:items-end"
-					onsubmit={(event) => {
-						event.preventDefault();
-						addItem();
-					}}
-				>
-					<div class="col-span-2 sm:col-span-1">
-						<label for="item" class={label}>Item</label>
-						<input id="item" type="text" autocomplete="off" bind:value={newItem} class={field} />
-					</div>
-					<div>
-						<label for="quantity" class={label}>Quantity</label>
-						<input
-							id="quantity"
-							type="number"
-							inputmode="numeric"
-							min="1"
-							max={MAX_QUANTITY}
-							step="1"
-							bind:value={newQuantity}
-							class={field}
-						/>
-					</div>
-					<div>
-						<!-- People know a menu's price for one, so with several it asks for that. -->
-						<label for="price" class={label}
-							>{quantityOf(newQuantity) > 1 ? 'Price each' : 'Price'}</label
-						>
-						<input
-							id="price"
-							type="text"
-							inputmode={amountKeypad}
-							autocomplete="off"
-							bind:value={newPriceText}
-							aria-describedby="price-note"
-							aria-invalid={newPriceNote?.problem ? true : undefined}
-							class={field}
-						/>
-					</div>
-					<button
-						type="submit"
-						disabled={!canAddItem}
-						aria-describedby="add-item-reason price-note"
-						class="{smallButton} {besideField} col-span-2 sm:col-span-1">Add item</button
-					>
-				</form>
-				<p
-					id="price-note"
-					role="status"
-					class="mt-2 text-sm empty:mt-0 {newPriceNote?.problem ? 'font-medium' : 'text-muted'}"
-				>
-					{#if newPriceNote}{newPriceNote.text}{/if}
-				</p>
-				<p id="add-item-reason" role="status" class="mt-2 text-sm text-muted empty:mt-0">
-					{#if addItemReason}{addItemReason}{/if}
-				</p>
 
 				{#if items.length}
 					<ul class="mt-5 space-y-3">
@@ -1687,7 +1696,7 @@
 										<button
 											type="button"
 											onclick={() => stopCounting(item)}
-											class="mt-1 min-h-9 text-sm text-muted underline underline-offset-4 hover:text-text"
+											class="mt-1 min-h-9 text-sm text-muted underline underline-offset-4 hover:text-text pointer-coarse:min-h-11"
 											>Share evenly instead</button
 										>
 									</fieldset>
@@ -1721,7 +1730,7 @@
 												<button
 													type="button"
 													onclick={() => startCounting(item)}
-													class="min-h-9 text-sm text-muted underline underline-offset-4 hover:text-text"
+													class="min-h-9 text-sm text-muted underline underline-offset-4 hover:text-text pointer-coarse:min-h-11"
 													>Count who had how many</button
 												>
 												<Toggletip
@@ -1748,12 +1757,86 @@
 					role="status"
 				>
 					{#if removal?.from === 'items'}{SPLIT_BILL.removed(removal.name)}<button
+							id="undo-items"
 							type="button"
 							onclick={undoRemoval}
 							class="min-h-11 font-medium underline underline-offset-4 hover:text-accent-text"
 							>{SPLIT_BILL.undo}</button
 						>{/if}
 				</p>
+				<!-- One more item: the form, while there are none or once asked for; otherwise the button
+				     that opens it, under the list. -->
+				{#if items.length === 0 || addingByHand}
+					<div class={items.length ? 'mt-5 border-t border-border pt-5' : 'mt-5'}>
+						<form
+							class="grid grid-cols-[6rem_1fr] gap-3 sm:grid-cols-[1fr_6rem_9rem_auto] sm:items-end"
+							onsubmit={(event) => {
+								event.preventDefault();
+								addItem();
+							}}
+						>
+							<div class="col-span-2 sm:col-span-1">
+								<label for="item" class={label}>Item</label>
+								<input
+									id="item"
+									type="text"
+									autocomplete="off"
+									bind:value={newItem}
+									class={field}
+								/>
+							</div>
+							<div>
+								<label for="quantity" class={label}>Quantity</label>
+								<input
+									id="quantity"
+									type="number"
+									inputmode="numeric"
+									min="1"
+									max={MAX_QUANTITY}
+									step="1"
+									bind:value={newQuantity}
+									class={field}
+								/>
+							</div>
+							<div>
+								<!-- People know a menu's price for one, so with several it asks for that. -->
+								<label for="price" class={label}
+									>{quantityOf(newQuantity) > 1 ? 'Price each' : 'Price'}</label
+								>
+								<input
+									id="price"
+									type="text"
+									inputmode={amountKeypad}
+									autocomplete="off"
+									bind:value={newPriceText}
+									aria-describedby="price-note"
+									aria-invalid={newPriceNote?.problem ? true : undefined}
+									class={field}
+								/>
+							</div>
+							<button
+								type="submit"
+								disabled={!canAddItem}
+								aria-describedby="add-item-reason price-note"
+								class="{smallButton} {besideField} col-span-2 sm:col-span-1">Add item</button
+							>
+						</form>
+						<p
+							id="price-note"
+							role="status"
+							class="mt-2 text-sm empty:mt-0 {newPriceNote?.problem ? 'font-medium' : 'text-muted'}"
+						>
+							{#if newPriceNote}{newPriceNote.text}{/if}
+						</p>
+						<p id="add-item-reason" role="status" class="mt-2 text-sm text-muted empty:mt-0">
+							{#if addItemReason}{addItemReason}{/if}
+						</p>
+					</div>
+				{:else}
+					<button type="button" onclick={startAddingByHand} class="{secondaryButton} mt-5 w-full"
+						>{SPLIT_BILL.addByHand}</button
+					>
+				{/if}
 			</section>
 
 			<!-- Charges and adjustments, in the order a receipt prints them: after the items -->
@@ -1904,7 +1987,7 @@
 												<button
 													type="button"
 													onclick={() => shareWithEveryone(adjustment)}
-													class="mt-1 min-h-9 text-muted underline underline-offset-4 hover:text-text"
+													class="mt-1 min-h-9 text-muted underline underline-offset-4 hover:text-text pointer-coarse:min-h-11"
 													>Share with everyone again</button
 												>
 											</fieldset>
@@ -1912,7 +1995,7 @@
 											<button
 												type="button"
 												onclick={() => (choosing = [...choosing, adjustment.id])}
-												class="min-h-9 text-muted underline underline-offset-4 hover:text-text"
+												class="min-h-9 text-muted underline underline-offset-4 hover:text-text pointer-coarse:min-h-11"
 												>Just for some people</button
 											>
 										{/if}
@@ -2041,7 +2124,11 @@
 					{#if removal}
 						<p class="-mt-2 mb-3 flex flex-wrap items-center gap-x-3 text-sm">
 							{removal.from === 'people'
-								? SPLIT_BILL.removedPerson(removal.name, removal.shared ?? 0)
+								? SPLIT_BILL.removedPerson(
+										removal.name,
+										removal.shared ?? 0,
+										removal.alone ? money(removal.alone) : undefined
+									)
 								: SPLIT_BILL.removed(removal.name)}<button
 								type="button"
 								onclick={undoRemoval}
@@ -2274,7 +2361,7 @@
 							<button
 								type="button"
 								onclick={() => (confirmingDelete = true)}
-								class="mt-2 min-h-9 text-sm text-muted underline underline-offset-4 hover:text-text"
+								class="mt-2 min-h-9 text-sm text-muted underline underline-offset-4 hover:text-text pointer-coarse:min-h-11"
 								>Delete the shared copy</button
 							>
 						{/if}

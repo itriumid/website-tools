@@ -10,7 +10,7 @@
 
 import lzString from 'lz-string';
 import { LIFETIME, LIMIT } from '../../share/bills';
-import { readBill, type BillState } from './split-bill';
+import { billFromHash, HASH_PREFIX, readBill, type BillState } from './split-bill';
 
 const { compressToUint8Array, decompressFromUint8Array } = lzString;
 
@@ -50,6 +50,16 @@ export function codeFromHash(hash: string): string | undefined {
 	return code.length === LENGTH && [...code].every((character) => ALPHABET.includes(character))
 		? code
 		: undefined;
+}
+
+/**
+ * Whether the fragment is a link to a bill that can't be read: cut off when it was pasted, or
+ * changed on the way. It opens nothing, and the person should hear why rather than find an empty
+ * bill.
+ */
+export function isBrokenLink(hash: string): boolean {
+	if (hash.startsWith(SHORT_PREFIX)) return codeFromHash(hash) === undefined;
+	return hash.startsWith(HASH_PREFIX) && billFromHash(hash) === undefined;
 }
 
 /* ─── Encryption ─── */

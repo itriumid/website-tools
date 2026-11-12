@@ -477,7 +477,7 @@ tagged, and pink once tagging has begun and something is still left out: a state
 before anyone has started. The two lines under the rounding choice are kept even when empty, so
 picking a step never shifts what's below it. Then two radio groups, "Who paid?" and "Round shares
 up" (to two steps people actually hand over, Rp 500 and Rp 1.000 for rupiah), with a muted line
-saying what rounding added and whose part it came off. The breakdown (subtotal, charges, total)
+saying what rounding added and who gets it back. The breakdown (subtotal, charges, total)
 comes last, in an inset list: it's how the answer was reached, not the answer. A shared link opens
 with the split's heading focused, scrolled to on a phone.
 
@@ -486,7 +486,8 @@ with the split's heading focused, scrolled to on a phone.
 The Charges card shows the two rates. What only some receipts say (prices that include tax or
 service, tax on service, discounts and rounding) waits behind a disclosure, "More on the receipt",
 with the drawn arrow turning down when open. It opens itself when a scan, a link or a choice puts
-any of it on the bill.
+any of it on the bill, and only then: tax on service counts only when there's service and it isn't
+the currency's usual way.
 
 ### Undo line
 
@@ -495,7 +496,28 @@ Citra.", with an underlined "Undo" beside it at touch-target height. It stays un
 changes some other way. There's no countdown and no confirmation dialog: one tap took it, one
 tap brings it back. The split repeats the line, with its Undo, under its heading, since a removal
 changes it and on a wide screen it's in the other column; only the card's own line is a live
-region, so it's announced once.
+region, so it's announced once. Removing someone who had items alone says what's no longer in
+anyone's share, as an amount: money leaving the split is the one thing that line must not hide.
+
+### Where focus goes
+
+A press that removes or replaces the control it was made on never leaves focus on nothing (which
+drops a keyboard or a screen reader at the top of the page). Opening the scan form focuses its
+first field, reading the receipt its review heading, adding it the People field when there's nobody
+yet (scrolled to), or else the Items heading; removing focuses the Undo, and Undo the person or
+item brought back.
+
+### Adding an item
+
+With no items, the Items card is the form. Once there are items, they come first, and the form
+waits under them behind "Add an item by hand": after a receipt is read, the items are what's next,
+not an empty form above them. Items typed in by hand keep the form open under the list, for the
+next.
+
+### Links that can't open
+
+A shared link cut off when it was pasted, or changed on the way, says so ("This link looks
+incomplete…") with "Start a new bill", rather than opening an empty bill as if nothing were wrong.
 
 ### Graphite panel and title band
 

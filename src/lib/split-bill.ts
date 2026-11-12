@@ -99,7 +99,7 @@ export function taxOnServiceByDefault(currencyCode: string): boolean {
 // A bill travels in the part of the address after the "#", compressed. Browsers never send that
 // part to a server, so nobody but the people given the link sees the bill. Links made before this
 // site moved to tools.itrium.id use the same format and still open: keep it exactly as it is.
-const HASH_PREFIX = '#data=';
+export const HASH_PREFIX = '#data=';
 
 /** The address fragment that holds `state`, to put after the page's address. */
 export function billToHash(state: BillState): string {
@@ -387,10 +387,13 @@ export function formatAmount(
 	}).format(amount);
 }
 
-/** An amount with the currency's symbol before it: "Rp 45.000", "$ 12.50". */
+/**
+ * An amount with the currency's symbol before it: "Rp 45.000", "$ 12.50". The space between them
+ * doesn't break, so a line never ends on "Rp" with the amount on the next.
+ */
 export function formatMoney(amount: number, currencyCode: string): string {
 	const symbol = CURRENCIES.find((currency) => currency.code === currencyCode)?.symbol;
-	return `${symbol ?? currencyCode} ${formatAmount(amount, currencyCode)}`;
+	return `${symbol ?? currencyCode}\u00a0${formatAmount(amount, currencyCode)}`;
 }
 
 export type AmountProblem = 'unreadable' | 'negative' | 'no-cents';

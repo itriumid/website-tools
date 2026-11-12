@@ -106,6 +106,8 @@ export const SPLIT_BILL = {
 		updatedAt: (when: string) => `Updated ${when}`,
 		unreachable:
 			"We couldn't reach our server to open this bill. Check your connection, then try again.",
+		broken:
+			"This link looks incomplete, so we can't open the bill. Ask whoever sent it to copy it again.",
 		retry: 'Try again',
 		startNew: 'Start a new bill',
 		copied: 'Link copied. Anyone with it can open this bill for 30 days.',
@@ -139,7 +141,7 @@ export const SPLIT_BILL = {
 	// The split: what each person hands over, and to whom.
 	split: {
 		paidBy: 'Who paid?',
-		nobody: 'Not set',
+		nobody: 'No one yet',
 		paidTheBill: 'Paid the bill',
 		comesBack: 'comes back',
 		nothingTagged: 'Nothing tagged yet',
@@ -149,16 +151,27 @@ export const SPLIT_BILL = {
 		noRounding: 'No',
 		roundTo: (amount: string) => `To ${amount}`,
 		extraToPayer: (extra: string, name: string) =>
-			`Rounding up adds ${extra}, which comes off ${name}'s part.`,
+			`Rounding up adds ${extra}, which ${name} gets back.`,
 		extraOnTop: (extra: string) => `Rounding up adds ${extra} on top of the total.`,
 		empty: 'Add the items from the bill, and the split shows here as you go.'
 	},
 	// After removing someone or something: one tap took it, one tap brings it back.
 	removed: (name: string) => `Removed ${name}.`,
-	removedPerson: (name: string, shared: number) =>
-		shared === 0
-			? `Removed ${name}.`
-			: `Removed ${name}. ${shared === 1 ? 'The item they shared is' : `The ${shared} items they shared are`} now split among the others.`,
+	// What only they had leaves the split, and that's money someone has to notice.
+	removedPerson: (name: string, shared: number, alone?: string) => {
+		const theShared =
+			shared === 1 ? 'the item they shared is' : `the ${shared} items they shared are`;
+		if (alone && shared) {
+			return `Removed ${name}. What only they had, ${alone}, isn't in anyone's share now, and ${theShared} split among the others.`;
+		}
+		if (alone) return `Removed ${name}. What only they had, ${alone}, isn't in anyone's share now.`;
+		if (shared) {
+			return `Removed ${name}. ${theShared.charAt(0).toUpperCase()}${theShared.slice(1)} now split among the others.`;
+		}
+		return `Removed ${name}.`;
+	},
+	// Once the bill has items, the form for one more waits behind this.
+	addByHand: 'Add an item by hand',
 	// Behind it in the Charges card: what only some receipts say.
 	moreOnReceipt: 'More on the receipt',
 	moreOnReceiptHint: 'Prices with tax, discounts, rounding',
