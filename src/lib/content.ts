@@ -61,7 +61,7 @@ export const WHATSAPP = {
 	problems: {
 		'too-short': "That's too short for a phone number there. Check you have every digit.",
 		'too-long':
-			"That's too long for a phone number there. Check the country code isn't in it twice.",
+			"That's too long for a phone number there. Check the country is right, and its code isn't in the number twice.",
 		'too-many-digits':
 			"That's more digits than any phone number has: 15 at most, country code included.",
 		'area-code': 'Add the area code too.',
