@@ -125,7 +125,9 @@ export const SPLIT_BILL = {
 	split: {
 		paidBy: 'Who paid?',
 		nobody: 'Not set',
-		getsBack: (share: string) => `Paid the bill, gets this back. Their own share: ${share}.`,
+		paidTheBill: 'Paid the bill',
+		comesBack: 'comes back',
+		nothingTagged: 'Nothing tagged yet',
 		to: (name: string) => `To ${name}`,
 		ordered: (amount: string) => `Ordered ${amount}`,
 		roundUp: 'Round shares up',
@@ -176,6 +178,8 @@ export const SPLIT_BILL = {
 			`${count} of these on the receipt: count who had how many once it's in the bill.`,
 		rates: (service: number, tax: number, onService: boolean) =>
 			`Service ${service}% and tax ${tax}%${onService ? ', charged on service too' : ''}.`,
+		ratesUntilNow: (service: number, tax: number) =>
+			`Until now the bill had service ${service}% and tax ${tax}%.`,
 		noRates:
 			"We couldn't work out tax and service from this receipt, so your settings stay as they are.",
 		matches: "The items match the receipt's subtotal.",

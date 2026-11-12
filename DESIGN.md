@@ -456,16 +456,21 @@ end of the page. Hidden from 1024 px, where the split has its own column.
 
 ### The split (signature)
 
-What each person hands over comes first and largest: one row per person, the name in medium
-weight with a muted line under it ("To Budi", or what they ordered), and the amount in bold
-1.5rem tabular figures, right-aligned. Whoever paid hands nothing over, so their big number is what
-comes back to them, with "Paid the bill, gets this back" and their own share in the muted line.
-The "Not in anyone's share" note is gray until anything is tagged, and pink once tagging has begun
-and something is still left out: a state isn't an error before anyone has started. Then two radio groups, "Who paid?" and
-"Round shares up" (to two steps people actually hand over, Rp 500 and Rp 1.000 for rupiah), with
-a muted line saying what rounding added and whose part it came off. The breakdown (subtotal,
-charges, total) comes last, in an inset list: it's how the answer was reached, not the answer. A
-shared link opens with the split's heading focused, scrolled to on a phone.
+What each person hands over comes first and largest: one row per person, the name in medium weight
+with a muted line under it ("To Budi", or what they ordered), and the amount in bold 1.5rem tabular
+figures, right-aligned. Whoever paid hands nothing over, so their big number is what comes back to
+them, labelled "comes back" beside it (on the same line, so choosing who paid never makes the row
+taller), with "Paid the bill" in the muted line under their name. Every row keeps that muted line,
+even empty, and every note in it is short, so choosing who paid never changes a row's height.
+Someone with nothing tagged gets "Nothing tagged yet" and a muted Rp 0, never "To Budi": the split
+doesn't tell anyone to pay nothing. The "Not in anyone's share" note is gray until anything is
+tagged, and pink once tagging has begun and something is still left out: a state isn't an error
+before anyone has started. The two lines under the rounding choice are kept even when empty, so
+picking a step never shifts what's below it. Then two radio groups, "Who paid?" and "Round shares
+up" (to two steps people actually hand over, Rp 500 and Rp 1.000 for rupiah), with a muted line
+saying what rounding added and whose part it came off. The breakdown (subtotal, charges, total)
+comes last, in an inset list: it's how the answer was reached, not the answer. A shared link opens
+with the split's heading focused, scrolled to on a phone.
 
 ### More on the receipt
 
