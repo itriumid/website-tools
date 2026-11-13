@@ -247,7 +247,9 @@
 							onclick={copyLink}
 							class="{secondaryButton} grow px-4! whitespace-nowrap"
 						>
-							Copy link
+							<!-- Says it worked where the press was: the line under the result is far below
+							     once the QR code is open, and stays for screen readers. -->
+							{copied === 'yes' ? WHATSAPP.result.copied : WHATSAPP.result.copy}
 						</button>
 					</div>
 					<p class="mt-3 font-mono text-xs break-all text-muted select-all">{target.link}</p>

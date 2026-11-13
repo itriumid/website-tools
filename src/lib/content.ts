@@ -82,6 +82,8 @@ export const WHATSAPP = {
 	reads: (number: string, country: string) => `= ${number}${country ? `, ${country}` : ''}`,
 	result: {
 		heading: 'Your link',
+		copy: 'Copy link',
+		copied: 'Copied',
 		empty: 'Enter a phone number and the link appears here.',
 		lettersDropped: 'We left out the letters and kept the digits: check this is the number.',
 		extension: (extension: string) =>
