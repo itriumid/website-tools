@@ -87,9 +87,12 @@
 			<li>
 				<a href={GITHUB_URL} rel="external" class={link}>GitHub</a>
 			</li>
-			<li>
-				<a href={SOURCE_URL} rel="external" class={link}> This site's source </a>
-			</li>
+			<!-- On the index, the closing panel's "Read the source" is right above. -->
+			{#if page.url.pathname !== '/'}
+				<li>
+					<a href={SOURCE_URL} rel="external" class={link}> This site's source </a>
+				</li>
+			{/if}
 		</ul>
 	</div>
 </footer>
