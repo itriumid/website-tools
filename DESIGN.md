@@ -358,7 +358,9 @@ Soft and rounded, with the radius growing with the size of the object, on the sa
 itrium.id. Buttons, chips and the info button are pills (`full`). Fields, notes and floating lists
 get 0.5rem (`sm`), and options inside a list a little less (0.375rem). Inset lists, receipt lines
 and the receipt photo get 0.75rem (`md`). Cards get 1rem (`lg`). Panels and title bands get 1.5rem
-(`xl`). The focus outline is 2 px at 4 px radius (`focus`), 3 px away from the element. Edges are
+(`xl`). The focus outline is 2 px at 4 px radius (`focus`), 3 px away from the element. Headings and
+cards that the page itself moves focus to (`tabindex="-1"`) show none: focus still moves and is
+announced, but a ring there read as a stray selection box, pink in dark mode. Edges are
 1 px hairlines, notes included.
 
 The arrow is drawn, not typed: one SVG, the same as itrium.id's `Arrow.svelte`, with a 2-unit
