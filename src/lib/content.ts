@@ -218,6 +218,8 @@ export const SPLIT_BILL = {
 	moreOnReceipt: 'More on the receipt',
 	moreOnReceiptHint: 'Prices with tax, discounts, rounding',
 	undo: 'Undo',
+	/** At the top of the page after "Yes, clear". */
+	cleared: 'Cleared.',
 	/** Read after the running total's untagged amount, which a press takes to the item. */
 	goToUnshared: "Go to the first item that's in nobody's share",
 	/** Under the untagged items' worth, when their part of the total differs from it. */

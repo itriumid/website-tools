@@ -555,7 +555,9 @@ A press that removes or replaces the control it was made on never leaves focus o
 drops a keyboard or a screen reader at the top of the page). Opening the scan form focuses its
 first field, reading the receipt its review heading, adding it the People field when there's nobody
 yet (scrolled to), or else the Items heading; removing focuses the Undo, and Undo the person or
-item brought back.
+item brought back. "Yes, clear" takes the card it was in with it: focus goes to "The bill", and the
+line at the top of the page says "Cleared.". "Clear everything" itself sits apart from the share
+buttons, under a hairline, as a quiet underlined button.
 
 ### Adding an item
 

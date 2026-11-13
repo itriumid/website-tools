@@ -714,7 +714,8 @@
 		| { kind: 'text-copied' }
 		| { kind: 'text-copy-failed'; text: string }
 		| { kind: 'share-failed' }
-		| { kind: 'link-copied' };
+		| { kind: 'link-copied' }
+		| { kind: 'cleared' };
 	let status: Status | undefined = $state();
 	let sharing = $state(false);
 	// The bill as it was last shared from here, so sharing it again unchanged reuses its link.
@@ -1019,6 +1020,16 @@
 
 	let confirmingClear = $state(false);
 
+	/**
+	 * "Yes, clear": the button, and the card it was in, go with the bill, so focus goes to the top
+	 * of the new one, and the line there says it's done.
+	 */
+	function confirmClear() {
+		clearEverything();
+		status = { kind: 'cleared' };
+		void focusAfter('bill-heading', true);
+	}
+
 	function clearEverything() {
 		people = [];
 		items = [];
@@ -1093,6 +1104,8 @@
 				</svg>
 				{SPLIT_BILL.sharing.opening}
 			</p>
+		{:else if status?.kind === 'cleared'}
+			<p class="text-sm text-muted">{SPLIT_BILL.cleared}</p>
 		{:else if status?.kind === 'opened'}
 			<p class="text-sm text-muted">
 				<span class="sr-only">{SPLIT_BILL.sharing.opened}</span>
@@ -2594,7 +2607,16 @@
 							>
 						{/if}
 					{/if}
-					<div class="mt-4 {viewing ? 'hidden' : ''}">
+					<!-- What sharing keeps on our server: for whoever shares, not for a friend reading a
+					     link, whose long link keeps nothing there at all. -->
+					<!-- What sharing keeps on our server: for whoever shares, not for a friend reading a
+					     link, whose long link keeps nothing there at all. -->
+					{#if !viewing}
+						<p class="mt-3 max-w-prose text-sm text-muted">{SPLIT_BILL.privacy}</p>
+					{/if}
+					<!-- Clearing is apart from sharing, under it and quieter: it undoes everything, and sat right
+					     under the share buttons at the same weight. -->
+					<div class="mt-6 border-t border-border pt-3 {viewing ? 'hidden' : ''}">
 						{#if confirmingClear}
 							<div
 								class="flex flex-wrap items-center gap-2"
@@ -2602,9 +2624,7 @@
 								aria-label="Clear everything?"
 							>
 								<span class="text-sm">Clear everything?</span>
-								<button type="button" onclick={clearEverything} class={smallButton}
-									>Yes, clear</button
-								>
+								<button type="button" onclick={confirmClear} class={smallButton}>Yes, clear</button>
 								<button type="button" onclick={() => (confirmingClear = false)} class={smallButton}
 									>Keep it</button
 								>
@@ -2613,15 +2633,11 @@
 							<button
 								type="button"
 								onclick={() => (confirmingClear = true)}
-								class="{secondaryButton} w-full sm:w-auto">Clear everything</button
+								class="min-h-9 text-sm text-muted underline underline-offset-4 hover:text-text pointer-coarse:min-h-11"
+								>Clear everything</button
 							>
 						{/if}
 					</div>
-					<!-- What sharing keeps on our server: for whoever shares, not for a friend reading a
-					     link, whose long link keeps nothing there at all. -->
-					{#if !viewing}
-						<p class="mt-3 max-w-prose text-sm text-muted">{SPLIT_BILL.privacy}</p>
-					{/if}
 				</div>
 			{/if}
 		</div>
