@@ -562,7 +562,10 @@ for the next.
 ### Links that can't open
 
 A shared link cut off when it was pasted, or changed on the way, says so ("This link looks
-incomplete…") with "Start a new bill", rather than opening an empty bill as if nothing were wrong.
+incomplete…") with "Start a new bill", rather than opening an empty bill as if nothing were wrong. That line, and the ones for a bill
+that's gone or a server out of reach, carry the warning sign in medium weight. A link that fails after
+one that opened in the same tab clears the bill it showed, so the old one isn't left under the
+error still headed as shared; someone's own bill stays.
 
 ### Graphite panel and title band
 

@@ -2,6 +2,7 @@
 	import { onMount, tick } from 'svelte';
 	import SearchableSelect, { type Choice } from '#lib/SearchableSelect.svelte';
 	import Arrow from '#lib/Arrow.svelte';
+	import Caution from '#lib/Caution.svelte';
 	import Check from '#lib/Check.svelte';
 	import Step from '#lib/Step.svelte';
 	import Seo from '#lib/Seo.svelte';
@@ -744,12 +745,35 @@
 		if (settled || !billIsEmpty) saveDraft(bill, location.hash);
 	});
 
+	/**
+	 * A link that can't open a bill, after one that did in this tab: the bill on screen is the old
+	 * link's, still headed as shared with you, so it goes. The address stays, so "Try again" can
+	 * still reach a server that was only out of reach. Someone's own bill, not one they were
+	 * shown, stays as it is.
+	 */
+	function forgetViewedBill() {
+		if (!viewing) return;
+		open({
+			people: [],
+			items: [],
+			taxPercentage: DEFAULT_TAX_PERCENTAGE,
+			servicePercentage: DEFAULT_SERVICE_PERCENTAGE,
+			currencyCode: DEFAULT_CURRENCY_CODE
+		});
+		viewing = false;
+		deletable = undefined;
+		lastShared = undefined;
+	}
+
 	async function readLink() {
 		const code = codeFromHash(location.hash);
 		if (!code) {
 			const shared = billFromHash(location.hash);
 			if (shared) open(shared);
-			else if (isBrokenLink(location.hash)) status = { kind: 'broken' };
+			else if (isBrokenLink(location.hash)) {
+				forgetViewedBill();
+				status = { kind: 'broken' };
+			}
 			settled = true;
 			if (shared) await landOnSplit();
 			return;
@@ -760,6 +784,7 @@
 		const result = await openBill(code);
 		if (codeFromHash(location.hash) !== code) return;
 		if ('problem' in result) {
+			forgetViewedBill();
 			status = { kind: result.problem === 'gone' ? 'gone' : 'unreachable' };
 			return;
 		}
@@ -1059,12 +1084,16 @@
 						? SPLIT_BILL.sharing.updatedAt
 						: SPLIT_BILL.sharing.sharedAt)(when(status.version.updatedAt))}{/if}
 			</p>
-		{:else if status?.kind === 'gone'}
-			<p>{SPLIT_BILL.sharing.gone}</p>
-		{:else if status?.kind === 'unreachable'}
-			<p>{SPLIT_BILL.sharing.unreachable}</p>
-		{:else if status?.kind === 'broken'}
-			<p>{SPLIT_BILL.sharing.broken}</p>
+		{:else if status?.kind === 'gone' || status?.kind === 'unreachable' || status?.kind === 'broken'}
+			<!-- A link that didn't open a bill: said with the warning sign and some weight, so it doesn't
+			     read as one more line of instructions above an empty bill. -->
+			<p class="flex gap-2 font-medium">
+				<Caution class="mt-1 shrink-0" />{status.kind === 'gone'
+					? SPLIT_BILL.sharing.gone
+					: status.kind === 'unreachable'
+						? SPLIT_BILL.sharing.unreachable
+						: SPLIT_BILL.sharing.broken}
+			</p>
 		{/if}
 	</div>
 	{#if status?.kind === 'gone' || status?.kind === 'unreachable' || status?.kind === 'broken'}
