@@ -447,6 +447,8 @@ opens the explanation as a gray-barred note on the next line, never as a floatin
 
 ### Chat result (WhatsApp click-to-chat)
 
+The form asks for the country, the number and then the optional message, all before the result:
+the message goes into the link, so typed after it, it changed a link and a QR code out of sight.
 The answer is the number, as people read it, in groups: "+62 811-2345-678" in bold 1.5rem, in an
 inset with a hairline, with the country it's for in muted text under it. The same number is read
 back in one muted line right under the field ("= +62 811-2345-678, Indonesia"), like an amount in

@@ -189,6 +189,18 @@
 			</p>
 		</div>
 
+		<!-- The message goes in the link, so it comes before it: typed after the result, it changed a
+		     link (and a QR code) above the person, out of sight. -->
+		<div>
+			<label for="message" class={label}>Message <span class="text-muted">(optional)</span></label>
+			<textarea
+				id="message"
+				bind:value={message}
+				rows="3"
+				placeholder="Hi! I'd like to ask about…"
+				class="{field} resize-y"></textarea>
+		</div>
+
 		<!-- The result: who the chat is with, as people read a number, and which country that is;
 		     anything to check; the two actions; then the link itself, small. Everything about the
 		     answer sits together, right under the field it comes from. -->
@@ -270,15 +282,5 @@
 			{#if copied === 'yes'}Link copied.{:else if copied === 'failed'}We couldn't copy it. Select
 				the link above and copy it yourself.{/if}
 		</p>
-
-		<div>
-			<label for="message" class={label}>Message <span class="text-muted">(optional)</span></label>
-			<textarea
-				id="message"
-				bind:value={message}
-				rows="3"
-				placeholder="Hi! I'd like to ask about…"
-				class="{field} resize-y"></textarea>
-		</div>
 	</form>
 </section>
