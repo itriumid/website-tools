@@ -1605,7 +1605,7 @@
 							<li
 								id="item-{item.id}"
 								tabindex="-1"
-								class="rounded-xl border border-border bg-bg p-4"
+								class="rounded-xl border border-border bg-bg p-3 sm:p-4"
 							>
 								{#if editing?.id === item.id}
 									<form
@@ -1750,7 +1750,7 @@
 								{#if people.length && item.counts}
 									{@const quantity = item.quantity ?? 1}
 									{@const counted = countedOf(item)}
-									<fieldset class="mt-3">
+									<fieldset class="mt-2 sm:mt-3">
 										<legend class="mb-2 text-sm text-muted">How many each had</legend>
 										<div class="flex flex-wrap gap-2">
 											{#each people as person (person.id)}
@@ -1802,7 +1802,7 @@
 										>
 									</fieldset>
 								{:else if people.length}
-									<fieldset class="mt-3">
+									<fieldset class="mt-2 sm:mt-3">
 										<legend class="sr-only">Who had this?</legend>
 										<!-- "Everyone" sits on the question's line, not in the row of names: at six people
 										     it took a row of its own under them on most items. -->
