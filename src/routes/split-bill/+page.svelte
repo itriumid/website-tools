@@ -1115,8 +1115,16 @@
 	// The running total's "Not in anyone's share yet" takes someone to where it comes from: on a big
 	// table that's somewhere in a long list of items.
 	const unsharedItem = $derived(firstUnsharedItem(bill));
+	// The item it goes to takes the pink edge of a line to check for a few seconds: focus on it
+	// draws no ring (it isn't a control), and it looks like every item around it.
+	let pointedAt: string | undefined = $state();
+	let pointedTimer: ReturnType<typeof setTimeout> | undefined;
 	function showUnshared() {
-		if (unsharedItem) void focusAfter(`item-${unsharedItem}`, true);
+		if (!unsharedItem) return;
+		pointedAt = unsharedItem;
+		clearTimeout(pointedTimer);
+		pointedTimer = setTimeout(() => (pointedAt = undefined), 3000);
+		void focusAfter(`item-${unsharedItem}`, true);
 	}
 
 	// While the split itself is on screen, the bar that points to it has nothing to add: it steps
@@ -1782,7 +1790,10 @@
 								id="item-{item.id}"
 								tabindex="-1"
 								onclickcapture={() => touchItem(item.id)}
-								class="rounded-xl border border-border bg-bg p-3 sm:p-4"
+								class="rounded-xl border bg-bg p-3 transition-colors duration-500 sm:p-4 {pointedAt ===
+								item.id
+									? 'border-accent-edge'
+									: 'border-border'}"
 							>
 								{#if editing?.id === item.id}
 									<form
