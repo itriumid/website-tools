@@ -2630,7 +2630,9 @@
 				</div>
 			{/if}
 			<!-- Share and clear -->
-			{#if items.length || people.length}
+			<!-- Sharing, once there's something on the bill to share: a pink "Copy a link" over an empty
+			     bill asked for the wrong next step. -->
+			{#if items.length}
 				<div>
 					<!-- Each as wide as its words, sharing what's left over; a row too narrow for them all wraps a
 					     whole button, never its label. -->
