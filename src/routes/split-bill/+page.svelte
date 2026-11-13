@@ -878,6 +878,17 @@
 		lastShared = undefined;
 	}
 
+	/**
+	 * A link that didn't open a bill says so at the top of the page: taken there, at once, with
+	 * focus on the line, since a link opened in a tab that had scrolled down would otherwise show
+	 * the bottom of an empty bill and no reason.
+	 */
+	async function showLinkProblem() {
+		await tick();
+		window.scrollTo({ top: 0, behavior: 'instant' });
+		document.getElementById('link-problem')?.focus({ preventScroll: true });
+	}
+
 	async function readLink() {
 		const code = codeFromHash(location.hash);
 		if (!code) {
@@ -886,6 +897,7 @@
 			else if (isBrokenLink(location.hash)) {
 				forgetViewedBill();
 				status = { kind: 'broken' };
+				void showLinkProblem();
 			}
 			settled = true;
 			if (shared) await landOnSplit();
@@ -899,6 +911,7 @@
 		if ('problem' in result) {
 			forgetViewedBill();
 			status = { kind: result.problem === 'gone' ? 'gone' : 'unreachable' };
+			void showLinkProblem();
 			return;
 		}
 		open(result.bill);
@@ -1243,7 +1256,7 @@
 		{:else if status?.kind === 'gone' || status?.kind === 'unreachable' || status?.kind === 'broken'}
 			<!-- A link that didn't open a bill: said with the warning sign and some weight, so it doesn't
 			     read as one more line of instructions above an empty bill. -->
-			<p class="flex gap-2 font-medium">
+			<p id="link-problem" tabindex="-1" class="flex gap-2 font-medium">
 				<Caution class="mt-1 shrink-0" />{status.kind === 'gone'
 					? SPLIT_BILL.sharing.gone
 					: status.kind === 'unreachable'
