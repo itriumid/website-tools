@@ -238,11 +238,6 @@
 						{target.display}
 					</p>
 					{#if countryOfTarget}<p class="text-sm text-muted">{countryOfTarget}</p>{/if}
-					{#if message.trim()}
-						<p class="mt-2 text-sm break-words whitespace-pre-line text-muted">
-							{message.trim()}
-						</p>
-					{/if}
 					{#if notes.length}
 						<ul class="mt-3 space-y-1.5 text-sm font-medium">
 							{#each notes as note (note)}
