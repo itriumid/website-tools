@@ -304,11 +304,13 @@ small uppercase heading or back link sits above it. Nothing here is set in upper
   way too, since the browser's own bars take what the device height promised. Above
   the cards, for someone in the middle of a bill, one line from what the browser already keeps (the
   draft in this tab, or the bills this device shared) with an action line to a shared one (a draft's
-  way in is the Split bill card under it, whose action then says "Continue your bill"): shown after the
+  way in is the Split bill card under it, whose action then says "Continue your bill", read to screen readers too, and
+  whose sample gives way so a made-up bill isn't taken for theirs): shown after the
   page loads, never stored or sent, in the space already kept above the cards for everyone (up to
   two lines on a phone), so the cards don't move when it appears. While there's only one tool on a site of its own, its card takes
   the whole row from 640 px, text on the left and the action line on the right. Its
-  address shows under the action line, since it leaves this site. The section heading
+  address shows under the action line, since it leaves this site; screen readers skip it, as it
+  only lengthened the link's name. The section heading
   over tools on sites of their own is a step smaller than the closing panel's, which is the page's
   last word.
 - **Tool page:** a slim title band (title and introduction only, about 2rem of padding on phones),
@@ -438,7 +440,8 @@ they go by too, never shown: "uk", "usa", "uae", or their names in Indonesian ("
   a muted summary, then a sample of what the tool makes under a muted caption ("Each person's
   share", "The link it makes"): an inset list of shares or the link, hidden from screen readers
   with its caption because the summary says it, then a pink action line with the drawn arrow,
-  hidden from screen readers too so each card's name isn't the same words. On hover the card lifts
+  hidden from screen readers too so each card's name isn't the same words (except "Continue your
+  bill", which says something the name doesn't). On hover the card lifts
   4 px, its edge turns pink (deep rose on light backgrounds), and the arrow moves 4 px right, all
   gated on `motion-safe`.
 - **Inset lists and receipt lines:** one tonal step back inside a card (page color), 0.75rem
