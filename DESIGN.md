@@ -299,7 +299,9 @@ small uppercase heading or back link sits above it. Nothing here is set in upper
   the tool cards in one column, two from 640 px, Split bill first. Then a section heading and the
   cards for tools on sites of their own. A closing slab ends it: what stays on the device as a ruled
   list, and the source as a secondary button. On a screen under 44rem tall the panel and the gap
-  under it tighten, so the first card's action line stays on a 390x667 phone's first screen. Above
+  under it tighten, so the first card's action line stays on a 390x667 phone's first screen;
+  under 36rem of visible height (an iPhone SE in Safari shows about 548px) the cards' samples give
+  way too, since the browser's own bars take what the device height promised. Above
   the cards, for someone in the middle of a bill, one line from what the browser already keeps (the
   draft in this tab, or the bills this device shared) with an action line to a shared one (a draft's
   way in is the Split bill card under it): shown after the

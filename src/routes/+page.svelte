@@ -91,7 +91,9 @@
 					<p class="mt-2 text-muted">{tool.summary}</p>
 					<!-- What the tool makes, as it looks in the tool. It's a picture, so screen readers
 					     skip it: the summary already says it. -->
-					<div class="mt-5" aria-hidden="true">
+					<!-- Under 36rem of height (an iPhone SE in Safari shows about 548px) the sample gives way,
+					     so the card's action is still on the first screen; the summary says the same. -->
+					<div class="mt-5 [@media(max-height:36rem)]:hidden" aria-hidden="true">
 						<p class="text-sm text-muted">{tool.sampleCaption}</p>
 						<div class="mt-2 divide-y divide-border rounded-xl bg-bg px-4 text-sm tabular-nums">
 							{#each tool.sample as line (line.value)}
