@@ -8,6 +8,7 @@ import {
 	changeItem,
 	decimalPlaces,
 	formatAmount,
+	firstUnsharedItem,
 	formatMoney,
 	missingForItem,
 	parseAmount,
@@ -1124,5 +1125,56 @@ describe('service charge', () => {
 		const old = { people: [], items: [], taxPercentage: 10, currencyCode: 'IDR' };
 		expect(readBill(old)?.servicePercentage).toBe(5);
 		expect(readBill({ ...old, servicePercentage: 0 })?.servicePercentage).toBe(0);
+	});
+});
+
+describe('firstUnsharedItem', () => {
+	const people = [
+		{ id: 'a', name: 'Ayu' },
+		{ id: 'b', name: 'Budi' }
+	];
+	const bill = (items: BillItem[]): BillState => ({
+		people,
+		items,
+		taxPercentage: 0,
+		servicePercentage: 0,
+		currencyCode: 'IDR'
+	});
+
+	it('finds the first item nobody is tagged to', () => {
+		expect(
+			firstUnsharedItem(
+				bill([
+					{ id: '1', name: 'Nasi', price: 10, assignedPersonIds: ['a'] },
+					{ id: '2', name: 'Teh', price: 5, assignedPersonIds: [] },
+					{ id: '3', name: 'Kopi', price: 5, assignedPersonIds: [] }
+				])
+			)
+		).toBe('2');
+	});
+
+	it('counts someone who was removed as nobody', () => {
+		expect(
+			firstUnsharedItem(bill([{ id: '1', name: 'Nasi', price: 10, assignedPersonIds: ['gone'] }]))
+		).toBe('1');
+	});
+
+	it('finds a counted item with fewer counted than there were', () => {
+		const counted: BillItem = {
+			id: '1',
+			name: 'Teh',
+			price: 30,
+			quantity: 3,
+			assignedPersonIds: ['a', 'b'],
+			counts: { a: 1, b: 1 }
+		};
+		expect(firstUnsharedItem(bill([counted]))).toBe('1');
+		expect(firstUnsharedItem(bill([{ ...counted, counts: { a: 2, b: 1 } }]))).toBeUndefined();
+	});
+
+	it("has nothing to find when every item is someone's", () => {
+		expect(
+			firstUnsharedItem(bill([{ id: '1', name: 'Nasi', price: 10, assignedPersonIds: ['a', 'b'] }]))
+		).toBeUndefined();
 	});
 });

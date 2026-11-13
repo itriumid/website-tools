@@ -27,6 +27,7 @@
 		changeItem,
 		decimalPlaces,
 		formatAmount,
+		firstUnsharedItem,
 		formatMoney,
 		missingForItem,
 		parseAmount,
@@ -938,6 +939,13 @@
 		}
 	}
 
+	// The running total's "Not in anyone's share yet" takes someone to where it comes from: on a big
+	// table that's somewhere in a long list of items.
+	const unsharedItem = $derived(firstUnsharedItem(bill));
+	function showUnshared() {
+		if (unsharedItem) void focusAfter(`item-${unsharedItem}`, true);
+	}
+
 	function showSplit() {
 		const heading = document.getElementById('split-heading');
 		heading?.focus({ preventScroll: true });
@@ -1540,7 +1548,11 @@
 				{#if items.length}
 					<ul class="mt-5 space-y-3">
 						{#each items as item (item.id)}
-							<li class="rounded-xl border border-border bg-bg p-4">
+							<li
+								id="item-{item.id}"
+								tabindex="-1"
+								class="rounded-xl border border-border bg-bg p-4"
+							>
 								{#if editing?.id === item.id}
 									<form
 										class="grid grid-cols-[6rem_1fr] gap-3"
@@ -2470,16 +2482,38 @@
 				class="sticky bottom-0 z-10 -mx-5 border-t border-border bg-surface px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:-mx-8 sm:px-8 lg:hidden"
 			>
 				<div class="flex items-center justify-between gap-3">
-					<dl class="min-w-0 text-sm">
-						<div class="flex flex-wrap gap-x-1.5">
-							<dt>Total</dt>
-							<dd class="font-semibold">{money(totals.grandTotal)}</dd>
-						</div>
-						<div class="flex flex-wrap gap-x-1.5 {totals.unshared > 0 ? '' : 'text-muted'}">
-							<dt>Not in anyone's share yet</dt>
-							<dd class={totals.unshared > 0 ? 'font-semibold' : ''}>{money(totals.unshared)}</dd>
-						</div>
-					</dl>
+					{#if unsharedItem && totals.unshared > 0}
+						<!-- With something in nobody's share, the two lines are a way to it: a press goes to the
+						     first item it comes from. -->
+						<button
+							type="button"
+							onclick={showUnshared}
+							class="-m-1 min-w-0 rounded-lg p-1 text-left text-sm hover:bg-bg"
+						>
+							<span class="flex flex-wrap gap-x-1.5">
+								<span>Total</span>
+								<span class="font-semibold">{money(totals.grandTotal)}</span>
+							</span>
+							<span class="flex flex-wrap items-center gap-x-1.5">
+								<span>Not in anyone's share yet</span>
+								<span class="inline-flex items-center gap-1 font-semibold"
+									>{money(totals.unshared)}<Arrow /></span
+								>
+							</span>
+							<span class="sr-only">{SPLIT_BILL.goToUnshared}</span>
+						</button>
+					{:else}
+						<dl class="min-w-0 text-sm">
+							<div class="flex flex-wrap gap-x-1.5">
+								<dt>Total</dt>
+								<dd class="font-semibold">{money(totals.grandTotal)}</dd>
+							</div>
+							<div class="flex flex-wrap gap-x-1.5 {totals.unshared > 0 ? '' : 'text-muted'}">
+								<dt>Not in anyone's share yet</dt>
+								<dd class={totals.unshared > 0 ? 'font-semibold' : ''}>{money(totals.unshared)}</dd>
+							</div>
+						</dl>
+					{/if}
 					<button
 						type="button"
 						onclick={showSplit}

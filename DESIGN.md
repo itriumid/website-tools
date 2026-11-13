@@ -477,7 +477,9 @@ it over as a PNG made on the device. Nothing is sent anywhere to make either.
 
 Split bill's bar at the bottom of a phone screen while items exist: the surface color, a hairline
 on top, the total in semibold, and what isn't in anyone's share yet (semibold when it isn't zero,
-muted when it is), with a small "See the split" button. Sticky, not fixed, so it never hides the
+muted when it is), with a small "See the split" button. While something is in nobody's share, the
+two lines are one button, with the drawn arrow after the amount: it goes to the first item that
+amount comes from, the way through a long list of items on a big table. Sticky, not fixed, so it never hides the
 end of the page. Hidden from 1024 px, where the split has its own column.
 
 ### The split (signature)

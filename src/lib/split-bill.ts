@@ -668,6 +668,24 @@ export function calculateBill(state: BillState): BillTotals {
 	};
 }
 
+/**
+ * The first item with some of it in nobody's share: nobody tagged to it, or, when it's counted,
+ * fewer counted than there were. The way `calculateBill` leaves an item out, so a jump to it
+ * lands on what makes "Not in anyone's share" more than nothing.
+ */
+export function firstUnsharedItem(state: BillState): string | undefined {
+	const people = new Set(state.people.map((person) => person.id));
+	return state.items.find((item) => {
+		if (item.counts && (item.quantity ?? 1) > 1) {
+			const counted = Object.entries(item.counts)
+				.filter(([id, count]) => people.has(id) && count > 0)
+				.reduce((sum, [, count]) => sum + count, 0);
+			return counted < (item.quantity ?? 1);
+		}
+		return !item.assignedPersonIds.some((id) => people.has(id));
+	})?.id;
+}
+
 /* ─── Settling up ─── */
 
 // The steps a share can round up to, by currency: amounts people actually hand over. A rupiah
