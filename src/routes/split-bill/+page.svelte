@@ -2393,14 +2393,23 @@
 										{#if settlement.paidTheBill}<span class="text-sm text-muted"
 												>{SPLIT_BILL.split.comesBack}</span
 											>{/if}
-										<span
-											class="text-2xl font-bold tracking-tight tabular-nums {settlement.amount ===
-												0 && !settlement.paidTheBill
-												? 'text-muted'
-												: ''}"
-										>
-											{money(settlement.paidTheBill ? settledUp.back : settlement.amount)}
-										</span>
+										<!-- What comes back to whoever paid is set apart from what everyone else hands
+										     over: a plus, a size smaller and muted, so a quick read of the column never
+										     takes it for the biggest debt. -->
+										{#if settlement.paidTheBill}
+											<span class="text-xl font-semibold tracking-tight text-muted tabular-nums"
+												>+{money(settledUp.back)}</span
+											>
+										{:else}
+											<span
+												class="text-2xl font-bold tracking-tight tabular-nums {settlement.amount ===
+												0
+													? 'text-muted'
+													: ''}"
+											>
+												{money(settlement.amount)}
+											</span>
+										{/if}
 									</span>
 								{/snippet}
 								<li>
