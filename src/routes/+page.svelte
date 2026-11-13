@@ -13,6 +13,7 @@
 		PROMISE_HEADING,
 		SOURCE_LABEL,
 		SOURCE_URL,
+		SPLIT_BILL,
 		TAGLINE,
 		TITLE,
 		TOOLS
@@ -27,9 +28,12 @@
 	// A draft is just said: the Split bill card right under it already opens it, and a second way
 	// to the same place was noise. A shared bill gets its own way in, since it opens that bill.
 	let inProgress: { text: string; action?: string; href?: string } | undefined = $state();
+	// With a draft in this tab, Split bill's card is the way back to it, and says so.
+	let hasDraft = $state(false);
 	onMount(() => {
 		if (loadDraft()) {
 			inProgress = { text: IN_PROGRESS.draft };
+			hasDraft = true;
 			return;
 		}
 		const shared = sharedFromHere();
@@ -55,11 +59,11 @@
 	<div class="band mx-auto max-w-6xl rounded-3xl">
 		<!-- On a short phone (667px tall) the panel and the gap under it tighten, so the first card's
 		     action is still on the first screen. -->
-		<div class="mx-auto max-w-5xl px-6 py-10 sm:px-8 sm:py-16 [@media(max-height:44rem)]:py-6">
+		<div class="mx-auto max-w-5xl px-6 py-8 sm:px-8 sm:py-16 [@media(max-height:44rem)]:py-6">
 			<h1 class="text-5xl font-bold tracking-tight sm:text-7xl">{HEADING}</h1>
 			<!-- The two jobs, in the text color: the first pink a visitor meets is something to press. -->
 			<p
-				class="mt-5 max-w-2xl text-2xl leading-snug font-medium sm:text-3xl [@media(max-height:44rem)]:mt-3"
+				class="mt-4 max-w-2xl text-xl leading-snug font-medium sm:mt-5 sm:text-3xl [@media(max-height:44rem)]:mt-3"
 			>
 				{TAGLINE}
 			</p>
@@ -106,7 +110,9 @@
 						</div>
 					</div>
 					<span class="mt-5 {actionLine}" aria-hidden="true"
-						>Open {tool.name}<Arrow class={arrowMove} /></span
+						>{hasDraft && tool.path === SPLIT_BILL.path
+							? IN_PROGRESS.continue
+							: `Open ${tool.name}`}<Arrow class={arrowMove} /></span
 					>
 				</a>
 			</li>
