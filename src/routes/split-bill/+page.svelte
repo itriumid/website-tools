@@ -1114,6 +1114,8 @@
 		if (!deletable) return;
 		const shared = deletable;
 		confirmingDelete = false;
+		// "Yes, delete" goes at once: focus waits on the button that asked, until the server answers.
+		void focusAfter('delete-open');
 		const problem = await deleteBill(shared);
 		if (problem) {
 			status = { kind: 'delete-failed' };
@@ -1126,6 +1128,8 @@
 			history.replaceState(null, '', location.pathname);
 		}
 		status = { kind: 'deleted' };
+		// Deleted, the button that asked is gone too: focus goes to the link button above it.
+		void focusAfter('copy-link');
 	}
 
 	let confirmingClear = $state(false);
@@ -1134,6 +1138,19 @@
 	 * "Yes, clear": the button, and the card it was in, go with the bill, so focus goes to the top
 	 * of the new one, and the line there says it's done.
 	 */
+	/**
+	 * Asking, and taking it back: the button pressed gives way to the other, so focus goes with it,
+	 * to "Yes, …" when asking and back to the button when it's kept.
+	 */
+	function askToClear(asking: boolean) {
+		confirmingClear = asking;
+		void focusAfter(asking ? 'confirm-clear' : 'clear-open');
+	}
+	function askToDelete(asking: boolean) {
+		confirmingDelete = asking;
+		void focusAfter(asking ? 'confirm-delete' : 'delete-open');
+	}
+
 	function confirmClear() {
 		clearEverything();
 		status = { kind: 'cleared' };
@@ -2690,6 +2707,7 @@
 							>
 						{:else}
 							<button
+								id="copy-link"
 								type="button"
 								onclick={copyLink}
 								disabled={sharing}
@@ -2739,23 +2757,23 @@
 						{#if confirmingDelete}
 							<div class="mt-2 flex flex-wrap items-center gap-2" role="group" aria-label="Delete">
 								<span class="text-sm">{SPLIT_BILL.sharing.deleteQuestion}</span>
-								<button type="button" onclick={deleteShared} class={smallButton}>Yes, delete</button
+								<button id="confirm-delete" type="button" onclick={deleteShared} class={smallButton}
+									>Yes, delete</button
 								>
-								<button type="button" onclick={() => (confirmingDelete = false)} class={smallButton}
+								<button type="button" onclick={() => askToDelete(false)} class={smallButton}
 									>Keep it</button
 								>
 							</div>
 						{:else}
 							<button
 								type="button"
-								onclick={() => (confirmingDelete = true)}
+								id="delete-open"
+								onclick={() => askToDelete(true)}
 								class="mt-2 min-h-9 text-sm text-muted underline underline-offset-4 hover:text-text pointer-coarse:min-h-11"
 								>Delete the shared copy</button
 							>
 						{/if}
 					{/if}
-					<!-- What sharing keeps on our server: for whoever shares, not for a friend reading a
-					     link, whose long link keeps nothing there at all. -->
 					<!-- What sharing keeps on our server: for whoever shares, not for a friend reading a
 					     link, and not right after a long link was copied, which keeps nothing there. -->
 					{#if !viewing && status?.kind !== 'copied-long'}
@@ -2771,15 +2789,18 @@
 								aria-label="Clear everything?"
 							>
 								<span class="text-sm">Clear everything?</span>
-								<button type="button" onclick={confirmClear} class={smallButton}>Yes, clear</button>
-								<button type="button" onclick={() => (confirmingClear = false)} class={smallButton}
+								<button id="confirm-clear" type="button" onclick={confirmClear} class={smallButton}
+									>Yes, clear</button
+								>
+								<button type="button" onclick={() => askToClear(false)} class={smallButton}
 									>Keep it</button
 								>
 							</div>
 						{:else}
 							<button
 								type="button"
-								onclick={() => (confirmingClear = true)}
+								id="clear-open"
+								onclick={() => askToClear(true)}
 								class="min-h-9 text-sm text-muted underline underline-offset-4 hover:text-text pointer-coarse:min-h-11"
 								>Clear everything</button
 							>
