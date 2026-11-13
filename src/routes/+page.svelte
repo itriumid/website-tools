@@ -13,6 +13,7 @@
 		PROMISE_HEADING,
 		SOURCE_LABEL,
 		SOURCE_URL,
+		SPLIT_BILL,
 		TAGLINE,
 		TITLE,
 		TOOLS
@@ -27,9 +28,12 @@
 	// A draft is just said: the Split bill card right under it already opens it, and a second way
 	// to the same place was noise. A shared bill gets its own way in, since it opens that bill.
 	let inProgress: { text: string; action?: string; href?: string } | undefined = $state();
+	// With a draft in this tab, Split bill's card is the way back to it, and says so.
+	let hasDraft = $state(false);
 	onMount(() => {
 		if (loadDraft()) {
 			inProgress = { text: IN_PROGRESS.draft };
+			hasDraft = true;
 			return;
 		}
 		const shared = sharedFromHere();
@@ -106,7 +110,9 @@
 						</div>
 					</div>
 					<span class="mt-5 {actionLine}" aria-hidden="true"
-						>Open {tool.name}<Arrow class={arrowMove} /></span
+						>{hasDraft && tool.path === SPLIT_BILL.path
+							? IN_PROGRESS.continue
+							: `Open ${tool.name}`}<Arrow class={arrowMove} /></span
 					>
 				</a>
 			</li>

@@ -304,7 +304,7 @@ small uppercase heading or back link sits above it. Nothing here is set in upper
   way too, since the browser's own bars take what the device height promised. Above
   the cards, for someone in the middle of a bill, one line from what the browser already keeps (the
   draft in this tab, or the bills this device shared) with an action line to a shared one (a draft's
-  way in is the Split bill card under it): shown after the
+  way in is the Split bill card under it, whose action then says "Continue your bill"): shown after the
   page loads, never stored or sent, in the space already kept above the cards for everyone (up to
   two lines on a phone), so the cards don't move when it appears. While there's only one tool on a site of its own, its card takes
   the whole row from 640 px, text on the left and the action line on the right. Its
