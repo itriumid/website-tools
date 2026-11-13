@@ -11,6 +11,7 @@
 
 <script lang="ts">
 	import Check from '#lib/Check.svelte';
+	import { SEARCH } from '#lib/content.js';
 	import { matchChoices } from '#lib/search.js';
 	import { field } from '#lib/styles.js';
 
@@ -158,9 +159,11 @@
 			</li>
 		{:else}
 			{#if open}
-				<li class="px-3 py-4 text-center text-sm text-muted" role="presentation">No match</li>
+				<li class="px-3 py-4 text-center text-sm text-muted" role="presentation">
+					{SEARCH.noMatch}
+				</li>
 			{/if}
 		{/each}
 	</ul>
-	<p class="sr-only" role="status">{open ? `${shown.length} choices` : ''}</p>
+	<p class="sr-only" role="status">{open ? SEARCH.count(shown.length) : ''}</p>
 </div>
