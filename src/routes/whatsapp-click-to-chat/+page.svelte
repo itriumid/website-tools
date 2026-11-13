@@ -83,6 +83,8 @@
 		context.fillStyle = '#ffffff';
 		context.fillRect(0, 0, canvas.width, canvas.height);
 		context.fillStyle = '#2b2b2b';
+		// The path is in modules; each module is `scale` pixels.
+		context.scale(scale, scale);
 		context.fill(new Path2D(qrPath(modules)));
 		const name = qrFileName(target.number);
 		canvas.toBlob((blob) => {
