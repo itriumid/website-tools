@@ -173,20 +173,24 @@
 				aria-invalid={problem ? true : undefined}
 				class={field}
 			/>
-			<!-- Before anything's typed, how a number with its country is read; after, what's wrong. -->
-			{#if !typed.trim()}
-				<p id="number-hint" class="mt-1.5 text-sm text-muted">{WHATSAPP.hint}</p>
-			{/if}
-			<!-- What the number reads as, right under it: on a phone the keyboard covers the result
-			     below, and this is the line to check against what was typed. -->
-			{#if target}
-				<p id="number-reads" class="mt-1.5 text-sm text-muted tabular-nums">
-					{WHATSAPP.reads(target.display, countryOfTarget)}
+			<!-- One slot under the field, two lines tall, for whichever line has something to say: how a
+			     number with its country is read (before anything's typed), what the number reads as, or
+			     what's wrong. The result under it doesn't move when one gives way to another. -->
+			<div class="mt-1.5 min-h-10 text-sm">
+				{#if !typed.trim()}
+					<p id="number-hint" class="text-muted">{WHATSAPP.hint}</p>
+				{/if}
+				<!-- What the number reads as: on a phone the keyboard covers the result below, and this
+				     is the line to check against what was typed. -->
+				{#if target}
+					<p id="number-reads" class="text-muted tabular-nums">
+						{WHATSAPP.reads(target.display, countryOfTarget)}
+					</p>
+				{/if}
+				<p id="number-problem" class="font-medium" role="status">
+					{#if problem}{WHATSAPP.problems[problem]}{/if}
 				</p>
-			{/if}
-			<p id="number-problem" class="mt-1.5 text-sm font-medium empty:mt-0" role="status">
-				{#if problem}{WHATSAPP.problems[problem]}{/if}
-			</p>
+			</div>
 		</div>
 
 		<!-- The message goes in the link, so it comes before it: typed after the result, it changed a
