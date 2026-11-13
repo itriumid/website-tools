@@ -2285,21 +2285,29 @@
 														</div>
 													{/if}
 												</dl>
-												<!-- Whoever paid: what the rest rounded up comes back to them, so their own share is
-												     what's above less that, said in the words the rounding note uses. -->
+												<!-- Whoever paid: the subtraction, shown. What the rest rounded up comes back to them;
+												     anything in nobody's share is theirs to cover for now. What's left is what they're
+												     out once everyone has paid them, the total less what comes back. -->
 												{#if settlement.paidTheBill}
-													{#if settledUp.extra > 0}
-														<p class="mt-1 text-muted">
-															{SPLIT_BILL.split.extraToPayer(
-																money(settledUp.extra),
-																nameOf(settlement.personId)
-															)}
-														</p>
-													{/if}
-													<dl class="mt-1 border-t border-border pt-1 font-semibold">
-														<div class="flex justify-between gap-4">
-															<dt>{SPLIT_BILL.split.ownShare}</dt>
-															<dd class="shrink-0">{money(settlement.amount)}</dd>
+													{@const payer = nameOf(settlement.personId)}
+													<dl class="mt-1 space-y-1">
+														{#if settledUp.extra > 0}
+															<div class="flex justify-between gap-4 text-muted">
+																<dt>{SPLIT_BILL.split.roundingBack}</dt>
+																<dd class="shrink-0">−{money(settledUp.extra)}</dd>
+															</div>
+														{/if}
+														{#if totals.unshared > 0}
+															<div class="flex justify-between gap-4 text-muted">
+																<dt>{SPLIT_BILL.split.unsharedOnPayer(payer)}</dt>
+																<dd class="shrink-0">{money(totals.unshared)}</dd>
+															</div>
+														{/if}
+														<div
+															class="flex justify-between gap-4 border-t border-border pt-1 font-semibold"
+														>
+															<dt>{SPLIT_BILL.split.paysInTheEnd(payer)}</dt>
+															<dd class="shrink-0">{money(settlement.amount + totals.unshared)}</dd>
 														</div>
 													</dl>
 												{/if}

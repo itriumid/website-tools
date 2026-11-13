@@ -188,7 +188,11 @@ export const SPLIT_BILL = {
 		// In a row opened to what's in the share, after the items.
 		charges: 'Charges and adjustments',
 		roundedUp: 'Rounded up',
-		ownShare: 'Their own share'
+		// For whoever paid, ending their row: what comes back from the rest's rounding, what they
+		// cover while it's nobody's, and what they're out once everyone has paid them.
+		roundingBack: 'Rounding from the others',
+		unsharedOnPayer: (name: string) => `Not in anyone's share, on ${name} for now`,
+		paysInTheEnd: (name: string) => `${name} pays in the end`
 	},
 	// After removing someone or something: one tap took it, one tap brings it back.
 	removed: (name: string) => `Removed ${name}.`,
