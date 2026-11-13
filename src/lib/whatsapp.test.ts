@@ -251,9 +251,24 @@ describe('grouped', () => {
 		expect(grouped('1', '4155550132')).toBe('415-555-0132');
 	});
 
+	it('writes mobile numbers the way they are written where they are from', () => {
+		expect(grouped('81', '9012345678')).toBe('90-1234-5678');
+		expect(grouped('44', '7700900123')).toBe('7700-900123');
+		expect(grouped('60', '123456789')).toBe('12-345-6789');
+		expect(grouped('60', '1123456789')).toBe('11-2345-6789');
+		expect(grouped('61', '412345678')).toBe('412-345-678');
+		expect(grouped('63', '9171234567')).toBe('917-123-4567');
+		expect(grouped('82', '1012345678')).toBe('10-1234-5678');
+		expect(grouped('86', '13812345678')).toBe('138-1234-5678');
+		expect(grouped('91', '9876543210')).toBe('98765-43210');
+		expect(grouped('966', '501234567')).toBe('50-123-4567');
+		expect(grouped('971', '501234567')).toBe('50-123-4567');
+		expect(grouped('852', '91234567')).toBe('9123-4567');
+	});
+
 	it('elsewhere, reads in threes with four at the end', () => {
 		expect(grouped('62', '215550123')).toBe('21-555-0123');
-		expect(grouped('44', '7700900123')).toBe('770-090-0123');
+		expect(grouped('49', '3012345678')).toBe('301-234-5678');
 		expect(grouped('65', '91234567')).toBe('9123-4567');
 		expect(grouped('49', '15123456789')).toBe('1512-345-6789');
 	});
