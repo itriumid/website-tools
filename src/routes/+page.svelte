@@ -89,6 +89,7 @@
 	</div>
 	<ul class="grid gap-5 sm:grid-cols-2">
 		{#each TOOLS as tool (tool.path)}
+			{@const continuing = hasDraft && tool.path === SPLIT_BILL.path}
 			<li>
 				<a href={resolve(tool.path)} class={cardLink}>
 					<h2 class="text-xl font-semibold">{tool.name}</h2>
@@ -96,8 +97,13 @@
 					<!-- What the tool makes, as it looks in the tool. It's a picture, so screen readers
 					     skip it: the summary already says it. -->
 					<!-- Under 36rem of height (an iPhone SE in Safari shows about 548px) the sample gives way,
-					     so the card's action is still on the first screen; the summary says the same. -->
-					<div class="mt-5 [@media(max-height:36rem)]:hidden" aria-hidden="true">
+					     so the card's action is still on the first screen; the summary says the same. With a
+					     bill in progress it gives way too: a made-up bill beside "Continue your bill" reads
+					     as theirs. -->
+					<div
+						class="mt-5 [@media(max-height:36rem)]:hidden {continuing ? 'hidden' : ''}"
+						aria-hidden="true"
+					>
 						<p class="text-sm text-muted">{tool.sampleCaption}</p>
 						<div class="mt-2 divide-y divide-border rounded-xl bg-bg px-4 text-sm tabular-nums">
 							{#each tool.sample as line (line.value)}
@@ -109,10 +115,12 @@
 							{/each}
 						</div>
 					</div>
-					<span class="mt-5 {actionLine}" aria-hidden="true"
-						>{hasDraft && tool.path === SPLIT_BILL.path
-							? IN_PROGRESS.continue
-							: `Open ${tool.name}`}<Arrow class={arrowMove} /></span
+					<!-- "Open …" only repeats the card's name to a screen reader; "Continue your bill" says
+					     something the name doesn't, so it's read. -->
+					<span class="mt-5 {actionLine}" aria-hidden={continuing ? undefined : 'true'}
+						>{continuing ? IN_PROGRESS.continue : `Open ${tool.name}`}<Arrow
+							class={arrowMove}
+						/></span
 					>
 				</a>
 			</li>
