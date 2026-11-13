@@ -13,7 +13,13 @@
 		primaryButton,
 		secondaryButton
 	} from '#lib/styles.js';
-	import { chatLink, chatTarget, countriesWithCode, waitsForTyping } from '#lib/whatsapp.js';
+	import {
+		chatLink,
+		chatTarget,
+		countriesWithCode,
+		waitsForTyping,
+		withoutDoubledCode
+	} from '#lib/whatsapp.js';
 	import Caution from '#lib/Caution.svelte';
 	import Arrow from '#lib/Arrow.svelte';
 	import { drawnSize, qrFileName, qrModules, qrPath } from '#lib/qr.js';
@@ -57,6 +63,13 @@
 		const found = result && 'problem' in result ? result.problem : undefined;
 		return found && waitsForTyping(found) && !typingStopped ? undefined : found;
 	});
+	// The number with its country code once, when it was typed twice and once makes it work.
+	const fixed = $derived(problem ? withoutDoubledCode(countryCode, typed, message) : undefined);
+	function useFixed() {
+		if (!fixed) return;
+		typed = fixed.display;
+		document.getElementById('number')?.focus();
+	}
 	// Which country the number is for: the one chosen, or, for a number typed with its own code,
 	// the countries that code belongs to.
 	const countryOfTarget = $derived.by(() => {
@@ -212,6 +225,11 @@
 				<p id="number-problem" class="flex gap-2 font-medium" role="status">
 					{#if problem}<Caution class="mt-0.5" />{WHATSAPP.problems[problem]}{/if}
 				</p>
+				{#if fixed}
+					<button type="button" onclick={useFixed} class="{secondaryButton} mt-2 tabular-nums">
+						{WHATSAPP.useFixed(fixed.display)}
+					</button>
+				{/if}
 			</div>
 		</div>
 

@@ -6,6 +6,7 @@ import {
 	digitsOnly,
 	grouped,
 	waitsForTyping,
+	withoutDoubledCode,
 	type ChatTarget
 } from './whatsapp';
 
@@ -312,5 +313,21 @@ describe('chatLink', () => {
 		expect(chatLink('6281234567890', ' Halo, kak ')).toBe(
 			'https://wa.me/6281234567890?text=Halo%2C%20kak'
 		);
+	});
+});
+
+describe('withoutDoubledCode', () => {
+	it('offers the number with its country code once', () => {
+		expect(withoutDoubledCode('62', '+62 62 812 3456 7890', '')?.display).toBe('+62 812-3456-7890');
+		expect(withoutDoubledCode('62', '62 62 812 3456 7890', '')?.display).toBe('+62 812-3456-7890');
+		expect(withoutDoubledCode('62', '0062 62 812 3456 7890', 'Halo')?.link).toBe(
+			'https://wa.me/6281234567890?text=Halo'
+		);
+	});
+	it("offers nothing when once still isn't a number", () => {
+		expect(withoutDoubledCode('62', '+62 62 812 3456 7890 12', '')).toBeUndefined();
+		expect(withoutDoubledCode('62', '0811 2345 6781 23', '')).toBeUndefined();
+		expect(withoutDoubledCode('62', '+62 812 3456 7890', '')).toBeUndefined();
+		expect(withoutDoubledCode('62', '', '')).toBeUndefined();
 	});
 });

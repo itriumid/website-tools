@@ -78,6 +78,8 @@ export const WHATSAPP = {
 		several: 'That looks like more than one number. Make a link for one at a time.',
 		'no-digits': "There's no number here yet. Type the phone number's digits."
 	},
+	/** Under a number typed with its country code twice: puts it in once. */
+	useFixed: (number: string) => `Use ${number}`,
 	/** Under the field, as soon as the number reads as one: the number, as the link will have it. */
 	reads: (number: string, country: string) => `= ${number}${country ? `, ${country}` : ''}`,
 	result: {
