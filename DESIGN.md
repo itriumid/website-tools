@@ -463,13 +463,13 @@ opens the explanation as a gray-barred note on the next line, never as a floatin
 
 The form asks for the country, the number and then the optional message, all before the result:
 the message goes into the link, so typed after it, it changed a link and a QR code out of sight.
-The answer is the number, as people read it, in groups: "+62 811-2345-678" in bold 1.5rem, in an
+The answer is the number, as people read it, in groups: "+62 811-2345-678" in bold 1.5rem (written the way numbers are where they're from, for the
+countries people most often message: Japan's "90-1234-5678", the United Kingdom's "7700-900123"), in an
 inset with a hairline, with the country it's for in muted text under it. The same number is read
 back in one muted line right under the field ("= +62 811-2345-678, Indonesia"), like an amount in
 Split bill, in a slot two lines tall that the hint and any problem share, so the result under
 it never moves: on a phone the keyboard covers the result while the number is typed, and this is the
-line to check it against. Then the message as plain text, then
-anything decided on the person's behalf, each with the drawn warning sign in medium weight (letters
+line to check it against. Then anything decided on the person's behalf, each with the drawn warning sign in medium weight (letters
 left out, an extension WhatsApp can't dial, a number at the short end for its country). Then "Open
 in WhatsApp" and "Copy link" side by side, neither ever breaking onto two lines (on the narrowest
 phones Copy moves under Open); Copy says "Copied" for three seconds after a press, where the
@@ -489,6 +489,9 @@ both themes, because scanners read dark on light and that's what prints. "Save t
 it over as a PNG made on the device, 24 pixels a module, with "Chat on WhatsApp" and the number
 under the code, below its white margin, in Plus Jakarta Sans: a printed code can be checked by eye,
 and used by someone without a camera. Nothing is sent anywhere to make either.
+With a message, a muted line says the code includes it ("whoever scans it starts with it typed"),
+with a "Leave the message out of the code" checkbox: a shop printing one code for everyone may not
+want one customer's message on it, and a shorter link makes a coarser code that scans better.
 
 ### Running total (signature)
 
@@ -605,8 +608,8 @@ The error page is one panel: its heading in display type and a ruled list of whe
 each row with the arrow. On a tool
 page it's a title band holding just the title and the introduction. The band is a little wider than the
 tool under it: Split bill's goes to 72rem, where the split has its own column, and WhatsApp
-click-to-chat's to 42rem, around its 36rem form, so on a wide screen the form isn't a small card
-under a long slab.
+click-to-chat's to its form card's 32rem, so their edges line up and on a wide screen the form
+isn't a small card under a long slab.
 
 ### Navigation
 

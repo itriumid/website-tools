@@ -44,6 +44,12 @@ export type ChatProblem =
 	| 'several'
 	| 'no-digits';
 
+/** The link that opens a chat with a number (digits, country code first), with a message typed in. */
+export function chatLink(number: string, message = ''): string {
+	const text = message.trim();
+	return `https://wa.me/${number}${text ? `?text=${encodeURIComponent(text)}` : ''}`;
+}
+
 /**
  * Whether a problem is true of every number halfway typed ("too short", "add the area code"), so
  * it waits until the typing stops. The others can't be right however the number ends.
@@ -225,7 +231,7 @@ export function chatTarget(
 	const target: ChatTarget = {
 		number,
 		display: code ? `+${code} ${grouped(code, national)}` : `+${number}`,
-		link: `https://wa.me/${number}${text ? `?text=${encodeURIComponent(text)}` : ''}`,
+		link: chatLink(number, text),
 		countryCode: code,
 		short: Boolean(lengths && lengths[0] < lengths[1] && national.length === lengths[0]),
 		lettersDropped
@@ -234,18 +240,54 @@ export function chatTarget(
 	return target;
 }
 
+// How numbers are written where people most often message from Indonesia, mobile numbers above
+// all, by country code: which numbers (a length and how they start) and the sizes of their groups.
+// Only for reading: the link keeps the digits alone.
+const NUMBER_FORMATS: Record<string, { length: number; starts: RegExp; groups: number[] }[]> = {
+	'1': [{ length: 10, starts: /^/, groups: [3, 3, 4] }], // 415-555-0132
+	'44': [{ length: 10, starts: /^7/, groups: [4, 6] }], // 7700-900123
+	'60': [
+		{ length: 9, starts: /^1/, groups: [2, 3, 4] }, // 12-345-6789
+		{ length: 10, starts: /^1/, groups: [2, 4, 4] } // 11-2345-6789
+	],
+	'61': [{ length: 9, starts: /^4/, groups: [3, 3, 3] }], // 412-345-678
+	'62': [
+		{ length: 9, starts: /^8/, groups: [3, 3, 3] }, // 812-345-678
+		{ length: 10, starts: /^8/, groups: [3, 4, 3] }, // 811-2345-678
+		{ length: 11, starts: /^8/, groups: [3, 4, 4] }, // 812-3456-7890
+		{ length: 12, starts: /^8/, groups: [3, 4, 5] }
+	],
+	'63': [{ length: 10, starts: /^9/, groups: [3, 3, 4] }], // 917-123-4567
+	'65': [{ length: 8, starts: /^/, groups: [4, 4] }], // 9123-4567
+	'66': [{ length: 9, starts: /^[689]/, groups: [2, 3, 4] }], // 81-234-5678
+	'81': [{ length: 10, starts: /^[789]0/, groups: [2, 4, 4] }], // 90-1234-5678
+	'82': [{ length: 10, starts: /^10/, groups: [2, 4, 4] }], // 10-1234-5678
+	'84': [{ length: 9, starts: /^[35789]/, groups: [2, 3, 4] }], // 91-234-5678
+	'86': [{ length: 11, starts: /^1/, groups: [3, 4, 4] }], // 138-1234-5678
+	'91': [{ length: 10, starts: /^[6-9]/, groups: [5, 5] }], // 98765-43210
+	'852': [{ length: 8, starts: /^/, groups: [4, 4] }], // 9123-4567
+	'966': [{ length: 9, starts: /^5/, groups: [2, 3, 4] }], // 50-123-4567
+	'971': [{ length: 9, starts: /^5/, groups: [2, 3, 4] }] // 50-123-4567
+};
+
 /**
  * A number after its country code, in groups, so it can be checked against what was typed: a run
- * of eleven digits is the hardest thing to compare. Indonesian mobile numbers are written
- * 812-3456-7890, and North American ones 415-555-0132; elsewhere, blocks of three with four at
- * the end, the way most numbers are read out, and never a digit on its own. Only for reading: the link keeps the digits alone.
+ * of eleven digits is the hardest thing to compare. Where it's known how numbers are written there
+ * ("90-1234-5678" in Japan), that way; elsewhere, blocks of three with four at the end, the way
+ * most numbers are read out, and never a digit on its own.
  */
 export function grouped(code: string, national: string): string {
-	if (code === '1' && national.length === 10) {
-		return `${national.slice(0, 3)}-${national.slice(3, 6)}-${national.slice(6)}`;
-	}
-	if (code === '62' && national.startsWith('8') && national.length >= 9) {
-		return `${national.slice(0, 3)}-${national.slice(3, 7)}-${national.slice(7)}`;
+	const format = NUMBER_FORMATS[code]?.find(
+		(candidate) => candidate.length === national.length && candidate.starts.test(national)
+	);
+	if (format) {
+		const parts: string[] = [];
+		let at = 0;
+		for (const size of format.groups) {
+			parts.push(national.slice(at, at + size));
+			at += size;
+		}
+		return parts.join('-');
 	}
 	if (national.length <= 4) return national;
 	const groups = [national.slice(-4)];
