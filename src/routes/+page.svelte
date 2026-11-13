@@ -128,11 +128,11 @@
 						<h3 class="text-xl font-semibold">{app.name}</h3>
 						<p class="mt-2 max-w-2xl text-muted">{app.summary}</p>
 					</div>
-					<span class="mt-5 shrink-0 {actionLine} {ELSEWHERE.length === 1 ? 'sm:mt-0' : ''}"
-						><span aria-hidden="true">{app.label}</span><span class="sr-only"
-							>{app.label} at {new URL(app.url).host}</span
-						><Arrow class={arrowMove} /></span
-					>
+					<!-- Where it goes, shown: a site of its own, so the address is under the action. -->
+					<span class="mt-5 block shrink-0 {ELSEWHERE.length === 1 ? 'sm:mt-0' : ''}">
+						<span class={actionLine}>{app.label}<Arrow class={arrowMove} /></span>
+						<span class="block text-sm text-muted">{new URL(app.url).host}</span>
+					</span>
 				</a>
 			</li>
 		{/each}
