@@ -226,6 +226,19 @@ export const SPLIT_BILL = {
 	cleared: 'Cleared.',
 	/** Read after the running total's untagged amount, which a press takes to the item. */
 	goToUnshared: "Go to the first item that's in nobody's share",
+	/** The split's note on what nobody's tagged to: up to three names, then how many more. */
+	untagged: (names: string[], worth: string) => {
+		const shown = names.length > 3 ? names.slice(0, 3) : names;
+		const more = names.length - shown.length;
+		const list =
+			more > 0
+				? `${shown.join(', ')} and ${more} more`
+				: shown.length > 1
+					? `${shown.slice(0, -1).join(', ')} and ${shown.at(-1)}`
+					: (shown[0] ?? 'Items');
+		const one = names.length === 1;
+		return `${list}, worth ${worth}, ${one ? "isn't" : "aren't"} tagged or counted for anyone, so ${one ? "it's" : "they're"} left out of the shares.`;
+	},
 	/** Under the untagged items' worth, when their part of the total differs from it. */
 	unsharedOfTotal: (amount: string) => `That's ${amount} of the total.`,
 	// What an amount field says under it as it's typed: what we read, or why we can't.

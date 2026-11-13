@@ -30,6 +30,7 @@
 		formatAmount,
 		firstUnsharedItem,
 		partlyNobodys,
+		unsharedItemNames,
 		formatMoney,
 		missingForItem,
 		parseAmount,
@@ -2557,8 +2558,8 @@
 								? 'border-accent-edge'
 								: 'border-border text-muted'}"
 						>
-							<strong>Not in anyone's share:</strong> items worth {money(totals.unassigned)} aren't tagged
-							or counted for anyone, so they're left out of the shares.
+							<strong>Not in anyone's share:</strong>
+							{SPLIT_BILL.untagged(unsharedItemNames(bill), money(totals.unassigned))}
 							{#if totals.unshared !== totals.unassigned}{SPLIT_BILL.unsharedOfTotal(
 									money(totals.unshared)
 								)}{/if}
