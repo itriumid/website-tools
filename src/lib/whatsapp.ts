@@ -271,6 +271,25 @@ const NUMBER_FORMATS: Record<string, { length: number; starts: RegExp; groups: n
 };
 
 /**
+ * The number with its country code once, when it was typed twice ("+62 62 812 …", "62 62 812 …")
+ * and once makes a number that works: for a button that puts it right. Undefined otherwise, so
+ * nothing is offered that would only swap one problem for another.
+ */
+export function withoutDoubledCode(
+	countryCode: string,
+	original: string,
+	message: string
+): ChatTarget | undefined {
+	const found = chatTarget(countryCode, original, message);
+	if (!found || !('problem' in found)) return undefined;
+	if (found.problem !== 'too-long' && found.problem !== 'too-many-digits') return undefined;
+	const full = digitsOnly(original).replace(/^00/, '');
+	const code = CODES.find((candidate) => full.startsWith(candidate + candidate));
+	if (!code) return undefined;
+	const fixed = chatTarget(countryCode, `+${full.slice(code.length)}`, message);
+	return fixed && 'link' in fixed ? fixed : undefined;
+}
+/**
  * A number after its country code, in groups, so it can be checked against what was typed: a run
  * of eleven digits is the hardest thing to compare. Where it's known how numbers are written there
  * ("90-1234-5678" in Japan), that way; elsewhere, blocks of three with four at the end, the way

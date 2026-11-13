@@ -477,7 +477,10 @@ press was, as well as in the status line under the result, and the raw link in s
 Under it, one muted line on using the link: in a profile or a message, or as a QR code checked once
 before it's printed. Everything about the answer sits together, right under the field it comes from:
 nothing floats over it, so nothing can cover it on a short phone. A number too short or too long for
-its country is a problem in words, never a link. "Too short" and "add the area code" wait until the
+its country is a problem in words, never a link. The problem starts with the drawn warning sign, and the
+field takes the deep-rose edge, as a Split bill line to check does. A number with its country code
+typed twice gets a button under the problem, "Use +62 812-3456-7890", when the number with the code
+once works. "Too short" and "add the area code" wait until the
 typing stops: every number is too short halfway through it.
 
 ### QR code to print (WhatsApp click-to-chat)
