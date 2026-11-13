@@ -181,11 +181,11 @@
 	 * form it was in closed, the row it was on removed), and focus left on nothing falls back to
 	 * the top of the page, for a keyboard or a screen reader in the middle of the bill.
 	 */
-	async function focusAfter(id: string, scroll = false) {
+	async function focusAfter(id: string, scroll: boolean | 'nearest' = false) {
 		await tick();
 		const element = document.getElementById(id);
 		element?.focus({ preventScroll: !scroll });
-		if (scroll) element?.scrollIntoView({ block: 'center' });
+		if (scroll) element?.scrollIntoView({ block: scroll === 'nearest' ? 'nearest' : 'center' });
 	}
 
 	/* ─── People ─── */
@@ -249,6 +249,8 @@
 		alone?: number;
 		/** For an item: only who had it was cleared ("Nobody"), not the item itself. */
 		cleared?: boolean;
+		/** For a removed item: where it was in the list, where its Undo now stands. */
+		index?: number;
 		before: Pick<BillState, 'people' | 'items'> & {
 			adjustments: BillAdjustment[];
 			paidBy?: string;
@@ -257,6 +259,12 @@
 		after: string;
 	}
 	let removal: Removal | undefined = $state();
+	// Where a removed item's Undo stands in the list: its old place.
+	const removedAt = $derived(
+		removal?.from === 'items' && !removal.cleared ? (removal.index ?? -1) : -1
+	);
+	const removedLine =
+		'flex min-h-11 flex-wrap items-center gap-x-3 rounded-xl border border-dashed border-border px-3 text-sm sm:px-4';
 
 	function undoable(from: Removal['from'], id: string, name: string, change: () => void) {
 		const before = {
@@ -267,14 +275,18 @@
 		};
 		change();
 		removal = { from, id, name, before, after: JSON.stringify(bill) };
-		void focusAfter(`undo-${from}`);
+		// The Undo is beside what changed, but on a long list that can be past the screen's edge.
+		void focusAfter(`undo-${from}`, 'nearest');
 	}
 
 	function undoRemoval() {
 		if (!removal) return;
 		// An item brought back opens, so its edit button is there to take focus.
 		if (removal.from === 'items') openItem = removal.id;
-		void focusAfter(removal.from === 'people' ? `rename-${removal.id}` : `edit-${removal.id}`);
+		void focusAfter(
+			removal.from === 'people' ? `rename-${removal.id}` : `edit-${removal.id}`,
+			'nearest'
+		);
 		people = removal.before.people;
 		items = removal.before.items;
 		adjustments = removal.before.adjustments;
@@ -522,9 +534,11 @@
 
 	function removeItem(id: string) {
 		const name = items.find((item) => item.id === id)?.name ?? '';
+		const index = items.findIndex((item) => item.id === id);
 		undoable('items', id, name, () => {
 			items = items.filter((item) => item.id !== id);
 		});
+		if (removal) removal.index = index;
 	}
 
 	function toggleTag(item: BillItem, personId: string) {
@@ -1769,7 +1783,7 @@
 							id="undo-people"
 							type="button"
 							onclick={undoRemoval}
-							class="min-h-11 font-medium underline underline-offset-4 hover:text-accent-text"
+							class="min-h-11 scroll-mt-24 scroll-mb-32 font-medium underline underline-offset-4 hover:text-accent-text"
 							>{SPLIT_BILL.undo}</button
 						>{/if}
 				</p>
@@ -1777,6 +1791,19 @@
 
 			<!-- Items -->
 			<section class={card} aria-labelledby="items-heading">
+				<!-- After a removal or a "Nobody" in this card: what changed, and the way back, shown where
+				     it happened. Scroll margins keep it clear of the bar at the bottom of a phone. -->
+				{#snippet undoItems()}
+					{#if removal?.from === 'items'}{(removal.cleared
+							? SPLIT_BILL.clearedWho
+							: SPLIT_BILL.removed)(removal.name)}<button
+							id="undo-items"
+							type="button"
+							onclick={undoRemoval}
+							class="min-h-11 scroll-mt-24 scroll-mb-32 font-medium underline underline-offset-4 hover:text-accent-text"
+							>{SPLIT_BILL.undo}</button
+						>{/if}
+				{/snippet}
 				<h2 id="items-heading" tabindex="-1" class={cardHeading}>
 					Items {#if items.length}<span class="font-normal text-muted">({items.length})</span>{/if}
 				</h2>
@@ -1785,7 +1812,8 @@
 					<!-- The list keeps the item being tagged still itself (holdStill), so the browser's own
 					     scroll anchoring is off here: the two would move it twice. -->
 					<ul class="mt-5 space-y-3 [overflow-anchor:none]">
-						{#each items as item (item.id)}
+						{#each items as item, position (item.id)}
+							{#if removedAt === position}<li class={removedLine}>{@render undoItems()}</li>{/if}
 							<li
 								id="item-{item.id}"
 								tabindex="-1"
@@ -2072,28 +2100,27 @@
 								{:else}
 									<p class="mt-3 text-sm text-muted">Add people first, then tag who had this.</p>
 								{/if}
+								{#if removal?.from === 'items' && removal.cleared && removal.id === item.id}
+									<p class="mt-2 flex flex-wrap items-center gap-x-3 text-sm">
+										{@render undoItems()}
+									</p>
+								{/if}
 							</li>
 						{/each}
+						{#if removedAt === items.length}<li class={removedLine}>{@render undoItems()}</li>{/if}
 					</ul>
 				{:else}
 					<p class="mt-5 text-sm text-muted">No items yet. Add the items from the bill.</p>
+					{#if removal?.from === 'items'}
+						<p class="mt-3 flex flex-wrap items-center gap-x-3 text-sm">{@render undoItems()}</p>
+					{/if}
 				{/if}
-				<!-- After a removal from this card: what went, and the way back. -->
-				<p
-					class="flex flex-wrap items-center gap-x-3 text-sm {removal?.from === 'items'
-						? 'mt-3 min-h-11'
-						: ''}"
-					role="status"
-				>
+				<!-- What went, for screen readers, from a region that's always there so it's announced; the
+				     Undo itself is where the change happened, which focus moves to. -->
+				<p class="sr-only" role="status">
 					{#if removal?.from === 'items'}{(removal.cleared
 							? SPLIT_BILL.clearedWho
-							: SPLIT_BILL.removed)(removal.name)}<button
-							id="undo-items"
-							type="button"
-							onclick={undoRemoval}
-							class="min-h-11 font-medium underline underline-offset-4 hover:text-accent-text"
-							>{SPLIT_BILL.undo}</button
-						>{/if}
+							: SPLIT_BILL.removed)(removal.name)}{/if}
 				</p>
 				<!-- One more item: the form, while there are none or once asked for; otherwise the button
 				     that opens it, under the list. -->
