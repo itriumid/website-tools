@@ -2374,12 +2374,14 @@
 			<!-- Share and clear -->
 			{#if items.length || people.length}
 				<div>
+					<!-- Each as wide as its words, sharing what's left over; a row too narrow for them all wraps a
+					     whole button, never its label. -->
 					<div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap lg:flex-col">
 						{#if viewing}
 							<button
 								type="button"
 								onclick={copyOpenedLink}
-								class="{primaryButton} sm:flex-[2_1_auto]"
+								class="{primaryButton} whitespace-nowrap sm:grow-[2]"
 								>{SPLIT_BILL.sharedWithYou.copyLink}</button
 							>
 						{:else}
@@ -2387,16 +2389,21 @@
 								type="button"
 								onclick={copyLink}
 								disabled={sharing}
-								class="{primaryButton} sm:flex-[2_1_auto]">Copy a link to this bill</button
+								class="{primaryButton} whitespace-nowrap sm:grow-[2]"
+								>Copy a link to this bill</button
 							>
 						{/if}
 						{#if items.length && people.length}
-							<button type="button" onclick={copyText} class="{secondaryButton} sm:flex-1"
-								>Copy as text</button
+							<button
+								type="button"
+								onclick={copyText}
+								class="{secondaryButton} whitespace-nowrap sm:grow">Copy as text</button
 							>
 							{#if canShare}
-								<button type="button" onclick={shareText} class="{secondaryButton} sm:flex-1"
-									>Share</button
+								<button
+									type="button"
+									onclick={shareText}
+									class="{secondaryButton} whitespace-nowrap sm:grow">Share</button
 								>
 							{/if}
 						{/if}
@@ -2474,12 +2481,14 @@
 		<!-- On a phone the split is far below the tagging: the total and what isn't in anyone's share
 		     stay at the bottom while the bill is made. It's sticky, not fixed, so it takes its own
 		     space at the end of the page and never sits over the last of it. Not while the split is
-		     seen on its own: it's already in view. -->
+		     seen on its own: it's already in view. Edge to edge at
+		     every width (50cqw is half the page's width, from the container on <main>), its contents
+		     in line with the column's. -->
 		{#if items.length && !viewing}
 			<section
 				aria-label="The bill so far"
 				data-running-total
-				class="sticky bottom-0 z-10 -mx-5 border-t border-border bg-surface px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:-mx-8 sm:px-8 lg:hidden"
+				class="sticky bottom-0 z-10 mx-[calc(50%-50cqw)] border-t border-border bg-surface px-[calc(50cqw-50%)] pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:hidden"
 			>
 				<div class="flex items-center justify-between gap-3">
 					{#if unsharedItem && totals.unshared > 0}
