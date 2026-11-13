@@ -12,6 +12,7 @@ import {
 	missingForItem,
 	parseAmount,
 	readBill,
+	DEFAULT_SERVICE_PERCENTAGE,
 	roundingSteps,
 	settleBill,
 	taxOnServiceByDefault,
@@ -1095,5 +1096,17 @@ describe('settling up: who paid, and rounding', () => {
 		expect(billAsText(three({ paidBy: 'a', roundTo: 500 }))).toBe(
 			'Ayu: paid the bill, gets Rp\u00a044.000 back\nBudi: Rp\u00a033.500 to Ayu\nCitra: Rp\u00a010.500 to Ayu\nTotal: Rp\u00a0143.334'
 		);
+	});
+});
+
+describe('service charge', () => {
+	it('starts a new bill without one, until a receipt or the person adds it', () => {
+		expect(DEFAULT_SERVICE_PERCENTAGE).toBe(0);
+	});
+
+	it('reads a shared bill without a service rate the way it was made, at 5%', () => {
+		const old = { people: [], items: [], taxPercentage: 10, currencyCode: 'IDR' };
+		expect(readBill(old)?.servicePercentage).toBe(5);
+		expect(readBill({ ...old, servicePercentage: 0 })?.servicePercentage).toBe(0);
 	});
 });

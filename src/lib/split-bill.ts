@@ -81,7 +81,16 @@ export interface BillState {
 }
 
 export const DEFAULT_TAX_PERCENTAGE = 10;
-export const DEFAULT_SERVICE_PERCENTAGE = 5;
+/**
+ * A new bill has no service charge until a receipt or the person says so: 5% added unasked came to
+ * real money nobody had chosen on a large bill. Service shows on the receipt when it's there.
+ */
+export const DEFAULT_SERVICE_PERCENTAGE = 0;
+/**
+ * What a shared bill without a service rate meant when it was made: 5%, the default then. Links
+ * like that keep reading the way they did.
+ */
+const SERVICE_PERCENTAGE_OF_OLD_LINKS = 5;
 export const DEFAULT_CURRENCY_CODE = 'IDR';
 
 /**
@@ -206,7 +215,7 @@ export function readBill(value: unknown): BillState | undefined {
 		taxPercentage: isPercentage(value.taxPercentage) ? value.taxPercentage : DEFAULT_TAX_PERCENTAGE,
 		servicePercentage: isPercentage(value.servicePercentage)
 			? value.servicePercentage
-			: DEFAULT_SERVICE_PERCENTAGE,
+			: SERVICE_PERCENTAGE_OF_OLD_LINKS,
 		currencyCode:
 			typeof value.currencyCode === 'string' && value.currencyCode
 				? value.currencyCode
