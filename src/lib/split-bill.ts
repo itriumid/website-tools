@@ -889,7 +889,11 @@ export function billAsText(state: BillState, link?: string): string {
 		);
 		return items.length ? [line, `  ${items.join(', ')}`] : [line];
 	});
-	if (totals.unshared > 0) lines.push(`${SPLIT_BILL.text.unshared}: ${money(totals.unshared)}`);
+	// Untagged money is whoever paid's to cover for now: the chat should know who's covering it.
+	if (totals.unshared > 0) {
+		const label = payer ? SPLIT_BILL.split.unsharedOnPayer(payer.name) : SPLIT_BILL.text.unshared;
+		lines.push(`${label}: ${money(totals.unshared)}`);
+	}
 	lines.push(`${SPLIT_BILL.text.total}: ${money(totals.grandTotal)}`);
 	if (link) lines.push(link);
 	return lines.join('\n');

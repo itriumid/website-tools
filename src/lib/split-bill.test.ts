@@ -1170,6 +1170,14 @@ describe('settling up: who paid, and rounding', () => {
 		expect(readBill({ ...state, roundTo: 1e12 })?.roundTo).toBeUndefined();
 	});
 
+	it("says who covers what's in nobody's share, when someone paid", () => {
+		const untagged = three({ paidBy: 'a' });
+		untagged.items[2].assignedPersonIds = [];
+		expect(billAsText(untagged).split('\n')).toContain(
+			"Not in anyone's share, on Ayu for now: Rp\u00a010.001"
+		);
+	});
+
 	it('says who to pay in the text, when someone paid', () => {
 		expect(billAsText(three({ paidBy: 'a', roundTo: 500 }))).toBe(
 			'Ayu: paid the bill, gets Rp\u00a044.000 back\n  Ikan\nBudi: Rp\u00a033.500 to Ayu\n  Sate\nCitra: Rp\u00a010.500 to Ayu\n  Teh\nTotal: Rp\u00a0143.334'
