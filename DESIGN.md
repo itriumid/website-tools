@@ -497,7 +497,8 @@ on top, the total in semibold, and what isn't in anyone's share yet (semibold wh
 muted when it is), with a small "See the split" button. While something is in nobody's share, the
 two lines are one button, with the drawn arrow after the amount: it goes to the first item that
 amount comes from, the way through a long list of items on a big table. Sticky, not fixed, so it never hides the
-end of the page. Hidden from 1024 px, where the split has its own column.
+end of the page. While the split itself is on screen it steps aside (invisible, keeping its space), since it has
+nothing to add there. Hidden from 1024 px, where the split has its own column.
 
 ### The split (signature)
 
@@ -506,10 +507,12 @@ with a muted line under it ("To Budi", or what they ordered), and the amount in 
 figures, right-aligned. Whoever paid hands nothing over, so their big number is what comes back to
 them, labelled "comes back" beside it (on the same line, so choosing who paid never makes the row
 taller), with "Paid the bill" in the muted line under their name. Every row keeps that muted line,
-even empty, and every note in it is short, so choosing who paid never changes a row's height.
+even empty, and every note in it is short, so choosing who paid never changes a row's height. What comes back to whoever paid is set apart from the debts: a plus, a size smaller and
+muted ("+Rp 437.000").
 Someone with nothing tagged gets "Nothing tagged yet" and a muted Rp 0, never "To Budi": the split
 doesn't tell anyone to pay nothing. The "Not in anyone's share" note is gray until anything is
-tagged, and pink once tagging has begun and something is still left out: a state isn't an error
+tagged, and pink once tagging has begun and something is still left out, and it names the items, up
+to three and then how many more: a state isn't an error
 before anyone has started. The two lines under the rounding choice are kept even when empty, so
 picking a step never shifts what's below it. Then two radio groups, "Who paid?" and "Round shares
 up" (to two steps people actually hand over, Rp 500 and Rp 1.000 for rupiah), with a muted line
@@ -553,7 +556,8 @@ Citra.", with an underlined "Undo" beside it at touch-target height. It stays un
 changes some other way. There's no countdown and no confirmation dialog: one tap took it, one
 tap brings it back. The split repeats the line, with its Undo, under its heading, since a removal
 changes it and on a wide screen it's in the other column; only the card's own line is a live
-region, so it's announced once. Removing someone who had items alone says what's no longer in
+region, so it's announced once. The split's copy is only for 1024px and up, where the split has a column of
+its own; below that the card's line is right above it. Removing someone who had items alone says what's no longer in
 anyone's share, as an amount: money leaving the split is the one thing that line must not hide.
 
 ### Where focus goes
@@ -571,12 +575,13 @@ buttons, under a hairline, as a quiet underlined button.
 With no items, the Items card is the form. Once there are items, they come first, and the form
 waits under them behind "Add an item by hand": after a receipt is read, the items are what's next,
 not an empty form above them. Items typed in by hand keep the form open under the list, with focus back in its Item field
-for the next.
+for the next. With a quantity over one, the price asked for is for one, and the line under it says
+what the line comes to ("= 4 × Rp 32.000 = Rp 128.000"), so a line total typed as "each" shows.
 
 ### Folded items
 
 An item that's someone's folds to one line once the person moves on to another: its name, "·",
-who had it in muted text (with counts when it was counted), and its price on the right; a tap
+who had it in muted text (with counts when it was counted), "Everyone" when it's the whole table, and its price on the right; a tap
 opens it again, with focus on its first name, and screen readers hear "Change who had Nasi
 Goreng". The item last touched stays open, so tagging a second person on it doesn't fold it under
 the finger, and when items above fold or open, the one being worked on stays where it was on
