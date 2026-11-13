@@ -115,7 +115,7 @@ export const SPLIT_BILL = {
 	description:
 		'Split a bill fairly: add the people and the items, tag who had what, add tax and service, and share the result as a short link. Shared bills are encrypted, and only people with the link can open them.',
 	introduction:
-		'Add the people and the items, tag each item to the people who had it, and we work out a fair share for each person, tax and service included.',
+		'Tag who had what, and we work out a fair share for each person, tax and service included.',
 	/** On the index, a glimpse of what the tool makes: each person's share. */
 	sample: [
 		{ label: 'Ayu', value: 'Rp 86.500' },

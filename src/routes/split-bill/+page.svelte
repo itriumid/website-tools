@@ -1307,11 +1307,14 @@
 				/>
 
 				{#if !scanning}
+					<!-- Until there's something on the bill, reading a receipt is the way to start: the pink
+					     button. After that it's one way among others to add, and steps back. -->
 					<button
 						id="scan-open"
 						type="button"
 						onclick={startScan}
-						class="{secondaryButton} mt-4 w-full">{SPLIT_BILL.scanning.open}</button
+						class="{items.length ? secondaryButton : primaryButton} mt-4 w-full"
+						>{SPLIT_BILL.scanning.open}</button
 					>
 				{:else if !scanned}
 					<form
