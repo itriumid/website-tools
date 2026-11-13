@@ -24,14 +24,12 @@
 	// A bill this visitor was in the middle of: the draft in this tab, or else the bills this
 	// device shared. Read from what the browser already keeps, after the page loads: nothing new is
 	// kept, and nothing is sent anywhere. The page is the same for everyone until then.
-	let inProgress: { text: string; action: string; href: string } | undefined = $state();
+	// A draft is just said: the Split bill card right under it already opens it, and a second way
+	// to the same place was noise. A shared bill gets its own way in, since it opens that bill.
+	let inProgress: { text: string; action?: string; href?: string } | undefined = $state();
 	onMount(() => {
 		if (loadDraft()) {
-			inProgress = {
-				text: IN_PROGRESS.draft,
-				action: IN_PROGRESS.carryOn,
-				href: resolve('/split-bill')
-			};
+			inProgress = { text: IN_PROGRESS.draft };
 			return;
 		}
 		const shared = sharedFromHere();
@@ -79,9 +77,9 @@
 		{#if inProgress}
 			<p class="flex flex-wrap items-center gap-x-3">
 				{inProgress.text}
-				<a href={inProgress.href} class="group {actionLine}"
-					>{inProgress.action}<Arrow class={arrowMove} /></a
-				>
+				{#if inProgress.href}<a href={inProgress.href} class="group {actionLine}"
+						>{inProgress.action}<Arrow class={arrowMove} /></a
+					>{/if}
 			</p>
 		{/if}
 	</div>
@@ -130,11 +128,11 @@
 						<h3 class="text-xl font-semibold">{app.name}</h3>
 						<p class="mt-2 max-w-2xl text-muted">{app.summary}</p>
 					</div>
-					<span class="mt-5 shrink-0 {actionLine} {ELSEWHERE.length === 1 ? 'sm:mt-0' : ''}"
-						><span aria-hidden="true">{app.label}</span><span class="sr-only"
-							>{app.label} at {new URL(app.url).host}</span
-						><Arrow class={arrowMove} /></span
-					>
+					<!-- Where it goes, shown: a site of its own, so the address is under the action. -->
+					<span class="mt-5 block shrink-0 {ELSEWHERE.length === 1 ? 'sm:mt-0' : ''}">
+						<span class={actionLine}>{app.label}<Arrow class={arrowMove} /></span>
+						<span class="block text-sm text-muted">{new URL(app.url).host}</span>
+					</span>
 				</a>
 			</li>
 		{/each}
