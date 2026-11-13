@@ -397,6 +397,9 @@ The people on a bill, tapped to say who had what.
 - **Counting:** when people had different numbers of an item, a counted chip looks like a
   selected one (pink, with the check mark) and holds round buttons with a drawn minus and plus
   (2rem, or 2.75rem on touch screens) around a tabular count.
+- **Everyone:** an underlined text button on the line of the question, "Who had this?", at its
+  right end, never in the row of names: at six people it took a row of its own under them on
+  most items.
 
 ### Fields
 
@@ -474,7 +477,9 @@ it over as a PNG made on the device. Nothing is sent anywhere to make either.
 
 Split bill's bar at the bottom of a phone screen while items exist: the surface color, a hairline
 on top, the total in semibold, and what isn't in anyone's share yet (semibold when it isn't zero,
-muted when it is), with a small "See the split" button. Sticky, not fixed, so it never hides the
+muted when it is), with a small "See the split" button. While something is in nobody's share, the
+two lines are one button, with the drawn arrow after the amount: it goes to the first item that
+amount comes from, the way through a long list of items on a big table. Sticky, not fixed, so it never hides the
 end of the page. Hidden from 1024 px, where the split has its own column.
 
 ### The split (signature)
@@ -536,8 +541,8 @@ item brought back.
 
 With no items, the Items card is the form. Once there are items, they come first, and the form
 waits under them behind "Add an item by hand": after a receipt is read, the items are what's next,
-not an empty form above them. Items typed in by hand keep the form open under the list, for the
-next.
+not an empty form above them. Items typed in by hand keep the form open under the list, with focus back in its Item field
+for the next.
 
 ### Links that can't open
 

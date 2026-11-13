@@ -8,10 +8,12 @@ import {
 	changeItem,
 	decimalPlaces,
 	formatAmount,
+	firstUnsharedItem,
 	formatMoney,
 	missingForItem,
 	parseAmount,
 	readBill,
+	DEFAULT_SERVICE_PERCENTAGE,
 	roundingSteps,
 	settleBill,
 	taxOnServiceByDefault,
@@ -452,6 +454,22 @@ describe('parseAmount', () => {
 		expect(read('45.5')).toEqual(amount(455));
 	});
 
+	it('reads thousands and millions written short, as menus and people write them', () => {
+		expect(read('45rb')).toEqual(amount(45000));
+		expect(read('45 rb')).toEqual(amount(45000));
+		expect(read('45 ribu')).toEqual(amount(45000));
+		expect(read('45K')).toEqual(amount(45000));
+		expect(read('Rp 45rb')).toEqual(amount(45000));
+		expect(read('45,5rb')).toEqual(amount(45500));
+		expect(read('1.250rb')).toEqual(amount(1250000));
+		expect(read('1,5jt')).toEqual(amount(1500000));
+		expect(read('1.5 juta')).toEqual(amount(1500000));
+		expect(read('4.5k', 'USD')).toEqual(amount(4500));
+		expect(read('-45rb')).toEqual({ problem: 'negative' });
+		expect(read('rb')).toEqual({ problem: 'unreadable' });
+		expect(read('45kg')).toEqual({ problem: 'unreadable' });
+	});
+
 	it('drops rupiah cents that are all zeros, as banking apps show them', () => {
 		expect(read('45.000,00')).toEqual(amount(45000));
 		expect(read('45,000.00')).toEqual(amount(45000));
@@ -525,7 +543,7 @@ describe('parseAmount', () => {
 
 	it("says when it can't read the amount at all", () => {
 		expect(read('abc')).toEqual({ problem: 'unreadable' });
-		expect(read('45rb')).toEqual({ problem: 'unreadable' });
+		expect(read('45 porsi')).toEqual({ problem: 'unreadable' });
 		expect(read('12.50 USD', 'EUR')).toEqual({ problem: 'unreadable' });
 		expect(read('.')).toEqual({ problem: 'unreadable' });
 		expect(read('-')).toEqual({ problem: 'unreadable' });
@@ -1095,5 +1113,68 @@ describe('settling up: who paid, and rounding', () => {
 		expect(billAsText(three({ paidBy: 'a', roundTo: 500 }))).toBe(
 			'Ayu: paid the bill, gets Rp\u00a044.000 back\nBudi: Rp\u00a033.500 to Ayu\nCitra: Rp\u00a010.500 to Ayu\nTotal: Rp\u00a0143.334'
 		);
+	});
+});
+
+describe('service charge', () => {
+	it('starts a new bill without one, until a receipt or the person adds it', () => {
+		expect(DEFAULT_SERVICE_PERCENTAGE).toBe(0);
+	});
+
+	it('reads a shared bill without a service rate the way it was made, at 5%', () => {
+		const old = { people: [], items: [], taxPercentage: 10, currencyCode: 'IDR' };
+		expect(readBill(old)?.servicePercentage).toBe(5);
+		expect(readBill({ ...old, servicePercentage: 0 })?.servicePercentage).toBe(0);
+	});
+});
+
+describe('firstUnsharedItem', () => {
+	const people = [
+		{ id: 'a', name: 'Ayu' },
+		{ id: 'b', name: 'Budi' }
+	];
+	const bill = (items: BillItem[]): BillState => ({
+		people,
+		items,
+		taxPercentage: 0,
+		servicePercentage: 0,
+		currencyCode: 'IDR'
+	});
+
+	it('finds the first item nobody is tagged to', () => {
+		expect(
+			firstUnsharedItem(
+				bill([
+					{ id: '1', name: 'Nasi', price: 10, assignedPersonIds: ['a'] },
+					{ id: '2', name: 'Teh', price: 5, assignedPersonIds: [] },
+					{ id: '3', name: 'Kopi', price: 5, assignedPersonIds: [] }
+				])
+			)
+		).toBe('2');
+	});
+
+	it('counts someone who was removed as nobody', () => {
+		expect(
+			firstUnsharedItem(bill([{ id: '1', name: 'Nasi', price: 10, assignedPersonIds: ['gone'] }]))
+		).toBe('1');
+	});
+
+	it('finds a counted item with fewer counted than there were', () => {
+		const counted: BillItem = {
+			id: '1',
+			name: 'Teh',
+			price: 30,
+			quantity: 3,
+			assignedPersonIds: ['a', 'b'],
+			counts: { a: 1, b: 1 }
+		};
+		expect(firstUnsharedItem(bill([counted]))).toBe('1');
+		expect(firstUnsharedItem(bill([{ ...counted, counts: { a: 2, b: 1 } }]))).toBeUndefined();
+	});
+
+	it("has nothing to find when every item is someone's", () => {
+		expect(
+			firstUnsharedItem(bill([{ id: '1', name: 'Nasi', price: 10, assignedPersonIds: ['a', 'b'] }]))
+		).toBeUndefined();
 	});
 });

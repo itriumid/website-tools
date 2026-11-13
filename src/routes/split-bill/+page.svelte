@@ -27,6 +27,7 @@
 		changeItem,
 		decimalPlaces,
 		formatAmount,
+		firstUnsharedItem,
 		formatMoney,
 		missingForItem,
 		parseAmount,
@@ -329,8 +330,10 @@
 		newItem = '';
 		newPriceText = '';
 		newQuantity = 1;
-		// Someone typing the items in has more to come: the form stays open under them.
+		// Someone typing the items in has more to come: the form stays open under them, ready for
+		// the next one's name.
 		addingByHand = true;
+		void focusAfter('item');
 	}
 
 	const nameWithQuantity = (item: BillItem) =>
@@ -583,7 +586,8 @@
 		reviewLines = scanned.items.map((item) => ({
 			id: newId(),
 			name: item.name,
-			priceText: item.price === undefined ? '' : String(item.price),
+			// Grouped the way the receipt printed it ("45.000"); the field reads it back the same.
+			priceText: item.price === undefined ? '' : formatAmount(item.price, currencyCode),
 			quantity: item.quantity,
 			unsure: item.unsure
 		}));
@@ -934,6 +938,13 @@
 				status = { kind: 'share-failed' };
 			}
 		}
+	}
+
+	// The running total's "Not in anyone's share yet" takes someone to where it comes from: on a big
+	// table that's somewhere in a long list of items.
+	const unsharedItem = $derived(firstUnsharedItem(bill));
+	function showUnshared() {
+		if (unsharedItem) void focusAfter(`item-${unsharedItem}`, true);
 	}
 
 	function showSplit() {
@@ -1538,7 +1549,11 @@
 				{#if items.length}
 					<ul class="mt-5 space-y-3">
 						{#each items as item (item.id)}
-							<li class="rounded-xl border border-border bg-bg p-4">
+							<li
+								id="item-{item.id}"
+								tabindex="-1"
+								class="rounded-xl border border-border bg-bg p-4"
+							>
 								{#if editing?.id === item.id}
 									<form
 										class="grid grid-cols-[6rem_1fr] gap-3"
@@ -1625,7 +1640,7 @@
 											<p class="font-medium break-words">{nameWithQuantity(item)}</p>
 											<p class="text-sm text-muted">
 												{money(item.price)}{(item.quantity ?? 1) > 1
-													? ` · ${money(item.price / (item.quantity ?? 1))} each`
+													? ` ·\u00a0${money(item.price / (item.quantity ?? 1))} each`
 													: ''}
 											</p>
 										</div>
@@ -1735,7 +1750,21 @@
 									</fieldset>
 								{:else if people.length}
 									<fieldset class="mt-3">
-										<legend class="mb-2 text-sm text-muted">Who had this?</legend>
+										<legend class="sr-only">Who had this?</legend>
+										<!-- "Everyone" sits on the question's line, not in the row of names: at six people
+										     it took a row of its own under them on most items. -->
+										<div
+											class="mb-1 flex min-h-9 items-center justify-between gap-3 pointer-coarse:min-h-11"
+										>
+											<span class="text-sm text-muted" aria-hidden="true">Who had this?</span>
+											<button
+												type="button"
+												onclick={() => toggleEveryone(item)}
+												class="min-h-9 shrink-0 text-sm text-muted underline underline-offset-4 hover:text-text pointer-coarse:min-h-11"
+											>
+												{everyoneHasIt(item) ? 'Nobody' : 'Everyone'}
+											</button>
+										</div>
 										<div class="flex flex-wrap gap-2">
 											{#each people as person (person.id)}
 												{@const had = item.assignedPersonIds.includes(person.id)}
@@ -1750,13 +1779,6 @@
 													{#if had}<Check class="mr-1 align-[-0.125em]" />{/if}{person.name}
 												</button>
 											{/each}
-											<button
-												type="button"
-												onclick={() => toggleEveryone(item)}
-												class="min-h-9 rounded-full px-3 text-sm text-muted underline underline-offset-4 hover:text-text pointer-coarse:min-h-11"
-											>
-												{everyoneHasIt(item) ? 'Nobody' : 'Everyone'}
-											</button>
 										</div>
 										{#if (item.quantity ?? 1) > 1}
 											<div class="mt-1 flex flex-wrap items-center gap-x-1">
@@ -2353,12 +2375,14 @@
 			<!-- Share and clear -->
 			{#if items.length || people.length}
 				<div>
+					<!-- Each as wide as its words, sharing what's left over; a row too narrow for them all wraps a
+					     whole button, never its label. -->
 					<div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap lg:flex-col">
 						{#if viewing}
 							<button
 								type="button"
 								onclick={copyOpenedLink}
-								class="{primaryButton} sm:flex-[2_1_auto]"
+								class="{primaryButton} whitespace-nowrap sm:grow-[2]"
 								>{SPLIT_BILL.sharedWithYou.copyLink}</button
 							>
 						{:else}
@@ -2366,16 +2390,21 @@
 								type="button"
 								onclick={copyLink}
 								disabled={sharing}
-								class="{primaryButton} sm:flex-[2_1_auto]">Copy a link to this bill</button
+								class="{primaryButton} whitespace-nowrap sm:grow-[2]"
+								>Copy a link to this bill</button
 							>
 						{/if}
 						{#if items.length && people.length}
-							<button type="button" onclick={copyText} class="{secondaryButton} sm:flex-1"
-								>Copy as text</button
+							<button
+								type="button"
+								onclick={copyText}
+								class="{secondaryButton} whitespace-nowrap sm:grow">Copy as text</button
 							>
 							{#if canShare}
-								<button type="button" onclick={shareText} class="{secondaryButton} sm:flex-1"
-									>Share</button
+								<button
+									type="button"
+									onclick={shareText}
+									class="{secondaryButton} whitespace-nowrap sm:grow">Share</button
 								>
 							{/if}
 						{/if}
@@ -2453,24 +2482,48 @@
 		<!-- On a phone the split is far below the tagging: the total and what isn't in anyone's share
 		     stay at the bottom while the bill is made. It's sticky, not fixed, so it takes its own
 		     space at the end of the page and never sits over the last of it. Not while the split is
-		     seen on its own: it's already in view. -->
+		     seen on its own: it's already in view. Edge to edge at
+		     every width (50cqw is half the page's width, from the container on <main>), its contents
+		     in line with the column's. -->
 		{#if items.length && !viewing}
 			<section
 				aria-label="The bill so far"
 				data-running-total
-				class="sticky bottom-0 z-10 -mx-5 border-t border-border bg-surface px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:-mx-8 sm:px-8 lg:hidden"
+				class="sticky bottom-0 z-10 mx-[calc(50%-50cqw)] border-t border-border bg-surface px-[calc(50cqw-50%)] pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:hidden"
 			>
 				<div class="flex items-center justify-between gap-3">
-					<dl class="min-w-0 text-sm">
-						<div class="flex flex-wrap gap-x-1.5">
-							<dt>Total</dt>
-							<dd class="font-semibold">{money(totals.grandTotal)}</dd>
-						</div>
-						<div class="flex flex-wrap gap-x-1.5 {totals.unshared > 0 ? '' : 'text-muted'}">
-							<dt>Not in anyone's share yet</dt>
-							<dd class={totals.unshared > 0 ? 'font-semibold' : ''}>{money(totals.unshared)}</dd>
-						</div>
-					</dl>
+					{#if unsharedItem && totals.unshared > 0}
+						<!-- With something in nobody's share, the two lines are a way to it: a press goes to the
+						     first item it comes from. -->
+						<button
+							type="button"
+							onclick={showUnshared}
+							class="-m-1 min-w-0 rounded-lg p-1 text-left text-sm hover:bg-bg"
+						>
+							<span class="flex flex-wrap gap-x-1.5">
+								<span>Total</span>
+								<span class="font-semibold">{money(totals.grandTotal)}</span>
+							</span>
+							<span class="flex flex-wrap items-center gap-x-1.5">
+								<span>Not in anyone's share yet</span>
+								<span class="inline-flex items-center gap-1 font-semibold"
+									>{money(totals.unshared)}<Arrow /></span
+								>
+							</span>
+							<span class="sr-only">{SPLIT_BILL.goToUnshared}</span>
+						</button>
+					{:else}
+						<dl class="min-w-0 text-sm">
+							<div class="flex flex-wrap gap-x-1.5">
+								<dt>Total</dt>
+								<dd class="font-semibold">{money(totals.grandTotal)}</dd>
+							</div>
+							<div class="flex flex-wrap gap-x-1.5 {totals.unshared > 0 ? '' : 'text-muted'}">
+								<dt>Not in anyone's share yet</dt>
+								<dd class={totals.unshared > 0 ? 'font-semibold' : ''}>{money(totals.unshared)}</dd>
+							</div>
+						</dl>
+					{/if}
 					<button
 						type="button"
 						onclick={showSplit}

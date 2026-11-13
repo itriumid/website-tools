@@ -62,7 +62,9 @@
 	</nav>
 </header>
 
-<main id="main">
+<!-- A size container, so a page can reach the screen's edges from inside its column (cqw), which
+     100vw can't do without a desktop scrollbar's width of overflow. -->
+<main id="main" class="@container">
 	{@render children()}
 </main>
 

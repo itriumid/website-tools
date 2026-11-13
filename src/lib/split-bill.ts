@@ -81,7 +81,16 @@ export interface BillState {
 }
 
 export const DEFAULT_TAX_PERCENTAGE = 10;
-export const DEFAULT_SERVICE_PERCENTAGE = 5;
+/**
+ * A new bill has no service charge until a receipt or the person says so: 5% added unasked came to
+ * real money nobody had chosen on a large bill. Service shows on the receipt when it's there.
+ */
+export const DEFAULT_SERVICE_PERCENTAGE = 0;
+/**
+ * What a shared bill without a service rate meant when it was made: 5%, the default then. Links
+ * like that keep reading the way they did.
+ */
+const SERVICE_PERCENTAGE_OF_OLD_LINKS = 5;
 export const DEFAULT_CURRENCY_CODE = 'IDR';
 
 /**
@@ -206,7 +215,7 @@ export function readBill(value: unknown): BillState | undefined {
 		taxPercentage: isPercentage(value.taxPercentage) ? value.taxPercentage : DEFAULT_TAX_PERCENTAGE,
 		servicePercentage: isPercentage(value.servicePercentage)
 			? value.servicePercentage
-			: DEFAULT_SERVICE_PERCENTAGE,
+			: SERVICE_PERCENTAGE_OF_OLD_LINKS,
 		currencyCode:
 			typeof value.currencyCode === 'string' && value.currencyCode
 				? value.currencyCode
@@ -413,6 +422,9 @@ export type AmountProblem = 'unreadable' | 'negative' | 'no-cents';
  *   ("45.000,00", as banking apps show it), which are dropped; any other cents are a problem.
  * - Spaces and apostrophes group too ("45 000", "1'234.50"), and the currency's symbol or code
  *   may come first or last ("Rp 45.000"). A minus sign makes it negative, which is a problem.
+ * - Thousands and millions may be written short, as menus and people do: "45rb", "45 ribu" and
+ *   "45k" are 45000, "1,5jt" and "1.5 juta" 1500000. Before one of these, a dot or comma followed
+ *   by three digits groups ("1.250rb") and any other is the decimal mark ("45,5rb" is 45500).
  * - Arabic, Persian and full-width digits read as 0 to 9, and the Arabic decimal and thousands
  *   marks as a dot and a comma: "٤٥٫٥٠" is 45.50.
  */
@@ -430,6 +442,8 @@ export function parseAmount(
 		else if (lower.endsWith(mark)) token = token.slice(0, -mark.length);
 	}
 	if (!token) return undefined;
+	const short = /^(.*\d)(rb|ribu|k|jt|juta)$/i.exec(token);
+	if (short) return readShort(short[1], short[2].toLowerCase(), currencyCode);
 	const negative = /^[-−]/.test(token);
 	if (negative) token = token.slice(1);
 	if (!/^[\d.,]*\d[\d.,]*$/.test(token)) return { problem: 'unreadable' };
@@ -458,6 +472,24 @@ export function parseAmount(
 	}
 	whole = whole.replace(/[.,]/g, '');
 	const amount = Number(`${whole || '0'}.${fraction || '0'}`);
+	return Number.isFinite(amount) ? { amount } : { problem: 'unreadable' };
+}
+
+/** "45,5" before "rb", "k", "jt" or "juta": an amount in thousands or millions. */
+function readShort(
+	number: string,
+	unit: string,
+	currencyCode: string
+): { amount: number } | { problem: AmountProblem } {
+	if (/^[-−]/.test(number)) return { problem: 'negative' };
+	if (!/^[\d.,]*\d$/.test(number)) return { problem: 'unreadable' };
+	const scale = unit === 'jt' || unit === 'juta' ? 1e6 : 1e3;
+	const last = Math.max(number.lastIndexOf('.'), number.lastIndexOf(','));
+	const decimal = last >= 0 && number.length - last - 1 !== 3;
+	const whole = (decimal ? number.slice(0, last) : number).replace(/[.,]/g, '');
+	const fraction = decimal ? number.slice(last + 1) : '0';
+	const coins = 10 ** decimalPlaces(currencyCode);
+	const amount = Math.round(Number(`${whole || '0'}.${fraction}`) * scale * coins) / coins;
 	return Number.isFinite(amount) ? { amount } : { problem: 'unreadable' };
 }
 
@@ -634,6 +666,24 @@ export function calculateBill(state: BillState): BillTotals {
 			total: rounded[index] / coins
 		}))
 	};
+}
+
+/**
+ * The first item with some of it in nobody's share: nobody tagged to it, or, when it's counted,
+ * fewer counted than there were. The way `calculateBill` leaves an item out, so a jump to it
+ * lands on what makes "Not in anyone's share" more than nothing.
+ */
+export function firstUnsharedItem(state: BillState): string | undefined {
+	const people = new Set(state.people.map((person) => person.id));
+	return state.items.find((item) => {
+		if (item.counts && (item.quantity ?? 1) > 1) {
+			const counted = Object.entries(item.counts)
+				.filter(([id, count]) => people.has(id) && count > 0)
+				.reduce((sum, [, count]) => sum + count, 0);
+			return counted < (item.quantity ?? 1);
+		}
+		return !item.assignedPersonIds.some((id) => people.has(id));
+	})?.id;
 }
 
 /* ─── Settling up ─── */
