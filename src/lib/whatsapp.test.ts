@@ -266,3 +266,9 @@ describe('waitsForTyping', () => {
 		}
 	});
 });
+
+describe('countries', () => {
+	it('names every country in full, so it can be found by any word of its name', () => {
+		expect(countriesWithCode('971')).toEqual(['United Arab Emirates']);
+	});
+});
