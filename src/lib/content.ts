@@ -54,8 +54,7 @@ export const WHATSAPP = {
 		'Paste a number as it is and get a link that opens a WhatsApp chat with it, and a QR code to print.',
 	description:
 		'Make a WhatsApp click-to-chat link from any phone number, with a message already typed if you like. Spaces and symbols are removed for you.',
-	introduction:
-		'Enter a phone number and we build the link that opens a chat with it. Spaces, dashes and brackets are taken out, so you can paste a number as it is.',
+	introduction: 'Paste a phone number as it is, and get a link that opens a chat with it.',
 	/** On the index, a glimpse of what the tool makes. */
 	sample: [{ value: 'wa.me/6281200000000' }] as Sample,
 	sampleCaption: 'The link it makes',
