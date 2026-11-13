@@ -2340,12 +2340,13 @@
 								{@const parts = had.get(settlement.personId) ?? []}
 								{@const charges = share.total - share.base}
 								{@const roundedUp = settlement.paidTheBill ? 0 : settlement.amount - share.total}
+								{@const opens = parts.length > 0 || settlement.paidTheBill}
 								{#snippet row()}
 									<!-- The arrow follows the name rather than coming before it: an indent would take the width the
 									     muted line under it needs ("Paid the bill", beside "comes back" and the amount). -->
 									<span class="min-w-0">
 										<span class="block font-medium break-words"
-											>{nameOf(settlement.personId)}{#if parts.length}<Arrow
+											>{nameOf(settlement.personId)}{#if opens}<Arrow
 													class="ml-1.5 align-[-0.125em] text-muted group-open/share:rotate-90 motion-safe:transition-transform"
 												/>{/if}</span
 										>
@@ -2379,9 +2380,9 @@
 								{/snippet}
 								<li>
 									<!-- A row opens to what's in that share: tapping a name answers "why that much?", for
-									     a friend opening the link above all. Someone with nothing tagged has nothing to
-									     open, so theirs is a plain row. -->
-									{#if parts.length}
+									     a friend opening the link above all. Whoever paid always has something to show
+									     (what comes back, what they cover); anyone else with nothing tagged has a plain row. -->
+									{#if opens}
 										<details class="group/share">
 											<summary
 												class="flex cursor-pointer list-none items-center justify-between gap-4 py-3 [&::-webkit-details-marker]:hidden"
