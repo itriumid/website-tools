@@ -80,7 +80,7 @@
 		if (!modules || !target) return;
 		const scale = 24;
 		const width = drawnSize(modules) * scale;
-		const labelHeight = 168;
+		const labelHeight = 176;
 		const canvas = document.createElement('canvas');
 		canvas.width = width;
 		canvas.height = width + labelHeight;
@@ -96,9 +96,11 @@
 		context.fillStyle = '#2b2b2b';
 		context.textAlign = 'center';
 		context.font = `600 40px "${font}", sans-serif`;
-		context.fillText(WHATSAPP.qr.printLabel, width / 2, width + 16);
+		// Both lines below the code's white margin (the image's top `width` pixels), which scanners
+		// need clear: the first line's capitals start about 10px under it.
+		context.fillText(WHATSAPP.qr.printLabel, width / 2, width + 40);
 		context.font = `700 60px "${font}", sans-serif`;
-		context.fillText(target.display, width / 2, width + 96, width - 2 * scale);
+		context.fillText(target.display, width / 2, width + 120, width - 2 * scale);
 		// The path is in modules; each module is `scale` pixels.
 		context.scale(scale, scale);
 		context.fill(new Path2D(qrPath(modules)));
