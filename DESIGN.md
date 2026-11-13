@@ -417,7 +417,8 @@ The people on a bill, tapped to say who had what.
 
 A field that opens a floating list: 0.5rem radius, control-edge border, the surface color, 0.25rem
 inset, and the floating-list shadow. The active option fills with the page color. It's capped at
-16rem tall and scrolls.
+16rem tall and scrolls. What's typed matches anywhere in a choice, and choices with a word starting
+with it come first: "mal" lists Malaysia before Guatemala (`src/lib/search.ts`).
 
 ### Cards
 

@@ -11,6 +11,7 @@
 
 <script lang="ts">
 	import Check from '#lib/Check.svelte';
+	import { matchChoices } from '#lib/search.js';
 	import { field } from '#lib/styles.js';
 
 	interface Props {
@@ -35,13 +36,7 @@
 	let typed = $state(false);
 	let active = $state(-1);
 
-	const shown = $derived.by(() => {
-		const query = text.trim().toLowerCase();
-		if (!typed || !query) return choices;
-		return choices.filter((choice) =>
-			`${choice.label} ${choice.searchTerms}`.toLowerCase().includes(query)
-		);
-	});
+	const shown = $derived(typed ? matchChoices(choices, text) : choices);
 
 	function openList(select?: HTMLInputElement) {
 		open = true;
