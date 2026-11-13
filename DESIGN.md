@@ -511,8 +511,9 @@ comes last, in an inset list: it's how the answer was reached, not the answer. E
 tagged opens, tapping anywhere on it, to what's in that share, in an inset: the items with the
 person's part of each ("Es Teh, ½", "Jus, 3 of 4") and what they come to, then "Charges and
 adjustments" and, when rounding added to it, "Rounded up", adding up to the big number. For whoever paid, the row shows the subtraction: "Rounding from the others" as a minus, "Not in
-anyone's share, on Budi for now" while something is untagged, and "Budi pays in the end", which is
-the total less what comes back. The drawn arrow follows the name, turning down when open; an indent before the
+anyone's share, on Budi for now" while something is untagged, and "Budi pays in the end", with a muted line under it
+that joins it to the row's "comes back" ("That's the Rp 427.900 Budi paid, less the Rp 300.000 that
+comes back."). The drawn arrow follows the name, turning down when open; an indent before the
 name would take the width the muted line under it needs. A shared link opens
 with the split's heading focused, scrolled to on a phone.
 

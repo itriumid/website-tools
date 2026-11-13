@@ -2359,6 +2359,15 @@
 															<dd class="shrink-0">{money(settlement.amount + totals.unshared)}</dd>
 														</div>
 													</dl>
+													<!-- The same amount the other way, joining it to the row's "comes back": what they
+													     paid at the table, less what everyone else hands them. -->
+													<p class="mt-1 text-muted">
+														{SPLIT_BILL.split.paidLessBack(
+															money(totals.grandTotal),
+															payer,
+															money(settledUp.back)
+														)}
+													</p>
 												{/if}
 											</div>
 										</details>

@@ -193,7 +193,9 @@ export const SPLIT_BILL = {
 		// cover while it's nobody's, and what they're out once everyone has paid them.
 		roundingBack: 'Rounding from the others',
 		unsharedOnPayer: (name: string) => `Not in anyone's share, on ${name} for now`,
-		paysInTheEnd: (name: string) => `${name} pays in the end`
+		paysInTheEnd: (name: string) => `${name} pays in the end`,
+		paidLessBack: (paid: string, name: string, back: string) =>
+			`That's the ${paid} ${name} paid, less the ${back} that comes back.`
 	},
 	// After removing someone or something: one tap took it, one tap brings it back.
 	removed: (name: string) => `Removed ${name}.`,
