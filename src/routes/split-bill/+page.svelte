@@ -586,7 +586,8 @@
 		reviewLines = scanned.items.map((item) => ({
 			id: newId(),
 			name: item.name,
-			priceText: item.price === undefined ? '' : String(item.price),
+			// Grouped the way the receipt printed it ("45.000"); the field reads it back the same.
+			priceText: item.price === undefined ? '' : formatAmount(item.price, currencyCode),
 			quantity: item.quantity,
 			unsure: item.unsure
 		}));
@@ -1639,7 +1640,7 @@
 											<p class="font-medium break-words">{nameWithQuantity(item)}</p>
 											<p class="text-sm text-muted">
 												{money(item.price)}{(item.quantity ?? 1) > 1
-													? ` · ${money(item.price / (item.quantity ?? 1))} each`
+													? ` ·\u00a0${money(item.price / (item.quantity ?? 1))} each`
 													: ''}
 											</p>
 										</div>
