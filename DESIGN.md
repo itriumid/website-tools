@@ -570,7 +570,10 @@ dark mode), rounded 1.5rem, inset and wider than the content. On the index it's 
 holds the title and the tagline and nothing above the title, and a closing panel ends the page.
 The error page is one panel: its heading in display type and a ruled list of where to go instead,
 each row with the arrow. On a tool
-page it's a title band holding just the title and the introduction.
+page it's a title band holding just the title and the introduction. The band is a little wider than the
+tool under it: Split bill's goes to 72rem, where the split has its own column, and WhatsApp
+click-to-chat's to 42rem, around its 36rem form, so on a wide screen the form isn't a small card
+under a long slab.
 
 ### Navigation
 

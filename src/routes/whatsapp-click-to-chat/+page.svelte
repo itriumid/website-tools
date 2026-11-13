@@ -145,7 +145,12 @@
 	}}
 />
 
-<TitleBand title={WHATSAPP.name} introduction={WHATSAPP.introduction} width="max-w-xl" />
+<TitleBand
+	title={WHATSAPP.name}
+	introduction={WHATSAPP.introduction}
+	width="max-w-xl"
+	bandWidth="max-w-2xl"
+/>
 
 <section class="mx-auto max-w-xl px-5 pt-6 pb-20 sm:px-8">
 	<form class="{card} space-y-5" onsubmit={(event) => event.preventDefault()}>
