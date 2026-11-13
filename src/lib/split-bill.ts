@@ -422,6 +422,9 @@ export type AmountProblem = 'unreadable' | 'negative' | 'no-cents';
  *   ("45.000,00", as banking apps show it), which are dropped; any other cents are a problem.
  * - Spaces and apostrophes group too ("45 000", "1'234.50"), and the currency's symbol or code
  *   may come first or last ("Rp 45.000"). A minus sign makes it negative, which is a problem.
+ * - Thousands and millions may be written short, as menus and people do: "45rb", "45 ribu" and
+ *   "45k" are 45000, "1,5jt" and "1.5 juta" 1500000. Before one of these, a dot or comma followed
+ *   by three digits groups ("1.250rb") and any other is the decimal mark ("45,5rb" is 45500).
  * - Arabic, Persian and full-width digits read as 0 to 9, and the Arabic decimal and thousands
  *   marks as a dot and a comma: "٤٥٫٥٠" is 45.50.
  */
@@ -439,6 +442,8 @@ export function parseAmount(
 		else if (lower.endsWith(mark)) token = token.slice(0, -mark.length);
 	}
 	if (!token) return undefined;
+	const short = /^(.*\d)(rb|ribu|k|jt|juta)$/i.exec(token);
+	if (short) return readShort(short[1], short[2].toLowerCase(), currencyCode);
 	const negative = /^[-−]/.test(token);
 	if (negative) token = token.slice(1);
 	if (!/^[\d.,]*\d[\d.,]*$/.test(token)) return { problem: 'unreadable' };
@@ -467,6 +472,24 @@ export function parseAmount(
 	}
 	whole = whole.replace(/[.,]/g, '');
 	const amount = Number(`${whole || '0'}.${fraction || '0'}`);
+	return Number.isFinite(amount) ? { amount } : { problem: 'unreadable' };
+}
+
+/** "45,5" before "rb", "k", "jt" or "juta": an amount in thousands or millions. */
+function readShort(
+	number: string,
+	unit: string,
+	currencyCode: string
+): { amount: number } | { problem: AmountProblem } {
+	if (/^[-−]/.test(number)) return { problem: 'negative' };
+	if (!/^[\d.,]*\d$/.test(number)) return { problem: 'unreadable' };
+	const scale = unit === 'jt' || unit === 'juta' ? 1e6 : 1e3;
+	const last = Math.max(number.lastIndexOf('.'), number.lastIndexOf(','));
+	const decimal = last >= 0 && number.length - last - 1 !== 3;
+	const whole = (decimal ? number.slice(0, last) : number).replace(/[.,]/g, '');
+	const fraction = decimal ? number.slice(last + 1) : '0';
+	const coins = 10 ** decimalPlaces(currencyCode);
+	const amount = Math.round(Number(`${whole || '0'}.${fraction}`) * scale * coins) / coins;
 	return Number.isFinite(amount) ? { amount } : { problem: 'unreadable' };
 }
 

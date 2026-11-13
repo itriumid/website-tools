@@ -453,6 +453,22 @@ describe('parseAmount', () => {
 		expect(read('45.5')).toEqual(amount(455));
 	});
 
+	it('reads thousands and millions written short, as menus and people write them', () => {
+		expect(read('45rb')).toEqual(amount(45000));
+		expect(read('45 rb')).toEqual(amount(45000));
+		expect(read('45 ribu')).toEqual(amount(45000));
+		expect(read('45K')).toEqual(amount(45000));
+		expect(read('Rp 45rb')).toEqual(amount(45000));
+		expect(read('45,5rb')).toEqual(amount(45500));
+		expect(read('1.250rb')).toEqual(amount(1250000));
+		expect(read('1,5jt')).toEqual(amount(1500000));
+		expect(read('1.5 juta')).toEqual(amount(1500000));
+		expect(read('4.5k', 'USD')).toEqual(amount(4500));
+		expect(read('-45rb')).toEqual({ problem: 'negative' });
+		expect(read('rb')).toEqual({ problem: 'unreadable' });
+		expect(read('45kg')).toEqual({ problem: 'unreadable' });
+	});
+
 	it('drops rupiah cents that are all zeros, as banking apps show them', () => {
 		expect(read('45.000,00')).toEqual(amount(45000));
 		expect(read('45,000.00')).toEqual(amount(45000));
@@ -526,7 +542,7 @@ describe('parseAmount', () => {
 
 	it("says when it can't read the amount at all", () => {
 		expect(read('abc')).toEqual({ problem: 'unreadable' });
-		expect(read('45rb')).toEqual({ problem: 'unreadable' });
+		expect(read('45 porsi')).toEqual({ problem: 'unreadable' });
 		expect(read('12.50 USD', 'EUR')).toEqual({ problem: 'unreadable' });
 		expect(read('.')).toEqual({ problem: 'unreadable' });
 		expect(read('-')).toEqual({ problem: 'unreadable' });
