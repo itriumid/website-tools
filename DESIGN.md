@@ -397,6 +397,9 @@ The people on a bill, tapped to say who had what.
 - **Counting:** when people had different numbers of an item, a counted chip looks like a
   selected one (pink, with the check mark) and holds round buttons with a drawn minus and plus
   (2rem, or 2.75rem on touch screens) around a tabular count.
+- **Everyone:** an underlined text button on the line of the question, "Who had this?", at its
+  right end, never in the row of names: at six people it took a row of its own under them on
+  most items.
 
 ### Fields
 

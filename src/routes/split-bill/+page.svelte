@@ -1737,7 +1737,21 @@
 									</fieldset>
 								{:else if people.length}
 									<fieldset class="mt-3">
-										<legend class="mb-2 text-sm text-muted">Who had this?</legend>
+										<legend class="sr-only">Who had this?</legend>
+										<!-- "Everyone" sits on the question's line, not in the row of names: at six people
+										     it took a row of its own under them on most items. -->
+										<div
+											class="mb-1 flex min-h-9 items-center justify-between gap-3 pointer-coarse:min-h-11"
+										>
+											<span class="text-sm text-muted" aria-hidden="true">Who had this?</span>
+											<button
+												type="button"
+												onclick={() => toggleEveryone(item)}
+												class="min-h-9 shrink-0 text-sm text-muted underline underline-offset-4 hover:text-text pointer-coarse:min-h-11"
+											>
+												{everyoneHasIt(item) ? 'Nobody' : 'Everyone'}
+											</button>
+										</div>
 										<div class="flex flex-wrap gap-2">
 											{#each people as person (person.id)}
 												{@const had = item.assignedPersonIds.includes(person.id)}
@@ -1752,13 +1766,6 @@
 													{#if had}<Check class="mr-1 align-[-0.125em]" />{/if}{person.name}
 												</button>
 											{/each}
-											<button
-												type="button"
-												onclick={() => toggleEveryone(item)}
-												class="min-h-9 rounded-full px-3 text-sm text-muted underline underline-offset-4 hover:text-text pointer-coarse:min-h-11"
-											>
-												{everyoneHasIt(item) ? 'Nobody' : 'Everyone'}
-											</button>
 										</div>
 										{#if (item.quantity ?? 1) > 1}
 											<div class="mt-1 flex flex-wrap items-center gap-x-1">
