@@ -69,15 +69,22 @@
 	</div>
 </section>
 
-<div class="mx-auto max-w-5xl px-5 py-16 sm:px-8 sm:py-20 [@media(max-height:44rem)]:pt-8">
-	{#if inProgress}
-		<p class="mb-5 flex flex-wrap items-center gap-x-3 gap-y-1">
-			{inProgress.text}
-			<a href={inProgress.href} class="group {actionLine}"
-				>{inProgress.action}<Arrow class={arrowMove} /></a
-			>
-		</p>
-	{/if}
+<div class="mx-auto max-w-5xl px-5 pb-16 sm:px-8 sm:pb-20">
+	<!-- The space above the cards is this line's: it's there for everyone, and a returning visitor's
+	     line appears in it after the page loads, so the cards never move under a finger reaching for
+	     one. Up to two lines fit on a phone; on a short one the space is kept for the first card. -->
+	<div
+		class="flex min-h-16 items-center py-2 sm:min-h-20 [@media(max-height:44rem)]:min-h-8 [@media(max-height:44rem)]:py-1"
+	>
+		{#if inProgress}
+			<p class="flex flex-wrap items-center gap-x-3">
+				{inProgress.text}
+				<a href={inProgress.href} class="group {actionLine}"
+					>{inProgress.action}<Arrow class={arrowMove} /></a
+				>
+			</p>
+		{/if}
+	</div>
 	<ul class="grid gap-5 sm:grid-cols-2">
 		{#each TOOLS as tool (tool.path)}
 			<li>

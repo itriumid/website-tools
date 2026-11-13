@@ -302,7 +302,8 @@ small uppercase heading or back link sits above it. Nothing here is set in upper
   under it tighten, so the first card's action line stays on a 390x667 phone's first screen. Above
   the cards, for someone in the middle of a bill, one line from what the browser already keeps (the
   draft in this tab, or the bills this device shared) with an action line to it: shown after the
-  page loads, never stored or sent. While there's only one tool on a site of its own, its card takes
+  page loads, never stored or sent, in the space already kept above the cards for everyone (up to
+  two lines on a phone), so the cards don't move when it appears. While there's only one tool on a site of its own, its card takes
   the whole row from 640 px, text on the left and the action line on the right. The section heading
   over tools on sites of their own is a step smaller than the closing panel's, which is the page's
   last word.
