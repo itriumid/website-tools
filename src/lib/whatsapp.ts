@@ -30,18 +30,26 @@ export interface ChatTarget {
 
 /**
  * Why there's no chat to open: the number is too short or too long to be a phone number (in the
- * country it's for, where we know how long numbers there are), it's a seven-digit North American
- * number without its area code, there's more than one number, or nothing typed was a digit.
+ * country it's for, where we know how long numbers there are), too short once the letters typed
+ * with it are left out ("0812-FLOWERS"), a landline without its area code (seven digits in North
+ * America, seven or eight in Indonesia that aren't a mobile's), there's more than one number, or
+ * nothing typed was a digit.
  */
 export type ChatProblem =
-	'too-short' | 'too-long' | 'too-many-digits' | 'area-code' | 'several' | 'no-digits';
+	| 'too-short'
+	| 'too-short-letters'
+	| 'too-long'
+	| 'too-many-digits'
+	| 'area-code'
+	| 'several'
+	| 'no-digits';
 
 /**
  * Whether a problem is true of every number halfway typed ("too short", "add the area code"), so
  * it waits until the typing stops. The others can't be right however the number ends.
  */
 export function waitsForTyping(problem: ChatProblem): boolean {
-	return problem === 'too-short' || problem === 'area-code';
+	return problem === 'too-short' || problem === 'too-short-letters' || problem === 'area-code';
 }
 
 /** A full number, country code included, has 8 to 15 digits (E.164 allows at most 15). */
@@ -190,12 +198,21 @@ export function chatTarget(
 	if (!national) return undefined;
 	// North American numbers are always ten digits after the 1: a three-digit area code first.
 	if (code === '1' && national.length === 7) return { problem: 'area-code' };
+	// An Indonesian landline is its area code (21 for Jakarta) and five to eight digits; mobiles
+	// start with 8. Seven or eight digits that don't is a landline typed without its area code.
+	if (
+		code === '62' &&
+		(national.length === 7 || national.length === 8) &&
+		!national.startsWith('8')
+	) {
+		return { problem: 'area-code' };
+	}
 	const number = `${code}${national}`;
 	// Where we know how long numbers are, a number has to be one of those lengths; elsewhere, 8 to
 	// 15 digits with the code, as E.164 allows.
 	const lengths = NATIONAL_LENGTHS[code];
 	if (number.length < SHORTEST_NUMBER || (lengths && national.length < lengths[0])) {
-		return { problem: 'too-short' };
+		return { problem: lettersDropped ? 'too-short-letters' : 'too-short' };
 	}
 	// More digits than any phone number anywhere has: not a doubled country code, just too many.
 	if (number.length > LONGEST_NUMBER) return { problem: 'too-many-digits' };

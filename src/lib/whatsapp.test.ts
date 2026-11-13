@@ -149,6 +149,12 @@ describe('chatTarget', () => {
 
 	it('asks for the area code of a seven-digit North American number', () => {
 		expect(chatTarget('1', '555 1234', '')).toEqual({ problem: 'area-code' });
+		// In Indonesia too: a landline's seven or eight digits, without the 21 of Jakarta.
+		expect(chatTarget('62', '555 1234', '')).toEqual({ problem: 'area-code' });
+		expect(chatTarget('62', '5555 1234', '')).toEqual({ problem: 'area-code' });
+		expect(chat('62', '021 5555 1234', '')?.link).toBe('https://wa.me/622155551234');
+		// A mobile number seven digits long is just too short.
+		expect(chatTarget('62', '0812 345', '')).toEqual({ problem: 'too-short' });
 		expect(chatTarget('1', '809 555 123', '')).toEqual({ problem: 'too-short' });
 		expect(chatTarget('1', '809 555 12345', '')).toEqual({ problem: 'too-long' });
 	});
@@ -261,6 +267,7 @@ describe('waitsForTyping', () => {
 		const halfway = chatTarget('62', '08', '');
 		expect(halfway && 'problem' in halfway && waitsForTyping(halfway.problem)).toBe(true);
 		expect(waitsForTyping('area-code')).toBe(true);
+		expect(waitsForTyping('too-short-letters')).toBe(true);
 		for (const problem of ['too-long', 'too-many-digits', 'several', 'no-digits'] as const) {
 			expect(waitsForTyping(problem)).toBe(false);
 		}
@@ -270,5 +277,12 @@ describe('waitsForTyping', () => {
 describe('countries', () => {
 	it('names every country in full, so it can be found by any word of its name', () => {
 		expect(countriesWithCode('971')).toEqual(['United Arab Emirates']);
+	});
+});
+
+describe('letters typed with a number', () => {
+	it('says when a number is too short once the letters are left out', () => {
+		expect(chatTarget('62', '0812-FLOWERS', '')).toEqual({ problem: 'too-short-letters' });
+		expect(chatTarget('62', '0812', '')).toEqual({ problem: 'too-short' });
 	});
 });
