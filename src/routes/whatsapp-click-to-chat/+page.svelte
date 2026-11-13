@@ -104,6 +104,13 @@
 	 * Under it, below its white margin (which scanners need clear), what it's for and the number,
 	 * so a printed code can be checked by eye and used by someone without a camera.
 	 */
+	// The file last handed to the browser: said under Save, since a download can land unseen
+	// (Safari asks first, phones file it away). It's said only while the number is the same.
+	let savedFile: string | undefined = $state();
+	const savedNow = $derived(
+		target && savedFile === qrFileName(target.number) ? savedFile : undefined
+	);
+
 	async function saveQr() {
 		if (!modules || !target) return;
 		const scale = 24;
@@ -138,6 +145,7 @@
 			const url = URL.createObjectURL(blob);
 			const link = Object.assign(document.createElement('a'), { href: url, download: name });
 			link.click();
+			savedFile = name;
 			setTimeout(() => URL.revokeObjectURL(url), 1000);
 		}, 'image/png');
 	}
@@ -319,6 +327,9 @@
 							<button type="button" onclick={() => void saveQr()} class="{secondaryButton} mt-3"
 								>{WHATSAPP.qr.save}</button
 							>
+							<p class="mt-2 min-h-5 text-sm" role="status">
+								{#if savedNow}{WHATSAPP.qr.saved(savedNow)}{/if}
+							</p>
 						{/if}
 					</details>
 				</div>
