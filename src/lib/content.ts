@@ -101,6 +101,8 @@ export const WHATSAPP = {
 	qr: {
 		heading: 'QR code to print',
 		save: 'Save the QR code',
+		/** Under Save once pressed: a download can land without anything on screen saying so. */
+		saved: (file: string) => `Look for ${file} in your downloads.`,
 		/** Printed under the code in the saved image, above the number. */
 		printLabel: 'Chat on WhatsApp',
 		includesMessage: 'This code includes your message: whoever scans it starts with it typed.',
