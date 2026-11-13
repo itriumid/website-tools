@@ -511,8 +511,9 @@ comes last, in an inset list: it's how the answer was reached, not the answer. E
 tagged opens, tapping anywhere on it, to what's in that share, in an inset: the items with the
 person's part of each ("Es Teh, ½", "Jus, 3 of 4") and what they come to, then "Charges and
 adjustments" and, when rounding added to it, "Rounded up", adding up to the big number. For whoever paid, the row shows the subtraction: "Rounding from the others" as a minus, "Not in
-anyone's share, on Budi for now" while something is untagged, and "Budi pays in the end", which is
-the total less what comes back. The drawn arrow follows the name, turning down when open; an indent before the
+anyone's share, on Budi for now" while something is untagged, and "Budi pays in the end", with a muted line under it
+that joins it to the row's "comes back" ("That's the Rp 427.900 Budi paid, less the Rp 300.000 that
+comes back."). The drawn arrow follows the name, turning down when open; an indent before the
 name would take the width the muted line under it needs. A shared link opens
 with the split's heading focused, scrolled to on a phone.
 
@@ -554,7 +555,9 @@ A press that removes or replaces the control it was made on never leaves focus o
 drops a keyboard or a screen reader at the top of the page). Opening the scan form focuses its
 first field, reading the receipt its review heading, adding it the People field when there's nobody
 yet (scrolled to), or else the Items heading; removing focuses the Undo, and Undo the person or
-item brought back.
+item brought back. "Yes, clear" takes the card it was in with it: focus goes to "The bill", and the
+line at the top of the page says "Cleared.". "Clear everything" itself sits apart from the share
+buttons, under a hairline, as a quiet underlined button.
 
 ### Adding an item
 
@@ -562,6 +565,16 @@ With no items, the Items card is the form. Once there are items, they come first
 waits under them behind "Add an item by hand": after a receipt is read, the items are what's next,
 not an empty form above them. Items typed in by hand keep the form open under the list, with focus back in its Item field
 for the next.
+
+### Folded items
+
+An item that's someone's folds to one line once the person moves on to another: its name, "·",
+who had it in muted text (with counts when it was counted), and its price on the right; a tap
+opens it again, with focus on its first name, and screen readers hear "Change who had Nasi
+Goreng". The item last touched stays open, so tagging a second person on it doesn't fold it under
+the finger, and when items above fold or open, the one being worked on stays where it was on
+screen (scrolled at once, not smoothly, with the browser's own anchoring off for the list). A bill
+reopened from a draft starts with its tagged items folded.
 
 ### Links that can't open
 

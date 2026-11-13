@@ -675,15 +675,21 @@ export function calculateBill(state: BillState): BillTotals {
  */
 export function firstUnsharedItem(state: BillState): string | undefined {
 	const people = new Set(state.people.map((person) => person.id));
-	return state.items.find((item) => {
-		if (item.counts && (item.quantity ?? 1) > 1) {
-			const counted = Object.entries(item.counts)
-				.filter(([id, count]) => people.has(id) && count > 0)
-				.reduce((sum, [, count]) => sum + count, 0);
-			return counted < (item.quantity ?? 1);
-		}
-		return !item.assignedPersonIds.some((id) => people.has(id));
-	})?.id;
+	return state.items.find((item) => partlyNobodys(item, people))?.id;
+}
+
+/**
+ * Whether some of an item is in nobody's share: nobody among `people` tagged to it, or, when it's
+ * counted, fewer counted than there were.
+ */
+export function partlyNobodys(item: BillItem, people: Set<string>): boolean {
+	if (item.counts && (item.quantity ?? 1) > 1) {
+		const counted = Object.entries(item.counts)
+			.filter(([id, count]) => people.has(id) && count > 0)
+			.reduce((sum, [, count]) => sum + count, 0);
+		return counted < (item.quantity ?? 1);
+	}
+	return !item.assignedPersonIds.some((id) => people.has(id));
 }
 
 /* ─── Settling up ─── */
@@ -889,7 +895,11 @@ export function billAsText(state: BillState, link?: string): string {
 		);
 		return items.length ? [line, `  ${items.join(', ')}`] : [line];
 	});
-	if (totals.unshared > 0) lines.push(`${SPLIT_BILL.text.unshared}: ${money(totals.unshared)}`);
+	// Untagged money is whoever paid's to cover for now: the chat should know who's covering it.
+	if (totals.unshared > 0) {
+		const label = payer ? SPLIT_BILL.split.unsharedOnPayer(payer.name) : SPLIT_BILL.text.unshared;
+		lines.push(`${label}: ${money(totals.unshared)}`);
+	}
 	lines.push(`${SPLIT_BILL.text.total}: ${money(totals.grandTotal)}`);
 	if (link) lines.push(link);
 	return lines.join('\n');

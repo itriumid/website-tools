@@ -29,6 +29,7 @@
 		decimalPlaces,
 		formatAmount,
 		firstUnsharedItem,
+		partlyNobodys,
 		formatMoney,
 		missingForItem,
 		parseAmount,
@@ -268,6 +269,8 @@
 
 	function undoRemoval() {
 		if (!removal) return;
+		// An item brought back opens, so its edit button is there to take focus.
+		if (removal.from === 'items') openItem = removal.id;
 		void focusAfter(removal.from === 'people' ? `rename-${removal.id}` : `edit-${removal.id}`);
 		people = removal.before.people;
 		items = removal.before.items;
@@ -354,6 +357,50 @@
 		// the next one's name.
 		addingByHand = true;
 		void focusAfter('item');
+	}
+
+	/* ─── Folding tagged items ─── */
+	// Once an item is someone's and the person has moved on to another, it folds to one line: a big
+	// table's list of items was a long scroll of cards that were already done. The item last
+	// touched stays open, so tagging a second person on it doesn't fold it under the finger.
+	let openItem: string | undefined = $state();
+	const peopleIds = $derived(new Set(people.map((person) => person.id)));
+	const folded = (item: BillItem) =>
+		item.id !== openItem && editing?.id !== item.id && !partlyNobodys(item, peopleIds);
+	/** Who had a folded item: names, with counts when it was counted. */
+	const whoHad = (item: BillItem) =>
+		item.counts && (item.quantity ?? 1) > 1
+			? Object.entries(item.counts)
+					.filter(([id, count]) => peopleIds.has(id) && count > 0)
+					.map(([id, count]) => `${nameOf(id)} ${count}`)
+					.join(', ')
+			: item.assignedPersonIds
+					.filter((id) => peopleIds.has(id))
+					.map(nameOf)
+					.join(', ');
+
+	/**
+	 * Items above this one may fold or open as it becomes the open one: it stays where it was on
+	 * screen, under the finger that pressed it, rather than moving with them.
+	 */
+	async function holdStill(id: string, change: () => void) {
+		const before = document.getElementById(`item-${id}`)?.getBoundingClientRect().top;
+		change();
+		await tick();
+		const after = document.getElementById(`item-${id}`)?.getBoundingClientRect().top;
+		if (before !== undefined && after !== undefined && after !== before) {
+			// At once, not with the page's smooth scrolling: it has to look as if nothing moved.
+			window.scrollBy({ top: after - before, behavior: 'instant' });
+		}
+	}
+	function touchItem(id: string) {
+		if (openItem !== id) void holdStill(id, () => (openItem = id));
+	}
+	async function unfold(id: string) {
+		await holdStill(id, () => (openItem = id));
+		// Focus on its first name, where the change is made.
+		const card = document.getElementById(`item-${id}`);
+		(card?.querySelector<HTMLElement>('button[aria-pressed]') ?? card)?.focus();
 	}
 
 	const nameWithQuantity = (item: BillItem) =>
@@ -714,7 +761,8 @@
 		| { kind: 'text-copied' }
 		| { kind: 'text-copy-failed'; text: string }
 		| { kind: 'share-failed' }
-		| { kind: 'link-copied' };
+		| { kind: 'link-copied' }
+		| { kind: 'cleared' };
 	let status: Status | undefined = $state();
 	let sharing = $state(false);
 	// The bill as it was last shared from here, so sharing it again unchanged reuses its link.
@@ -1019,6 +1067,16 @@
 
 	let confirmingClear = $state(false);
 
+	/**
+	 * "Yes, clear": the button, and the card it was in, go with the bill, so focus goes to the top
+	 * of the new one, and the line there says it's done.
+	 */
+	function confirmClear() {
+		clearEverything();
+		status = { kind: 'cleared' };
+		void focusAfter('bill-heading', true);
+	}
+
 	function clearEverything() {
 		people = [];
 		items = [];
@@ -1093,6 +1151,8 @@
 				</svg>
 				{SPLIT_BILL.sharing.opening}
 			</p>
+		{:else if status?.kind === 'cleared'}
+			<p class="text-sm text-muted">{SPLIT_BILL.cleared}</p>
 		{:else if status?.kind === 'opened'}
 			<p class="text-sm text-muted">
 				<span class="sr-only">{SPLIT_BILL.sharing.opened}</span>
@@ -1600,11 +1660,14 @@
 				</h2>
 
 				{#if items.length}
-					<ul class="mt-5 space-y-3">
+					<!-- The list keeps the item being tagged still itself (holdStill), so the browser's own
+					     scroll anchoring is off here: the two would move it twice. -->
+					<ul class="mt-5 space-y-3 [overflow-anchor:none]">
 						{#each items as item (item.id)}
 							<li
 								id="item-{item.id}"
 								tabindex="-1"
+								onclickcapture={() => touchItem(item.id)}
 								class="rounded-xl border border-border bg-bg p-3 sm:p-4"
 							>
 								{#if editing?.id === item.id}
@@ -1687,6 +1750,21 @@
 											>
 										</div>
 									</form>
+								{:else if folded(item)}
+									<!-- Tagged and not the one being worked on: one line, who had it, a tap to open. -->
+									<button
+										type="button"
+										onclick={() => unfold(item.id)}
+										class="-my-1 flex min-h-11 w-full items-center justify-between gap-3 text-left"
+									>
+										<span class="min-w-0 break-words"
+											><span class="sr-only">{`${SPLIT_BILL.changeWhoHad} `}</span><span
+												class="font-medium">{nameWithQuantity(item)}</span
+											><span class="text-muted">{` · ${whoHad(item)}`}</span></span
+										>
+										<span class="shrink-0 text-sm text-muted tabular-nums">{money(item.price)}</span
+										>
+									</button>
 								{:else}
 									<div class="flex items-start justify-between gap-3">
 										<div class="min-w-0">
@@ -1747,7 +1825,8 @@
 									</div>
 								{/if}
 
-								{#if people.length && item.counts}
+								<!-- A folded item's who-had-it is on its one line. -->
+								{#if folded(item)}{:else if people.length && item.counts}
 									{@const quantity = item.quantity ?? 1}
 									{@const counted = countedOf(item)}
 									<fieldset class="mt-2 sm:mt-3">
@@ -2261,12 +2340,13 @@
 								{@const parts = had.get(settlement.personId) ?? []}
 								{@const charges = share.total - share.base}
 								{@const roundedUp = settlement.paidTheBill ? 0 : settlement.amount - share.total}
+								{@const opens = parts.length > 0 || settlement.paidTheBill}
 								{#snippet row()}
 									<!-- The arrow follows the name rather than coming before it: an indent would take the width the
 									     muted line under it needs ("Paid the bill", beside "comes back" and the amount). -->
 									<span class="min-w-0">
 										<span class="block font-medium break-words"
-											>{nameOf(settlement.personId)}{#if parts.length}<Arrow
+											>{nameOf(settlement.personId)}{#if opens}<Arrow
 													class="ml-1.5 align-[-0.125em] text-muted group-open/share:rotate-90 motion-safe:transition-transform"
 												/>{/if}</span
 										>
@@ -2300,9 +2380,9 @@
 								{/snippet}
 								<li>
 									<!-- A row opens to what's in that share: tapping a name answers "why that much?", for
-									     a friend opening the link above all. Someone with nothing tagged has nothing to
-									     open, so theirs is a plain row. -->
-									{#if parts.length}
+									     a friend opening the link above all. Whoever paid always has something to show
+									     (what comes back, what they cover); anyone else with nothing tagged has a plain row. -->
+									{#if opens}
 										<details class="group/share">
 											<summary
 												class="flex cursor-pointer list-none items-center justify-between gap-4 py-3 [&::-webkit-details-marker]:hidden"
@@ -2359,6 +2439,15 @@
 															<dd class="shrink-0">{money(settlement.amount + totals.unshared)}</dd>
 														</div>
 													</dl>
+													<!-- The same amount the other way, joining it to the row's "comes back": what they
+													     paid at the table, less what everyone else hands them. -->
+													<p class="mt-1 text-muted">
+														{SPLIT_BILL.split.paidLessBack(
+															money(totals.grandTotal),
+															payer,
+															money(settledUp.back)
+														)}
+													</p>
 												{/if}
 											</div>
 										</details>
@@ -2585,7 +2674,16 @@
 							>
 						{/if}
 					{/if}
-					<div class="mt-4 {viewing ? 'hidden' : ''}">
+					<!-- What sharing keeps on our server: for whoever shares, not for a friend reading a
+					     link, whose long link keeps nothing there at all. -->
+					<!-- What sharing keeps on our server: for whoever shares, not for a friend reading a
+					     link, and not right after a long link was copied, which keeps nothing there. -->
+					{#if !viewing && status?.kind !== 'copied-long'}
+						<p class="mt-3 max-w-prose text-sm text-muted">{SPLIT_BILL.privacy}</p>
+					{/if}
+					<!-- Clearing is apart from sharing, under it and quieter: it undoes everything, and sat right
+					     under the share buttons at the same weight. -->
+					<div class="mt-6 border-t border-border pt-3 {viewing ? 'hidden' : ''}">
 						{#if confirmingClear}
 							<div
 								class="flex flex-wrap items-center gap-2"
@@ -2593,9 +2691,7 @@
 								aria-label="Clear everything?"
 							>
 								<span class="text-sm">Clear everything?</span>
-								<button type="button" onclick={clearEverything} class={smallButton}
-									>Yes, clear</button
-								>
+								<button type="button" onclick={confirmClear} class={smallButton}>Yes, clear</button>
 								<button type="button" onclick={() => (confirmingClear = false)} class={smallButton}
 									>Keep it</button
 								>
@@ -2604,15 +2700,11 @@
 							<button
 								type="button"
 								onclick={() => (confirmingClear = true)}
-								class="{secondaryButton} w-full sm:w-auto">Clear everything</button
+								class="min-h-9 text-sm text-muted underline underline-offset-4 hover:text-text pointer-coarse:min-h-11"
+								>Clear everything</button
 							>
 						{/if}
 					</div>
-					<!-- What sharing keeps on our server: for whoever shares, not for a friend reading a
-					     link, whose long link keeps nothing there at all. -->
-					{#if !viewing}
-						<p class="mt-3 max-w-prose text-sm text-muted">{SPLIT_BILL.privacy}</p>
-					{/if}
 				</div>
 			{/if}
 		</div>

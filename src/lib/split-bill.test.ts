@@ -12,6 +12,7 @@ import {
 	formatMoney,
 	missingForItem,
 	parseAmount,
+	partlyNobodys,
 	readBill,
 	DEFAULT_SERVICE_PERCENTAGE,
 	roundingSteps,
@@ -1170,6 +1171,14 @@ describe('settling up: who paid, and rounding', () => {
 		expect(readBill({ ...state, roundTo: 1e12 })?.roundTo).toBeUndefined();
 	});
 
+	it("says who covers what's in nobody's share, when someone paid", () => {
+		const untagged = three({ paidBy: 'a' });
+		untagged.items[2].assignedPersonIds = [];
+		expect(billAsText(untagged).split('\n')).toContain(
+			"Not in anyone's share, on Ayu for now: Rp\u00a010.001"
+		);
+	});
+
 	it('says who to pay in the text, when someone paid', () => {
 		expect(billAsText(three({ paidBy: 'a', roundTo: 500 }))).toBe(
 			'Ayu: paid the bill, gets Rp\u00a044.000 back\n  Ikan\nBudi: Rp\u00a033.500 to Ayu\n  Sate\nCitra: Rp\u00a010.500 to Ayu\n  Teh\nTotal: Rp\u00a0143.334'
@@ -1237,5 +1246,27 @@ describe('firstUnsharedItem', () => {
 		expect(
 			firstUnsharedItem(bill([{ id: '1', name: 'Nasi', price: 10, assignedPersonIds: ['a', 'b'] }]))
 		).toBeUndefined();
+	});
+});
+
+describe('partlyNobodys', () => {
+	const people = new Set(['a', 'b']);
+	it("says whether any of an item is still in nobody's share", () => {
+		expect(partlyNobodys({ id: '1', name: 'Nasi', price: 1, assignedPersonIds: [] }, people)).toBe(
+			true
+		);
+		expect(
+			partlyNobodys({ id: '1', name: 'Nasi', price: 1, assignedPersonIds: ['a'] }, people)
+		).toBe(false);
+		const counted = {
+			id: '2',
+			name: 'Teh',
+			price: 3,
+			quantity: 3,
+			assignedPersonIds: ['a'],
+			counts: { a: 2 }
+		};
+		expect(partlyNobodys(counted, people)).toBe(true);
+		expect(partlyNobodys({ ...counted, counts: { a: 2, b: 1 } }, people)).toBe(false);
 	});
 });

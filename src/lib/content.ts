@@ -193,7 +193,9 @@ export const SPLIT_BILL = {
 		// cover while it's nobody's, and what they're out once everyone has paid them.
 		roundingBack: 'Rounding from the others',
 		unsharedOnPayer: (name: string) => `Not in anyone's share, on ${name} for now`,
-		paysInTheEnd: (name: string) => `${name} pays in the end`
+		paysInTheEnd: (name: string) => `${name} pays in the end`,
+		paidLessBack: (paid: string, name: string, back: string) =>
+			`That's the ${paid} ${name} paid, less the ${back} that comes back.`
 	},
 	// After removing someone or something: one tap took it, one tap brings it back.
 	removed: (name: string) => `Removed ${name}.`,
@@ -216,6 +218,10 @@ export const SPLIT_BILL = {
 	moreOnReceipt: 'More on the receipt',
 	moreOnReceiptHint: 'Prices with tax, discounts, rounding',
 	undo: 'Undo',
+	/** Read before a folded item's line, which opens it: "Change who had Nasi Goreng · Ayu". */
+	changeWhoHad: 'Change who had',
+	/** At the top of the page after "Yes, clear". */
+	cleared: 'Cleared.',
 	/** Read after the running total's untagged amount, which a press takes to the item. */
 	goToUnshared: "Go to the first item that's in nobody's share",
 	/** Under the untagged items' worth, when their part of the total differs from it. */
