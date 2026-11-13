@@ -2610,8 +2610,8 @@
 					<!-- What sharing keeps on our server: for whoever shares, not for a friend reading a
 					     link, whose long link keeps nothing there at all. -->
 					<!-- What sharing keeps on our server: for whoever shares, not for a friend reading a
-					     link, whose long link keeps nothing there at all. -->
-					{#if !viewing}
+					     link, and not right after a long link was copied, which keeps nothing there. -->
+					{#if !viewing && status?.kind !== 'copied-long'}
 						<p class="mt-3 max-w-prose text-sm text-muted">{SPLIT_BILL.privacy}</p>
 					{/if}
 					<!-- Clearing is apart from sharing, under it and quieter: it undoes everything, and sat right
