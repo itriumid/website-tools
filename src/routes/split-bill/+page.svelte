@@ -32,6 +32,7 @@
 		parseAmount,
 		roundingSteps,
 		settleBill,
+		whatEachHad,
 		taxOnServiceByDefault,
 		ADJUSTMENT_KINDS,
 		type AdjustmentKind,
@@ -139,6 +140,8 @@
 		)
 	);
 	const payerName = $derived(bill.paidBy ? nameOf(bill.paidBy) : undefined);
+	// What's in each share, item by item, for the split's rows to open to.
+	const had = $derived(whatEachHad(bill));
 
 	/* ─── Amounts as typed ─── */
 	// Amount fields are text, not numbers: "45.000" is forty-five thousand rupiah, which a number
@@ -2185,12 +2188,21 @@
 						<ul class="divide-y divide-border" aria-label="What each person owes">
 							{#each settledUp.settlements as settlement, index (settlement.personId)}
 								{@const share = totals.shares[index]}
-								<li class="flex items-center justify-between gap-4 py-3">
-									<div class="min-w-0">
-										<p class="font-medium break-words">{nameOf(settlement.personId)}</p>
+								{@const parts = had.get(settlement.personId) ?? []}
+								{@const charges = share.total - share.base}
+								{@const roundedUp = settlement.paidTheBill ? 0 : settlement.amount - share.total}
+								{#snippet row()}
+									<!-- The arrow follows the name rather than coming before it: an indent would take the width the
+									     muted line under it needs ("Paid the bill", beside "comes back" and the amount). -->
+									<span class="min-w-0">
+										<span class="block font-medium break-words"
+											>{nameOf(settlement.personId)}{#if parts.length}<Arrow
+													class="ml-1.5 align-[-0.125em] text-muted group-open/share:rotate-90 motion-safe:transition-transform"
+												/>{/if}</span
+										>
 										<!-- Every row keeps one short line here, even an empty one, so choosing who paid
-										     never changes a row's height and moves the choices below. -->
-										<p class="min-h-5 text-sm text-muted">
+											     never changes a row's height and moves the choices below. -->
+										<span class="block min-h-5 text-sm text-muted">
 											{#if settlement.paidTheBill}{SPLIT_BILL.split
 													.paidTheBill}{:else if settlement.amount === 0}{SPLIT_BILL.split
 													.nothingTagged}{:else if payerName}{SPLIT_BILL.split.to(
@@ -2198,13 +2210,11 @@
 												)}{:else if share.base !== share.total}{SPLIT_BILL.split.ordered(
 													money(share.base)
 												)}{/if}
-										</p>
-									</div>
+										</span>
+									</span>
 									<!-- Whoever paid hands nothing over: their big number is what comes back, and says so
-									     beside it, so it can't be read as what they owe. -->
-									<!-- "comes back" sits beside the number, not under it: choosing who paid mustn't make the
-									     row taller and move the choices below it under someone's thumb. -->
-									<p class="flex shrink-0 items-baseline gap-2">
+									     beside it, on the same line, so choosing who paid never makes the row taller. -->
+									<span class="flex shrink-0 items-baseline gap-2">
 										{#if settlement.paidTheBill}<span class="text-sm text-muted"
 												>{SPLIT_BILL.split.comesBack}</span
 											>{/if}
@@ -2216,7 +2226,67 @@
 										>
 											{money(settlement.paidTheBill ? settledUp.back : settlement.amount)}
 										</span>
-									</p>
+									</span>
+								{/snippet}
+								<li>
+									<!-- A row opens to what's in that share: tapping a name answers "why that much?", for
+									     a friend opening the link above all. Someone with nothing tagged has nothing to
+									     open, so theirs is a plain row. -->
+									{#if parts.length}
+										<details class="group/share">
+											<summary
+												class="flex cursor-pointer list-none items-center justify-between gap-4 py-3 [&::-webkit-details-marker]:hidden"
+											>
+												{@render row()}
+											</summary>
+											<div class="mb-3 rounded-lg bg-bg p-3 text-sm tabular-nums">
+												<dl class="space-y-1">
+													{#each parts as part (part.itemId)}
+														<div class="flex justify-between gap-4">
+															<dt class="min-w-0 break-words">
+																{part.name}{#if part.part}<span class="text-muted"
+																		>, {part.part}</span
+																	>{/if}
+															</dt>
+															<dd class="shrink-0">{money(part.amount)}</dd>
+														</div>
+													{/each}
+													{#if Math.abs(charges) >= coin / 2}
+														<div class="flex justify-between gap-4 text-muted">
+															<dt>{SPLIT_BILL.split.charges}</dt>
+															<dd class="shrink-0">{money(charges)}</dd>
+														</div>
+													{/if}
+													{#if roundedUp >= coin / 2}
+														<div class="flex justify-between gap-4 text-muted">
+															<dt>{SPLIT_BILL.split.roundedUp}</dt>
+															<dd class="shrink-0">{money(roundedUp)}</dd>
+														</div>
+													{/if}
+												</dl>
+												<!-- Whoever paid: what the rest rounded up comes back to them, so their own share is
+												     what's above less that, said in the words the rounding note uses. -->
+												{#if settlement.paidTheBill}
+													{#if settledUp.extra > 0}
+														<p class="mt-1 text-muted">
+															{SPLIT_BILL.split.extraToPayer(
+																money(settledUp.extra),
+																nameOf(settlement.personId)
+															)}
+														</p>
+													{/if}
+													<dl class="mt-1 border-t border-border pt-1 font-semibold">
+														<div class="flex justify-between gap-4">
+															<dt>{SPLIT_BILL.split.ownShare}</dt>
+															<dd class="shrink-0">{money(settlement.amount)}</dd>
+														</div>
+													</dl>
+												{/if}
+											</div>
+										</details>
+									{:else}
+										<div class="flex items-center justify-between gap-4 py-3">{@render row()}</div>
+									{/if}
 								</li>
 							{/each}
 						</ul>

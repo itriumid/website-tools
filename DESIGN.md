@@ -492,7 +492,13 @@ before anyone has started. The two lines under the rounding choice are kept even
 picking a step never shifts what's below it. Then two radio groups, "Who paid?" and "Round shares
 up" (to two steps people actually hand over, Rp 500 and Rp 1.000 for rupiah), with a muted line
 saying what rounding added and who gets it back. The breakdown (subtotal, charges, total)
-comes last, in an inset list: it's how the answer was reached, not the answer. A shared link opens
+comes last, in an inset list: it's how the answer was reached, not the answer. Each row with something
+tagged opens, tapping anywhere on it, to what's in that share, in an inset: the items with the
+person's part of each ("Es Teh, ½", "Jus, 3 of 4") and what they come to, then "Charges and
+adjustments" and, when rounding added to it, "Rounded up", adding up to the big number. For whoever
+paid, it ends with "Their own share", after the rounding note's sentence when the others' rounding
+comes back to them. The drawn arrow follows the name, turning down when open; an indent before the
+name would take the width the muted line under it needs. A shared link opens
 with the split's heading focused, scrolled to on a phone.
 
 ### A bill shared with you
