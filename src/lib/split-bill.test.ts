@@ -17,6 +17,7 @@ import {
 	roundingSteps,
 	settleBill,
 	taxOnServiceByDefault,
+	whatEachHad,
 	type BillItem,
 	type BillState
 } from './split-bill';
@@ -1001,9 +1002,9 @@ describe('the split as text', () => {
 		expect(formatMoney(12.5, 'USD')).toBe('$\u00a012.50');
 	});
 
-	it('gives a line per person, then the total', () => {
+	it("gives a line per person with what's in their share under it, then the total", () => {
 		expect(billAsText(state)).toBe(
-			'Ayu: Rp\u00a057.750\nBudi: Rp\u00a057.750\nTotal: Rp\u00a0115.500'
+			'Ayu: Rp\u00a057.750\n  Nasi ½\nBudi: Rp\u00a057.750\n  Nasi ½\nTotal: Rp\u00a0115.500'
 		);
 	});
 
@@ -1023,8 +1024,68 @@ describe('the split as text', () => {
 			})
 		);
 		expect(text).toBe(
-			"Ayu: Rp\u00a030.000\nBudi: Rp\u00a00\nNot in anyone's share: Rp\u00a05.000\nTotal: Rp\u00a035.000"
+			"Ayu: Rp\u00a030.000\n  Nasi\nBudi: Rp\u00a00\nNot in anyone's share: Rp\u00a05.000\nTotal: Rp\u00a035.000"
 		);
+	});
+});
+
+describe('whatEachHad', () => {
+	const people = [
+		{ id: 'a', name: 'Ayu' },
+		{ id: 'b', name: 'Budi' },
+		{ id: 'c', name: 'Citra' }
+	];
+	const state: BillState = {
+		people,
+		items: [
+			{ id: '1', name: 'Nasi Goreng', price: 45000, assignedPersonIds: ['a'] },
+			{ id: '2', name: 'Es Teh', price: 16000, quantity: 2, assignedPersonIds: ['a', 'b'] },
+			{ id: '3', name: 'Kerupuk', price: 12000, assignedPersonIds: ['a', 'b', 'c'] },
+			{
+				id: '4',
+				name: 'Jus',
+				price: 60000,
+				quantity: 4,
+				assignedPersonIds: ['b', 'c'],
+				counts: { b: 1, c: 3 }
+			},
+			{ id: '5', name: 'Sate', price: 30000, assignedPersonIds: [] }
+		],
+		taxPercentage: 10,
+		servicePercentage: 5,
+		taxOnService: true,
+		currencyCode: 'IDR'
+	};
+
+	it("lists each person's items with their part of each", () => {
+		const parts = whatEachHad(state);
+		expect(parts.get('a')).toEqual([
+			{ itemId: '1', name: 'Nasi Goreng', amount: 45000 },
+			{ itemId: '2', name: '2× Es Teh', part: '½', amount: 8000 },
+			{ itemId: '3', name: 'Kerupuk', part: '⅓', amount: 4000 }
+		]);
+		expect(parts.get('c')).toEqual([
+			{ itemId: '3', name: 'Kerupuk', part: '⅓', amount: 4000 },
+			{ itemId: '4', name: 'Jus', part: '3 of 4', amount: 45000 }
+		]);
+	});
+
+	it("adds up to each share's base, so a share is what's in it", () => {
+		const parts = whatEachHad(state);
+		for (const share of calculateBill(state).shares) {
+			const sum = parts.get(share.personId)!.reduce((total, part) => total + part.amount, 0);
+			expect(sum).toBeCloseTo(share.base, 6);
+		}
+	});
+
+	it('writes a share of more than ten as a plain fraction', () => {
+		const many = Array.from({ length: 12 }, (_, i) => ({ id: `p${i}`, name: `P${i}` }));
+		const parts = whatEachHad({
+			...state,
+			people: many,
+			items: [{ id: '1', name: 'Tumpeng', price: 120000, assignedPersonIds: many.map((p) => p.id) }]
+		});
+		expect(parts.get('p0')?.[0].part).toBe('1/12');
 	});
 });
 
@@ -1111,7 +1172,7 @@ describe('settling up: who paid, and rounding', () => {
 
 	it('says who to pay in the text, when someone paid', () => {
 		expect(billAsText(three({ paidBy: 'a', roundTo: 500 }))).toBe(
-			'Ayu: paid the bill, gets Rp\u00a044.000 back\nBudi: Rp\u00a033.500 to Ayu\nCitra: Rp\u00a010.500 to Ayu\nTotal: Rp\u00a0143.334'
+			'Ayu: paid the bill, gets Rp\u00a044.000 back\n  Ikan\nBudi: Rp\u00a033.500 to Ayu\n  Sate\nCitra: Rp\u00a010.500 to Ayu\n  Teh\nTotal: Rp\u00a0143.334'
 		);
 	});
 });

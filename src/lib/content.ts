@@ -142,7 +142,7 @@ export const SPLIT_BILL = {
 	},
 	// For someone who opened a bill shared with them: their share first, the editor one press away.
 	sharedWithYou: {
-		line: 'This is the bill as it was shared with you. Find your name for your share.',
+		line: "This is the bill as it was shared with you. Find your name, and tap it to see what's in your share.",
 		makeChanges: 'Make changes',
 		note: 'Changes stay on this device until you share the bill again.',
 		copyLink: 'Copy the link',
@@ -177,7 +177,11 @@ export const SPLIT_BILL = {
 		extraToPayer: (extra: string, name: string) =>
 			`Rounding up adds ${extra}, which ${name} gets back.`,
 		extraOnTop: (extra: string) => `Rounding up adds ${extra} on top of the total.`,
-		empty: 'Add the items from the bill, and the split shows here as you go.'
+		empty: 'Add the items from the bill, and the split shows here as you go.',
+		// In a row opened to what's in the share, after the items.
+		charges: 'Charges and adjustments',
+		roundedUp: 'Rounded up',
+		ownShare: 'Their own share'
 	},
 	// After removing someone or something: one tap took it, one tap brings it back.
 	removed: (name: string) => `Removed ${name}.`,

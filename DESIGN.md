@@ -497,15 +497,22 @@ before anyone has started. The two lines under the rounding choice are kept even
 picking a step never shifts what's below it. Then two radio groups, "Who paid?" and "Round shares
 up" (to two steps people actually hand over, Rp 500 and Rp 1.000 for rupiah), with a muted line
 saying what rounding added and who gets it back. The breakdown (subtotal, charges, total)
-comes last, in an inset list: it's how the answer was reached, not the answer. A shared link opens
+comes last, in an inset list: it's how the answer was reached, not the answer. Each row with something
+tagged opens, tapping anywhere on it, to what's in that share, in an inset: the items with the
+person's part of each ("Es Teh, ½", "Jus, 3 of 4") and what they come to, then "Charges and
+adjustments" and, when rounding added to it, "Rounded up", adding up to the big number. For whoever
+paid, it ends with "Their own share", after the rounding note's sentence when the others' rounding
+comes back to them. The drawn arrow follows the name, turning down when open; an indent before the
+name would take the width the muted line under it needs. A shared link opens
 with the split's heading focused, scrolled to on a phone.
 
 ### A bill shared with you
 
 Someone who opens a shared bill that wasn't shared from their own device sees the split on its own,
-centered, under one line that says what this is ("This is the bill as it was shared with you. Find
-your name for your share.") and a small "Make changes" with a muted note that changes stay on the
-device until the bill is shared again. Who paid and rounding show only as their result in the rows;
+centered, under one line that says what this is ("This is the bill as it was shared with you. Find your
+name, and tap it to see what's in your share."). A small "Make changes", with a muted note that
+changes stay on the device until the bill is shared again, waits under the split, so the friend's
+own row is on a phone's first screen. Who paid and rounding show only as their result in the rows;
 there's no running total, since the split is already in view. The pink action is "Copy the link",
 which copies the link they opened: making a new link is for whoever changes the bill. "Make changes"
 brings back the whole editor, focused on its first card. Whoever shared the bill gets the editor
