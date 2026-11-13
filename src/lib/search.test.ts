@@ -60,4 +60,11 @@ describe('matchChoices with the names countries go by', () => {
 	it('still lists a country whose own name starts with what was typed', () => {
 		expect(matchChoices(choices, 'uk').map((choice) => choice.label)).toContain('Ukraine');
 	});
+
+	it("doesn't find a country by letters inside a name it isn't shown by", () => {
+		expect(matchChoices(choices, 'uk').map((choice) => choice.label)).not.toContain('Luxembourg');
+		expect(matchChoices(choices, 'luksemburg').map((choice) => choice.label)).toEqual([
+			'Luxembourg'
+		]);
+	});
 });
