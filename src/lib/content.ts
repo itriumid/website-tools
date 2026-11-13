@@ -229,6 +229,8 @@ export const SPLIT_BILL = {
 	moreOnReceipt: 'More on the receipt',
 	moreOnReceiptHint: 'Prices with tax, discounts, rounding',
 	undo: 'Undo',
+	/** Each item's group of names, for screen readers: which item the names are for. */
+	whoHad: (item: string) => `Who had ${item}?`,
 	/** Read before a folded item's line, which opens it: "Change who had Nasi Goreng · Ayu". */
 	changeWhoHad: 'Change who had',
 	/** At the top of the page after "Yes, clear". */

@@ -1867,8 +1867,25 @@
 												class="font-medium">{nameWithQuantity(item)}</span
 											><span class="text-muted">{` · ${whoHad(item)}`}</span></span
 										>
-										<span class="shrink-0 text-sm text-muted tabular-nums">{money(item.price)}</span
-										>
+										<!-- With a muted pencil: the line opens to change who had it. -->
+										<span class="flex shrink-0 items-center gap-2 text-sm text-muted tabular-nums">
+											{money(item.price)}
+											<svg
+												class="size-3.5 shrink-0"
+												xmlns="http://www.w3.org/2000/svg"
+												fill="none"
+												viewBox="0 0 24 24"
+												stroke="currentColor"
+												stroke-width="2"
+												aria-hidden="true"
+											>
+												<path
+													stroke-linecap="round"
+													stroke-linejoin="round"
+													d="M16.9 3.6a2 2 0 0 1 2.9 2.9L8 18.3 4 19.5l1.2-4z"
+												/>
+											</svg>
+										</span>
 									</button>
 								{:else}
 									<div class="flex items-start justify-between gap-3">
@@ -1987,7 +2004,7 @@
 									</fieldset>
 								{:else if people.length}
 									<fieldset class="mt-2 sm:mt-3">
-										<legend class="sr-only">Who had this?</legend>
+										<legend class="sr-only">{SPLIT_BILL.whoHad(item.name)}</legend>
 										<!-- "Everyone" sits on the question's line, not in the row of names: at six people
 										     it took a row of its own under them on most items. -->
 										<div
@@ -2199,19 +2216,25 @@
 								Prices include service
 							</label>
 						</div>
-						<div class="flex flex-wrap items-center gap-x-1">
-							<label class="{checkRow} {taxIncluded ? 'text-muted' : ''}">
-								<input
-									type="checkbox"
-									checked={taxOnService && !taxIncluded}
-									disabled={taxIncluded}
-									onchange={(event) => setTaxOnService(event.currentTarget.checked)}
-									class={checkbox}
+						<!-- Tax on service only means something when there's service: at 0% it's left out. -->
+						{#if percentage(serviceInput) > 0}
+							<div class="flex flex-wrap items-center gap-x-1">
+								<label class="{checkRow} {taxIncluded ? 'text-muted' : ''}">
+									<input
+										type="checkbox"
+										checked={taxOnService && !taxIncluded}
+										disabled={taxIncluded}
+										onchange={(event) => setTaxOnService(event.currentTarget.checked)}
+										class={checkbox}
+									/>
+									Tax is charged on service too
+								</label>
+								<Toggletip
+									label="About tax on service"
+									text={SPLIT_BILL.explanations.taxOnService}
 								/>
-								Tax is charged on service too
-							</label>
-							<Toggletip label="About tax on service" text={SPLIT_BILL.explanations.taxOnService} />
-						</div>
+							</div>
+						{/if}
 					</div>
 
 					<div class="mt-6 border-t border-border pt-5">
