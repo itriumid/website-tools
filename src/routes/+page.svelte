@@ -59,11 +59,11 @@
 	<div class="band mx-auto max-w-6xl rounded-3xl">
 		<!-- On a short phone (667px tall) the panel and the gap under it tighten, so the first card's
 		     action is still on the first screen. -->
-		<div class="mx-auto max-w-5xl px-6 py-10 sm:px-8 sm:py-16 [@media(max-height:44rem)]:py-6">
+		<div class="mx-auto max-w-5xl px-6 py-8 sm:px-8 sm:py-16 [@media(max-height:44rem)]:py-6">
 			<h1 class="text-5xl font-bold tracking-tight sm:text-7xl">{HEADING}</h1>
 			<!-- The two jobs, in the text color: the first pink a visitor meets is something to press. -->
 			<p
-				class="mt-5 max-w-2xl text-2xl leading-snug font-medium sm:text-3xl [@media(max-height:44rem)]:mt-3"
+				class="mt-4 max-w-2xl text-xl leading-snug font-medium sm:mt-5 sm:text-3xl [@media(max-height:44rem)]:mt-3"
 			>
 				{TAGLINE}
 			</p>
