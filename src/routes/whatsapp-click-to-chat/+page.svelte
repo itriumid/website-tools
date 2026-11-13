@@ -164,7 +164,7 @@
 	title={WHATSAPP.name}
 	introduction={WHATSAPP.introduction}
 	width="max-w-xl"
-	bandWidth="max-w-2xl"
+	bandWidth="max-w-lg"
 />
 
 <section class="mx-auto max-w-xl px-5 pt-6 pb-20 sm:px-8">

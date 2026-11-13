@@ -603,8 +603,8 @@ The error page is one panel: its heading in display type and a ruled list of whe
 each row with the arrow. On a tool
 page it's a title band holding just the title and the introduction. The band is a little wider than the
 tool under it: Split bill's goes to 72rem, where the split has its own column, and WhatsApp
-click-to-chat's to 42rem, around its 36rem form, so on a wide screen the form isn't a small card
-under a long slab.
+click-to-chat's to its form card's 32rem, so their edges line up and on a wide screen the form
+isn't a small card under a long slab.
 
 ### Navigation
 
