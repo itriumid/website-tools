@@ -1197,10 +1197,11 @@
 							bind:value={receiptText}
 							class={field}></textarea>
 						<div class="mt-3 flex flex-wrap gap-3">
-							<button type="submit" disabled={!receiptText.trim()} class={smallButton}
+							<!-- Reading the receipt is this form's one main action, so it's the pink one. -->
+							<button type="submit" disabled={!receiptText.trim()} class={primaryButton}
 								>{SPLIT_BILL.scanning.read}</button
 							>
-							<button type="button" onclick={cancelScan} class={smallButton}
+							<button type="button" onclick={cancelScan} class={secondaryButton}
 								>{SPLIT_BILL.scanning.cancel}</button
 							>
 						</div>
