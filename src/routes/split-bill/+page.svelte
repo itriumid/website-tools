@@ -789,6 +789,28 @@
 		| { kind: 'link-copied' }
 		| { kind: 'cleared' };
 	let status: Status | undefined = $state();
+	// "Cleared." and what copying or sharing did are about the bill as it was then: once it
+	// changes, they're old news, and they go rather than sit there for minutes.
+	const STALE_ONCE_CHANGED = new Set<Status['kind']>([
+		'cleared',
+		'copied',
+		'copied-updated',
+		'copied-new',
+		'copied-long',
+		'link-copied',
+		'text-copied',
+		'deleted'
+	]);
+	let statusBill: string | undefined;
+	$effect(() => {
+		const now = JSON.stringify(bill);
+		if (!status || !STALE_ONCE_CHANGED.has(status.kind)) {
+			statusBill = undefined;
+			return;
+		}
+		if (statusBill === undefined) statusBill = now;
+		else if (statusBill !== now) status = undefined;
+	});
 	let sharing = $state(false);
 	// The bill as it was last shared from here, so sharing it again unchanged reuses its link.
 	let lastShared: { json: string; code: string } | undefined;
