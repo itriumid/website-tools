@@ -20,7 +20,6 @@ export const TAGLINE = "Split a bill fairly, or message a number you haven't sav
 // keeps (the draft in this tab, the bills this device shared). Nothing new is kept.
 export const IN_PROGRESS = {
 	draft: 'You have a bill in progress in this tab.',
-	carryOn: 'Carry on',
 	shared: (count: number) =>
 		count === 1
 			? 'You shared a bill from this device in the last 30 days.'

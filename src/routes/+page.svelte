@@ -24,14 +24,12 @@
 	// A bill this visitor was in the middle of: the draft in this tab, or else the bills this
 	// device shared. Read from what the browser already keeps, after the page loads: nothing new is
 	// kept, and nothing is sent anywhere. The page is the same for everyone until then.
-	let inProgress: { text: string; action: string; href: string } | undefined = $state();
+	// A draft is just said: the Split bill card right under it already opens it, and a second way
+	// to the same place was noise. A shared bill gets its own way in, since it opens that bill.
+	let inProgress: { text: string; action?: string; href?: string } | undefined = $state();
 	onMount(() => {
 		if (loadDraft()) {
-			inProgress = {
-				text: IN_PROGRESS.draft,
-				action: IN_PROGRESS.carryOn,
-				href: resolve('/split-bill')
-			};
+			inProgress = { text: IN_PROGRESS.draft };
 			return;
 		}
 		const shared = sharedFromHere();
@@ -79,9 +77,9 @@
 		{#if inProgress}
 			<p class="flex flex-wrap items-center gap-x-3">
 				{inProgress.text}
-				<a href={inProgress.href} class="group {actionLine}"
-					>{inProgress.action}<Arrow class={arrowMove} /></a
-				>
+				{#if inProgress.href}<a href={inProgress.href} class="group {actionLine}"
+						>{inProgress.action}<Arrow class={arrowMove} /></a
+					>{/if}
 			</p>
 		{/if}
 	</div>
