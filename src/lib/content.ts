@@ -218,6 +218,8 @@ export const SPLIT_BILL = {
 	moreOnReceipt: 'More on the receipt',
 	moreOnReceiptHint: 'Prices with tax, discounts, rounding',
 	undo: 'Undo',
+	/** Read before a folded item's line, which opens it: "Change who had Nasi Goreng · Ayu". */
+	changeWhoHad: 'Change who had',
 	/** At the top of the page after "Yes, clear". */
 	cleared: 'Cleared.',
 	/** Read after the running total's untagged amount, which a press takes to the item. */

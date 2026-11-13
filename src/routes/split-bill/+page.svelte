@@ -29,6 +29,7 @@
 		decimalPlaces,
 		formatAmount,
 		firstUnsharedItem,
+		partlyNobodys,
 		formatMoney,
 		missingForItem,
 		parseAmount,
@@ -268,6 +269,8 @@
 
 	function undoRemoval() {
 		if (!removal) return;
+		// An item brought back opens, so its edit button is there to take focus.
+		if (removal.from === 'items') openItem = removal.id;
 		void focusAfter(removal.from === 'people' ? `rename-${removal.id}` : `edit-${removal.id}`);
 		people = removal.before.people;
 		items = removal.before.items;
@@ -354,6 +357,50 @@
 		// the next one's name.
 		addingByHand = true;
 		void focusAfter('item');
+	}
+
+	/* ─── Folding tagged items ─── */
+	// Once an item is someone's and the person has moved on to another, it folds to one line: a big
+	// table's list of items was a long scroll of cards that were already done. The item last
+	// touched stays open, so tagging a second person on it doesn't fold it under the finger.
+	let openItem: string | undefined = $state();
+	const peopleIds = $derived(new Set(people.map((person) => person.id)));
+	const folded = (item: BillItem) =>
+		item.id !== openItem && editing?.id !== item.id && !partlyNobodys(item, peopleIds);
+	/** Who had a folded item: names, with counts when it was counted. */
+	const whoHad = (item: BillItem) =>
+		item.counts && (item.quantity ?? 1) > 1
+			? Object.entries(item.counts)
+					.filter(([id, count]) => peopleIds.has(id) && count > 0)
+					.map(([id, count]) => `${nameOf(id)} ${count}`)
+					.join(', ')
+			: item.assignedPersonIds
+					.filter((id) => peopleIds.has(id))
+					.map(nameOf)
+					.join(', ');
+
+	/**
+	 * Items above this one may fold or open as it becomes the open one: it stays where it was on
+	 * screen, under the finger that pressed it, rather than moving with them.
+	 */
+	async function holdStill(id: string, change: () => void) {
+		const before = document.getElementById(`item-${id}`)?.getBoundingClientRect().top;
+		change();
+		await tick();
+		const after = document.getElementById(`item-${id}`)?.getBoundingClientRect().top;
+		if (before !== undefined && after !== undefined && after !== before) {
+			// At once, not with the page's smooth scrolling: it has to look as if nothing moved.
+			window.scrollBy({ top: after - before, behavior: 'instant' });
+		}
+	}
+	function touchItem(id: string) {
+		if (openItem !== id) void holdStill(id, () => (openItem = id));
+	}
+	async function unfold(id: string) {
+		await holdStill(id, () => (openItem = id));
+		// Focus on its first name, where the change is made.
+		const card = document.getElementById(`item-${id}`);
+		(card?.querySelector<HTMLElement>('button[aria-pressed]') ?? card)?.focus();
 	}
 
 	const nameWithQuantity = (item: BillItem) =>
@@ -1613,11 +1660,14 @@
 				</h2>
 
 				{#if items.length}
-					<ul class="mt-5 space-y-3">
+					<!-- The list keeps the item being tagged still itself (holdStill), so the browser's own
+					     scroll anchoring is off here: the two would move it twice. -->
+					<ul class="mt-5 space-y-3 [overflow-anchor:none]">
 						{#each items as item (item.id)}
 							<li
 								id="item-{item.id}"
 								tabindex="-1"
+								onclickcapture={() => touchItem(item.id)}
 								class="rounded-xl border border-border bg-bg p-3 sm:p-4"
 							>
 								{#if editing?.id === item.id}
@@ -1700,6 +1750,21 @@
 											>
 										</div>
 									</form>
+								{:else if folded(item)}
+									<!-- Tagged and not the one being worked on: one line, who had it, a tap to open. -->
+									<button
+										type="button"
+										onclick={() => unfold(item.id)}
+										class="-my-1 flex min-h-11 w-full items-center justify-between gap-3 text-left"
+									>
+										<span class="min-w-0 break-words"
+											><span class="sr-only">{`${SPLIT_BILL.changeWhoHad} `}</span><span
+												class="font-medium">{nameWithQuantity(item)}</span
+											><span class="text-muted">{` · ${whoHad(item)}`}</span></span
+										>
+										<span class="shrink-0 text-sm text-muted tabular-nums">{money(item.price)}</span
+										>
+									</button>
 								{:else}
 									<div class="flex items-start justify-between gap-3">
 										<div class="min-w-0">
@@ -1760,7 +1825,8 @@
 									</div>
 								{/if}
 
-								{#if people.length && item.counts}
+								<!-- A folded item's who-had-it is on its one line. -->
+								{#if folded(item)}{:else if people.length && item.counts}
 									{@const quantity = item.quantity ?? 1}
 									{@const counted = countedOf(item)}
 									<fieldset class="mt-2 sm:mt-3">

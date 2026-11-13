@@ -675,15 +675,21 @@ export function calculateBill(state: BillState): BillTotals {
  */
 export function firstUnsharedItem(state: BillState): string | undefined {
 	const people = new Set(state.people.map((person) => person.id));
-	return state.items.find((item) => {
-		if (item.counts && (item.quantity ?? 1) > 1) {
-			const counted = Object.entries(item.counts)
-				.filter(([id, count]) => people.has(id) && count > 0)
-				.reduce((sum, [, count]) => sum + count, 0);
-			return counted < (item.quantity ?? 1);
-		}
-		return !item.assignedPersonIds.some((id) => people.has(id));
-	})?.id;
+	return state.items.find((item) => partlyNobodys(item, people))?.id;
+}
+
+/**
+ * Whether some of an item is in nobody's share: nobody among `people` tagged to it, or, when it's
+ * counted, fewer counted than there were.
+ */
+export function partlyNobodys(item: BillItem, people: Set<string>): boolean {
+	if (item.counts && (item.quantity ?? 1) > 1) {
+		const counted = Object.entries(item.counts)
+			.filter(([id, count]) => people.has(id) && count > 0)
+			.reduce((sum, [, count]) => sum + count, 0);
+		return counted < (item.quantity ?? 1);
+	}
+	return !item.assignedPersonIds.some((id) => people.has(id));
 }
 
 /* ─── Settling up ─── */

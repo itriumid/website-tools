@@ -12,6 +12,7 @@ import {
 	formatMoney,
 	missingForItem,
 	parseAmount,
+	partlyNobodys,
 	readBill,
 	DEFAULT_SERVICE_PERCENTAGE,
 	roundingSteps,
@@ -1245,5 +1246,27 @@ describe('firstUnsharedItem', () => {
 		expect(
 			firstUnsharedItem(bill([{ id: '1', name: 'Nasi', price: 10, assignedPersonIds: ['a', 'b'] }]))
 		).toBeUndefined();
+	});
+});
+
+describe('partlyNobodys', () => {
+	const people = new Set(['a', 'b']);
+	it("says whether any of an item is still in nobody's share", () => {
+		expect(partlyNobodys({ id: '1', name: 'Nasi', price: 1, assignedPersonIds: [] }, people)).toBe(
+			true
+		);
+		expect(
+			partlyNobodys({ id: '1', name: 'Nasi', price: 1, assignedPersonIds: ['a'] }, people)
+		).toBe(false);
+		const counted = {
+			id: '2',
+			name: 'Teh',
+			price: 3,
+			quantity: 3,
+			assignedPersonIds: ['a'],
+			counts: { a: 2 }
+		};
+		expect(partlyNobodys(counted, people)).toBe(true);
+		expect(partlyNobodys({ ...counted, counts: { a: 2, b: 1 } }, people)).toBe(false);
 	});
 });

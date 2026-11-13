@@ -566,6 +566,16 @@ waits under them behind "Add an item by hand": after a receipt is read, the item
 not an empty form above them. Items typed in by hand keep the form open under the list, with focus back in its Item field
 for the next.
 
+### Folded items
+
+An item that's someone's folds to one line once the person moves on to another: its name, "·",
+who had it in muted text (with counts when it was counted), and its price on the right; a tap
+opens it again, with focus on its first name, and screen readers hear "Change who had Nasi
+Goreng". The item last touched stays open, so tagging a second person on it doesn't fold it under
+the finger, and when items above fold or open, the one being worked on stays where it was on
+screen (scrolled at once, not smoothly, with the browser's own anchoring off for the list). A bill
+reopened from a draft starts with its tagged items folded.
+
 ### Links that can't open
 
 A shared link cut off when it was pasted, or changed on the way, says so ("This link looks
