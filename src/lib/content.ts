@@ -151,6 +151,8 @@ export const SPLIT_BILL = {
 		unsharedYet: (amount: string) => `${amount} isn't in anyone's share yet.`,
 		showIt: 'Show it',
 		startNew: 'Start a new bill',
+		/** On the button itself for a few seconds after a press: where the press was. */
+		copiedButton: 'Copied',
 		copied: 'Link copied. Anyone with it can open this bill for 30 days.',
 		copiedUpdated:
 			"Link copied. It's the same link as before, and it now opens this version for 30 days.",

@@ -1047,7 +1047,13 @@
 		return { url: `${location.origin}${location.pathname}${hash}`, copied };
 	}
 
+	// "Copied" on the button for a moment after a press, where the press was: the status line under
+	// the buttons can be below the screen's edge on a phone.
+	let linkJustCopied = $state(false);
+	let linkCopiedTimer: ReturnType<typeof setTimeout> | undefined;
+
 	async function copyLink() {
+		if (sharing) return;
 		sharing = true;
 		status = undefined;
 		confirmingDelete = false;
@@ -1062,6 +1068,9 @@
 				await navigator.clipboard.writeText((await link).url);
 			}
 			status = { kind: (await link).copied };
+			linkJustCopied = true;
+			clearTimeout(linkCopiedTimer);
+			linkCopiedTimer = setTimeout(() => (linkJustCopied = false), 3000);
 		} catch {
 			await link;
 			status = { kind: 'copy-failed' };
@@ -2789,13 +2798,17 @@
 								>{SPLIT_BILL.sharedWithYou.copyLink}</button
 							>
 						{:else}
+							<!-- aria-disabled while the server answers, not disabled: a disabled button loses focus,
+							     and a keyboard or screen reader's place with it. -->
 							<button
 								id="copy-link"
 								type="button"
 								onclick={copyLink}
-								disabled={sharing}
-								class="{primaryButton} whitespace-nowrap sm:grow-[2]"
-								>Copy a link to this bill</button
+								aria-disabled={sharing || undefined}
+								class="{primaryButton} whitespace-nowrap aria-disabled:cursor-wait aria-disabled:opacity-50 sm:grow-[2]"
+								>{linkJustCopied
+									? SPLIT_BILL.sharing.copiedButton
+									: 'Copy a link to this bill'}</button
 							>
 						{/if}
 						{#if items.length && people.length}
