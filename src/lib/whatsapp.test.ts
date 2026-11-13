@@ -110,6 +110,9 @@ describe('chatTarget', () => {
 		expect(chatTarget('62', '+62 811 2345 6781 23', '')).toEqual({ problem: 'too-long' });
 		// More than 15 digits isn't a phone number anywhere: a different problem from a code twice.
 		expect(chatTarget('62', '0811 2345 6781 2345', '')).toEqual({ problem: 'too-many-digits' });
+		// The country code typed twice: "too long", which asks about exactly that.
+		expect(chatTarget('62', '62 62 812 3456 7890', '')).toEqual({ problem: 'too-long' });
+		expect(chatTarget('62', '+62 62 812 3456 7890', '')).toEqual({ problem: 'too-long' });
 	});
 
 	it('takes 8 to 15 digits, country code included', () => {
