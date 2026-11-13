@@ -468,7 +468,9 @@ Under the line on using the link, "QR code to print" is a disclosure with the dr
 default since most people came to message a number. Open, it shows the code drawn in the browser
 (`src/lib/qr.ts`, encoded by qrcode-generator): graphite on white with its four-module margin in
 both themes, because scanners read dark on light and that's what prints. "Save the QR code" hands
-it over as a PNG made on the device. Nothing is sent anywhere to make either.
+it over as a PNG made on the device, 24 pixels a module, with "Chat on WhatsApp" and the number
+under the code, below its white margin, in Plus Jakarta Sans: a printed code can be checked by eye,
+and used by someone without a camera. Nothing is sent anywhere to make either.
 
 ### Running total (signature)
 

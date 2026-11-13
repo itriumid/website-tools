@@ -71,18 +71,34 @@
 	let qrOpen = $state(false);
 	const modules = $derived(qrOpen && target ? qrModules(target.link) : undefined);
 
-	/** The code as a PNG, drawn on a canvas here and handed over as a file: nothing is uploaded. */
-	function saveQr() {
+	/**
+	 * The code as a PNG, drawn on a canvas here and handed over as a file: nothing is uploaded.
+	 * Under it, below its white margin (which scanners need clear), what it's for and the number,
+	 * so a printed code can be checked by eye and used by someone without a camera.
+	 */
+	async function saveQr() {
 		if (!modules || !target) return;
 		const scale = 24;
-		const size = drawnSize(modules);
+		const width = drawnSize(modules) * scale;
+		const labelHeight = 168;
 		const canvas = document.createElement('canvas');
-		canvas.width = canvas.height = size * scale;
+		canvas.width = width;
+		canvas.height = width + labelHeight;
 		const context = canvas.getContext('2d');
 		if (!context) return;
+		const font = 'Plus Jakarta Sans Variable';
+		await Promise.all([
+			document.fonts.load(`600 40px "${font}"`),
+			document.fonts.load(`700 60px "${font}"`)
+		]);
 		context.fillStyle = '#ffffff';
 		context.fillRect(0, 0, canvas.width, canvas.height);
 		context.fillStyle = '#2b2b2b';
+		context.textAlign = 'center';
+		context.font = `600 40px "${font}", sans-serif`;
+		context.fillText(WHATSAPP.qr.printLabel, width / 2, width + 16);
+		context.font = `700 60px "${font}", sans-serif`;
+		context.fillText(target.display, width / 2, width + 96, width - 2 * scale);
 		// The path is in modules; each module is `scale` pixels.
 		context.scale(scale, scale);
 		context.fill(new Path2D(qrPath(modules)));
@@ -238,7 +254,7 @@
 							>
 								<path d={qrPath(modules)} fill="currentColor" />
 							</svg>
-							<button type="button" onclick={saveQr} class="{secondaryButton} mt-3"
+							<button type="button" onclick={() => void saveQr()} class="{secondaryButton} mt-3"
 								>{WHATSAPP.qr.save}</button
 							>
 						{/if}
