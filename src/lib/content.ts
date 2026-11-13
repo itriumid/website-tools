@@ -136,6 +136,9 @@ export const SPLIT_BILL = {
 		broken:
 			"This link looks incomplete, so we can't open the bill. Ask whoever sent it to copy it again.",
 		retry: 'Try again',
+		/** By the share buttons, while something's untagged, with "Show it" to go to it. */
+		unsharedYet: (amount: string) => `${amount} isn't in anyone's share yet.`,
+		showIt: 'Show it',
 		startNew: 'Start a new bill',
 		copied: 'Link copied. Anyone with it can open this bill for 30 days.',
 		copiedUpdated:
@@ -243,6 +246,13 @@ export const SPLIT_BILL = {
 		const one = names.length === 1;
 		return `${list}, worth ${worth}, ${one ? "isn't" : "aren't"} tagged or counted for anyone, so ${one ? "it's" : "they're"} left out of the shares.`;
 	},
+	/** For a friend reading a shared bill: what's in nobody's share, as a fact. */
+	unsharedCovered: (amount: string, payer: string) =>
+		`${amount} isn't in anyone's share: ${payer} covers it for now.`,
+	unsharedLeftOut: (amount: string) =>
+		`${amount} isn't in anyone's share, so it's left out of everyone's share.`,
+	/** After the untagged items, once someone's paid: who's out of pocket for them meanwhile. */
+	coversForNow: (payer: string) => `${payer} covers it for now.`,
 	/** Under the untagged items' worth, when their part of the total differs from it. */
 	unsharedOfTotal: (amount: string) => `That's ${amount} of the total.`,
 	// What an amount field says under it as it's typed: what we read, or why we can't.

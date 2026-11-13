@@ -2637,11 +2637,21 @@
 								? 'border-accent-edge'
 								: 'border-border text-muted'}"
 						>
-							<strong>Not in anyone's share:</strong>
-							{SPLIT_BILL.untagged(unsharedItemNames(bill), money(totals.unassigned))}
-							{#if totals.unshared !== totals.unassigned}{SPLIT_BILL.unsharedOfTotal(
-									money(totals.unshared)
-								)}{/if}
+							<!-- A friend reading the bill can't tag anything: they get the fact, and who covers it.
+							     Whoever's making it gets the items to tag, and, once someone's paid, who covers
+							     them meanwhile. -->
+							{#if viewing}
+								{payerName
+									? SPLIT_BILL.unsharedCovered(money(totals.unshared), payerName)
+									: SPLIT_BILL.unsharedLeftOut(money(totals.unshared))}
+							{:else}
+								<strong>Not in anyone's share:</strong>
+								{SPLIT_BILL.untagged(unsharedItemNames(bill), money(totals.unassigned))}
+								{#if totals.unshared !== totals.unassigned}{SPLIT_BILL.unsharedOfTotal(
+										money(totals.unshared)
+									)}{/if}
+								{#if payerName}{SPLIT_BILL.coversForNow(payerName)}{/if}
+							{/if}
 						</p>
 					{/if}
 
@@ -2708,6 +2718,23 @@
 			     bill asked for the wrong next step. -->
 			{#if items.length}
 				<div>
+					<!-- Something in nobody's share, said where the bill is about to be sent: the note above the
+					     totals is easy to have scrolled past. -->
+					{#if !viewing && totals.unshared > 0}
+						<p class="mb-3 flex flex-wrap items-center gap-x-3 text-sm">
+							<span class="flex gap-2"
+								><Caution class="mt-0.5 shrink-0" />{SPLIT_BILL.sharing.unsharedYet(
+									money(totals.unshared)
+								)}</span
+							>
+							{#if unsharedItem}<button
+									type="button"
+									onclick={showUnshared}
+									class="min-h-9 font-medium underline underline-offset-4 hover:text-accent-text pointer-coarse:min-h-11"
+									>{SPLIT_BILL.sharing.showIt}</button
+								>{/if}
+						</p>
+					{/if}
 					<!-- Each as wide as its words, sharing what's left over; a row too narrow for them all wraps a
 					     whole button, never its label. -->
 					<div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap lg:flex-col">
