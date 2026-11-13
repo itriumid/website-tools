@@ -394,10 +394,12 @@
 					.filter(([id, count]) => peopleIds.has(id) && count > 0)
 					.map(([id, count]) => `${nameOf(id)} ${count}`)
 					.join(', ')
-			: item.assignedPersonIds
-					.filter((id) => peopleIds.has(id))
-					.map(nameOf)
-					.join(', ');
+			: everyoneHasIt(item)
+				? 'Everyone'
+				: item.assignedPersonIds
+						.filter((id) => peopleIds.has(id))
+						.map(nameOf)
+						.join(', ');
 
 	/**
 	 * Items above this one may fold or open as it becomes the open one: it stays where it was on
@@ -2635,7 +2637,11 @@
 						{/if}
 						{#if bill.taxPercentage > 0}
 							<div class="flex justify-between gap-4 text-muted">
-								<dt>Tax ({bill.taxPercentage}%{bill.taxOnService ? ', on service too' : ''})</dt>
+								<dt>
+									Tax ({bill.taxPercentage}%{bill.taxOnService && bill.servicePercentage > 0
+										? ', on service too'
+										: ''})
+								</dt>
 								<dd>{bill.taxIncluded ? 'included' : money(totals.tax)}</dd>
 							</div>
 						{/if}
