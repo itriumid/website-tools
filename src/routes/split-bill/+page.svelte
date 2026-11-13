@@ -247,6 +247,8 @@
 		shared?: number;
 		/** For a person: what only they had, now in nobody's share. */
 		alone?: number;
+		/** For an item: only who had it was cleared ("Nobody"), not the item itself. */
+		cleared?: boolean;
 		before: Pick<BillState, 'people' | 'items'> & {
 			adjustments: BillAdjustment[];
 			paidBy?: string;
@@ -535,7 +537,14 @@
 		people.length > 0 && people.every((person) => item.assignedPersonIds.includes(person.id));
 
 	function toggleEveryone(item: BillItem) {
-		item.assignedPersonIds = everyoneHasIt(item) ? [] : people.map((person) => person.id);
+		if (!everyoneHasIt(item)) {
+			item.assignedPersonIds = people.map((person) => person.id);
+			return;
+		}
+		// "Nobody" undoes a whole row of tags in one press, sitting where a thumb lands: it can be
+		// undone like a removal.
+		undoable('items', item.id, item.name, () => (item.assignedPersonIds = []));
+		if (removal) removal.cleared = true;
 	}
 
 	/* ─── Charges and adjustments ─── */
@@ -2039,7 +2048,9 @@
 						: ''}"
 					role="status"
 				>
-					{#if removal?.from === 'items'}{SPLIT_BILL.removed(removal.name)}<button
+					{#if removal?.from === 'items'}{(removal.cleared
+							? SPLIT_BILL.clearedWho
+							: SPLIT_BILL.removed)(removal.name)}<button
 							id="undo-items"
 							type="button"
 							onclick={undoRemoval}
@@ -2421,7 +2432,9 @@
 										removal.shared ?? 0,
 										removal.alone ? money(removal.alone) : undefined
 									)
-								: SPLIT_BILL.removed(removal.name)}<button
+								: (removal.cleared ? SPLIT_BILL.clearedWho : SPLIT_BILL.removed)(
+										removal.name
+									)}<button
 								type="button"
 								onclick={undoRemoval}
 								class="min-h-11 font-medium underline underline-offset-4 hover:text-accent-text"

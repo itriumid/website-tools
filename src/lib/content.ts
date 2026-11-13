@@ -208,6 +208,8 @@ export const SPLIT_BILL = {
 	},
 	// After removing someone or something: one tap took it, one tap brings it back.
 	removed: (name: string) => `Removed ${name}.`,
+	/** After "Nobody" clears who had an item, with Undo beside it like a removal. */
+	clearedWho: (name: string) => `Cleared who had ${name}.`,
 	// What only they had leaves the split, and that's money someone has to notice.
 	removedPerson: (name: string, shared: number, alone?: string) => {
 		const theShared =
