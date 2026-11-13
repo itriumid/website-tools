@@ -1086,6 +1086,20 @@
 		if (unsharedItem) void focusAfter(`item-${unsharedItem}`, true);
 	}
 
+	// While the split itself is on screen, the bar that points to it has nothing to add: it steps
+	// aside, keeping its space, so the end of the page doesn't move.
+	let splitCard: HTMLElement | undefined = $state();
+	let splitInView = $state(false);
+	$effect(() => {
+		if (!splitCard) {
+			splitInView = false;
+			return;
+		}
+		const watcher = new IntersectionObserver(([entry]) => (splitInView = entry.isIntersecting));
+		watcher.observe(splitCard);
+		return () => watcher.disconnect();
+	});
+
 	function showSplit() {
 		const heading = document.getElementById('split-heading');
 		heading?.focus({ preventScroll: true });
@@ -2357,13 +2371,15 @@
 			{/if}
 			<!-- The split -->
 			{#if items.length}
-				<section class={card} aria-labelledby="split-heading">
+				<section class={card} aria-labelledby="split-heading" bind:this={splitCard}>
 					<h2 id="split-heading" tabindex="-1" class={cardHeading}>The split</h2>
 					<!-- A removal changes the split, so it says so here too, with the way back: on a wide
 					     screen the card it was made in is in the other column. Not a second live region:
 					     the card's own line already announces it. -->
 					{#if removal}
-						<p class="-mt-2 mb-3 flex flex-wrap items-center gap-x-3 text-sm">
+						<!-- Only from 1024px, where this card is in the other column: below that the card the
+						     removal was made in is right above, with its own line and Undo. -->
+						<p class="-mt-2 mb-3 hidden flex-wrap items-center gap-x-3 text-sm lg:flex">
 							{removal.from === 'people'
 								? SPLIT_BILL.removedPerson(
 										removal.name,
@@ -2777,7 +2793,9 @@
 			<section
 				aria-label="The bill so far"
 				data-running-total
-				class="sticky bottom-0 z-10 mx-[calc(50%-50cqw)] border-t border-border bg-surface px-[calc(50cqw-50%)] pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:hidden"
+				class="sticky bottom-0 z-10 mx-[calc(50%-50cqw)] border-t border-border bg-surface px-[calc(50cqw-50%)] pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:hidden {splitInView
+					? 'invisible'
+					: ''}"
 			>
 				<div class="flex items-center justify-between gap-3">
 					{#if unsharedItem && totals.unshared > 0}
