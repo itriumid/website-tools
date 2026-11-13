@@ -291,9 +291,10 @@
 				</p>
 			{/if}
 		</section>
-		<p class="-mt-2 min-h-5 text-sm" role="status">
-			{#if copied === 'yes'}Link copied.{:else if copied === 'failed'}We couldn't copy it. Select
-				the link above and copy it yourself.{/if}
+		<!-- Takes no room until it has something to say: it's the last thing in the card. -->
+		<p class="-mt-2 text-sm empty:mt-0" role="status">
+			{#if copied === 'yes'}{WHATSAPP.result.linkCopied}{:else if copied === 'failed'}{WHATSAPP
+					.result.copyFailed}{/if}
 		</p>
 	</form>
 </section>
