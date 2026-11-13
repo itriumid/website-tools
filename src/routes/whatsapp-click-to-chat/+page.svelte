@@ -3,7 +3,7 @@
 	import Seo from '#lib/Seo.svelte';
 	import TitleBand from '#lib/TitleBand.svelte';
 	import { WHATSAPP } from '#lib/content.js';
-	import { COUNTRIES, DEFAULT_COUNTRY_NAME } from '#lib/countries.js';
+	import { COUNTRIES, DEFAULT_COUNTRY_NAME, searchNames } from '#lib/countries.js';
 	import { card, field, label, primaryButton, secondaryButton } from '#lib/styles.js';
 	import { chatTarget, countriesWithCode, waitsForTyping } from '#lib/whatsapp.js';
 	import Caution from '#lib/Caution.svelte';
@@ -15,7 +15,7 @@
 	const choices: Choice[] = COUNTRIES.map((country) => ({
 		value: country.name,
 		label: `+${country.phoneCode}${country.areaCodes ? ` ${country.areaCodes.join('/')}` : ''} ${country.name}`,
-		searchTerms: country.name
+		searchTerms: searchNames(country.name)
 	}));
 
 	let countryName = $state(DEFAULT_COUNTRY_NAME);

@@ -358,7 +358,9 @@ Soft and rounded, with the radius growing with the size of the object, on the sa
 itrium.id. Buttons, chips and the info button are pills (`full`). Fields, notes and floating lists
 get 0.5rem (`sm`), and options inside a list a little less (0.375rem). Inset lists, receipt lines
 and the receipt photo get 0.75rem (`md`). Cards get 1rem (`lg`). Panels and title bands get 1.5rem
-(`xl`). The focus outline is 2 px at 4 px radius (`focus`), 3 px away from the element. Edges are
+(`xl`). The focus outline is 2 px at 4 px radius (`focus`), 3 px away from the element. Headings and
+cards that the page itself moves focus to (`tabindex="-1"`) show none: focus still moves and is
+announced, but a ring there read as a stray selection box, pink in dark mode. Edges are
 1 px hairlines, notes included.
 
 The arrow is drawn, not typed: one SVG, the same as itrium.id's `Arrow.svelte`, with a 2-unit
@@ -418,9 +420,12 @@ The people on a bill, tapped to say who had what.
 ### Searchable select
 
 A field that opens a floating list: 0.5rem radius, control-edge border, the surface color, 0.25rem
-inset, and the floating-list shadow. The active option fills with the page color. It's capped at
+inset, and the floating-list shadow. The active option, where keyboard focus is in the list, fills pink like any focus; hovering one
+fills it with the page color. It's capped at
 16rem tall and scrolls. What's typed matches anywhere in a choice, and choices with a word starting
-with it come first: "mal" lists Malaysia before Guatemala (`src/lib/search.ts`).
+with it come first: "mal" lists Malaysia before Guatemala (`src/lib/search.ts`). A
+word that is exactly what's typed comes before both, and countries are found by the other names
+they go by too, never shown: "uk", "usa", "uae", or their names in Indonesian ("Jepang").
 
 ### Cards
 
@@ -601,7 +606,8 @@ under a long slab.
 Two text links in the header beside the lockup, "Free tools" and "About Itrium", muted, turning to
 the text color on hover. On the index, "Free tools" carries `aria-current="page"` and stays in
 the text color. It's the way back from a tool. The lockup leads to itrium.id and is named
-"Itrium's main site". A pink skip link sits off screen and drops in from the top on focus. The footer is muted
+"Itrium's main site". Under 360px wide the lockup gives way to the mark alone, so the header
+stays one line. A pink skip link sits off screen and drops in from the top on focus. The footer is muted
 small text: the no-tracking promise on the left (except on the index, where the closing panel
 says it in full; only Split bill's mentions sharing a bill, the one thing that reaches us), contact
 and source links on the right. The header's and footer's links stay small text but are 2.75rem

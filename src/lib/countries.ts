@@ -188,3 +188,82 @@ export const DEFAULT_COUNTRY_NAME = 'Indonesia';
 
 /** Default currency code for Indonesia */
 export const DEFAULT_CURRENCY_CODE = 'IDR';
+
+/**
+ * Other names a country goes by, so typing one finds it: what people abbreviate or call it in
+ * English ("UK", "USA", "Holland"), and its name in Indonesian where that differs ("Jepang"). Only
+ * searched, never shown.
+ */
+const ALSO_KNOWN_AS: Record<string, string[]> = {
+	Afghanistan: ['Afganistan'],
+	Algeria: ['Aljazair'],
+	Belgium: ['Belgia'],
+	Brazil: ['Brasil'],
+	Cambodia: ['Kamboja'],
+	Canada: ['Kanada'],
+	China: ['Tiongkok', 'Cina', 'PRC'],
+	Colombia: ['Kolombia'],
+	Croatia: ['Kroasia'],
+	Cuba: ['Kuba'],
+	Cyprus: ['Siprus'],
+	'Czech Republic': ['Czechia', 'Ceko'],
+	'Dominican Republic': ['Republik Dominika'],
+	Egypt: ['Mesir'],
+	Ethiopia: ['Etiopia'],
+	Finland: ['Finlandia'],
+	France: ['Prancis'],
+	Germany: ['Jerman', 'Deutschland'],
+	Greece: ['Yunani'],
+	'Hong Kong': ['HK'],
+	Hungary: ['Hongaria'],
+	Iceland: ['Islandia'],
+	Iraq: ['Irak'],
+	Ireland: ['Irlandia'],
+	Italy: ['Italia'],
+	Japan: ['Jepang'],
+	Jordan: ['Yordania'],
+	Libya: ['Libia'],
+	Luxembourg: ['Luksemburg'],
+	Macau: ['Macao', 'Makau'],
+	Maldives: ['Maladewa'],
+	Mexico: ['Meksiko'],
+	Morocco: ['Maroko'],
+	Myanmar: ['Burma'],
+	Netherlands: ['Holland', 'Belanda'],
+	'New Zealand': ['NZ', 'Selandia Baru'],
+	'North Korea': ['Korea Utara'],
+	Norway: ['Norwegia'],
+	Palestine: ['Palestina'],
+	Philippines: ['Filipina'],
+	Poland: ['Polandia'],
+	Romania: ['Rumania'],
+	Russia: ['Rusia'],
+	'Saudi Arabia': ['KSA', 'Arab Saudi'],
+	Singapore: ['Singapura'],
+	Slovakia: ['Slowakia'],
+	'South Africa': ['Afrika Selatan'],
+	'South Korea': ['Korea', 'Korea Selatan'],
+	Spain: ['Spanyol'],
+	Sweden: ['Swedia'],
+	Switzerland: ['Swiss'],
+	'Timor-Leste': ['East Timor', 'Timor Leste'],
+	Turkey: ['Türkiye', 'Turki'],
+	Ukraine: ['Ukraina'],
+	'United Arab Emirates': ['UAE', 'Emirates', 'Dubai', 'Abu Dhabi', 'Uni Emirat Arab'],
+	'United Kingdom': [
+		'UK',
+		'Britain',
+		'Great Britain',
+		'England',
+		'Scotland',
+		'Wales',
+		'Northern Ireland',
+		'Inggris'
+	],
+	'United States': ['USA', 'US', 'America', 'Amerika', 'Amerika Serikat'],
+	Vietnam: ['Viet Nam'],
+	Yemen: ['Yaman']
+};
+
+/** A country's name and the others it goes by, for a search to match against. */
+export const searchNames = (name: string) => [name, ...(ALSO_KNOWN_AS[name] ?? [])].join(' ');

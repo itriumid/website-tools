@@ -5,6 +5,7 @@
 	import { page } from '$app/state';
 	import lockupOnDark from '#lib/itrium-lockup-on-dark.svg';
 	import lockupOnLight from '#lib/itrium-lockup-on-light.svg';
+	import mark from '#lib/itrium-mark.svg';
 	import {
 		EMAIL,
 		GITHUB_URL,
@@ -43,7 +44,10 @@
 
 <header class="mx-auto flex max-w-5xl items-center justify-between gap-4 px-5 py-6 sm:px-8">
 	<a href={MAIN_SITE_URL} class="shrink-0" aria-label="Itrium's main site">
+		<!-- Under 360px the lockup and both links don't fit on one line (the links broke onto two
+		     each at 320): there, the mark alone, which is the same tile in either theme. -->
 		<picture>
+			<source srcset={mark} media="(max-width: 359.98px)" />
 			<source srcset={lockupOnDark} media="(prefers-color-scheme: dark)" />
 			<img src={lockupOnLight} alt="" width="131" height="40" class="h-10 w-auto" />
 		</picture>

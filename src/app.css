@@ -82,6 +82,13 @@ html {
 		border-radius: 4px;
 	}
 
+	/* Headings and cards the page moves focus to itself (tabindex="-1"), so a keyboard or a screen
+	   reader carries on from there: no ring around them, which looked like a stray selection box
+	   (pink in dark mode) on a bill opened from a link. Focus still moves and is still announced. */
+	[tabindex='-1']:focus-visible {
+		outline: none;
+	}
+
 	/* No paragraph ends on a single stranded word, and headings balance their lines. */
 	p,
 	li,
