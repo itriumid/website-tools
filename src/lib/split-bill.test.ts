@@ -13,6 +13,7 @@ import {
 	missingForItem,
 	parseAmount,
 	partlyNobodys,
+	unsharedItemNames,
 	readBill,
 	DEFAULT_SERVICE_PERCENTAGE,
 	roundingSteps,
@@ -1268,5 +1269,22 @@ describe('partlyNobodys', () => {
 		};
 		expect(partlyNobodys(counted, people)).toBe(true);
 		expect(partlyNobodys({ ...counted, counts: { a: 2, b: 1 } }, people)).toBe(false);
+	});
+});
+
+describe('unsharedItemNames', () => {
+	it("names the items with some of them in nobody's share, with how many there were", () => {
+		const state: BillState = {
+			people: [{ id: 'a', name: 'Ayu' }],
+			items: [
+				{ id: '1', name: 'Nasi', price: 10, assignedPersonIds: ['a'] },
+				{ id: '2', name: 'Es Teh', price: 16, quantity: 2, assignedPersonIds: [] },
+				{ id: '3', name: 'Sate', price: 30, assignedPersonIds: ['gone'] }
+			],
+			taxPercentage: 0,
+			servicePercentage: 0,
+			currencyCode: 'IDR'
+		};
+		expect(unsharedItemNames(state)).toEqual(['2× Es Teh', 'Sate']);
 	});
 });

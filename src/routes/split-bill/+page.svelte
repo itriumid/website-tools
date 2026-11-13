@@ -30,6 +30,7 @@
 		formatAmount,
 		firstUnsharedItem,
 		partlyNobodys,
+		unsharedItemNames,
 		formatMoney,
 		missingForItem,
 		parseAmount,
@@ -320,12 +321,31 @@
 	let newPriceText = $state('');
 	const newPriceRead = $derived(readTypedAmount(newPriceText));
 	const newPrice = $derived(amountOf(newPriceRead));
-	const newPriceNote = $derived(amountNote(newPriceRead, SPLIT_BILL.amounts.negativePrice));
+	/** With a quantity over one, the price is for one: the note says what the line comes to. */
+	function timesNote(
+		note: ReturnType<typeof amountNote>,
+		read: AmountRead,
+		quantity: number
+	): ReturnType<typeof amountNote> {
+		const each = amountOf(read);
+		if (!note || note.problem || quantity <= 1 || each === null) return note;
+		return {
+			text: SPLIT_BILL.amounts.readsTimes(quantity, money(each), money(each * quantity)),
+			problem: false
+		};
+	}
 	let newQuantity: number | null = $state(1);
 	const quantityOf = (value: number | null) =>
 		typeof value === 'number' && Number.isFinite(value)
 			? Math.min(MAX_QUANTITY, Math.max(1, Math.round(value)))
 			: 1;
+	const newPriceNote = $derived(
+		timesNote(
+			amountNote(newPriceRead, SPLIT_BILL.amounts.negativePrice),
+			newPriceRead,
+			quantityOf(newQuantity)
+		)
+	);
 	const canAddItem = $derived(newItem.trim() !== '' && newPrice !== null && newPrice > 0);
 	// Once there are items read from a receipt, the form for another waits behind a button, under
 	// the list: the items are what's next, not an empty form above them. Typed in, it stays open.
@@ -374,10 +394,12 @@
 					.filter(([id, count]) => peopleIds.has(id) && count > 0)
 					.map(([id, count]) => `${nameOf(id)} ${count}`)
 					.join(', ')
-			: item.assignedPersonIds
-					.filter((id) => peopleIds.has(id))
-					.map(nameOf)
-					.join(', ');
+			: everyoneHasIt(item)
+				? 'Everyone'
+				: item.assignedPersonIds
+						.filter((id) => peopleIds.has(id))
+						.map(nameOf)
+						.join(', ');
 
 	/**
 	 * Items above this one may fold or open as it becomes the open one: it stays where it was on
@@ -448,7 +470,12 @@
 	let editing: ItemEdit | undefined = $state();
 	const editPriceRead = $derived(editing && readTypedAmount(editing.priceText));
 	const editPriceNote = $derived(
-		editing && amountNote(editPriceRead, SPLIT_BILL.amounts.negativePrice)
+		editing &&
+			timesNote(
+				amountNote(editPriceRead, SPLIT_BILL.amounts.negativePrice),
+				editPriceRead,
+				quantityOf(editing.quantity)
+			)
 	);
 	const editReason = $derived.by(() => {
 		if (!editing || editPriceNote?.problem) return undefined;
@@ -764,6 +791,28 @@
 		| { kind: 'link-copied' }
 		| { kind: 'cleared' };
 	let status: Status | undefined = $state();
+	// "Cleared." and what copying or sharing did are about the bill as it was then: once it
+	// changes, they're old news, and they go rather than sit there for minutes.
+	const STALE_ONCE_CHANGED = new Set<Status['kind']>([
+		'cleared',
+		'copied',
+		'copied-updated',
+		'copied-new',
+		'copied-long',
+		'link-copied',
+		'text-copied',
+		'deleted'
+	]);
+	let statusBill: string | undefined;
+	$effect(() => {
+		const now = JSON.stringify(bill);
+		if (!status || !STALE_ONCE_CHANGED.has(status.kind)) {
+			statusBill = undefined;
+			return;
+		}
+		if (statusBill === undefined) statusBill = now;
+		else if (statusBill !== now) status = undefined;
+	});
 	let sharing = $state(false);
 	// The bill as it was last shared from here, so sharing it again unchanged reuses its link.
 	let lastShared: { json: string; code: string } | undefined;
@@ -1038,6 +1087,20 @@
 	function showUnshared() {
 		if (unsharedItem) void focusAfter(`item-${unsharedItem}`, true);
 	}
+
+	// While the split itself is on screen, the bar that points to it has nothing to add: it steps
+	// aside, keeping its space, so the end of the page doesn't move.
+	let splitCard: HTMLElement | undefined = $state();
+	let splitInView = $state(false);
+	$effect(() => {
+		if (!splitCard) {
+			splitInView = false;
+			return;
+		}
+		const watcher = new IntersectionObserver(([entry]) => (splitInView = entry.isIntersecting));
+		watcher.observe(splitCard);
+		return () => watcher.disconnect();
+	});
 
 	function showSplit() {
 		const heading = document.getElementById('split-heading');
@@ -2310,13 +2373,15 @@
 			{/if}
 			<!-- The split -->
 			{#if items.length}
-				<section class={card} aria-labelledby="split-heading">
+				<section class={card} aria-labelledby="split-heading" bind:this={splitCard}>
 					<h2 id="split-heading" tabindex="-1" class={cardHeading}>The split</h2>
 					<!-- A removal changes the split, so it says so here too, with the way back: on a wide
 					     screen the card it was made in is in the other column. Not a second live region:
 					     the card's own line already announces it. -->
 					{#if removal}
-						<p class="-mt-2 mb-3 flex flex-wrap items-center gap-x-3 text-sm">
+						<!-- Only from 1024px, where this card is in the other column: below that the card the
+						     removal was made in is right above, with its own line and Undo. -->
+						<p class="-mt-2 mb-3 hidden flex-wrap items-center gap-x-3 text-sm lg:flex">
 							{removal.from === 'people'
 								? SPLIT_BILL.removedPerson(
 										removal.name,
@@ -2368,14 +2433,23 @@
 										{#if settlement.paidTheBill}<span class="text-sm text-muted"
 												>{SPLIT_BILL.split.comesBack}</span
 											>{/if}
-										<span
-											class="text-2xl font-bold tracking-tight tabular-nums {settlement.amount ===
-												0 && !settlement.paidTheBill
-												? 'text-muted'
-												: ''}"
-										>
-											{money(settlement.paidTheBill ? settledUp.back : settlement.amount)}
-										</span>
+										<!-- What comes back to whoever paid is set apart from what everyone else hands
+										     over: a plus, a size smaller and muted, so a quick read of the column never
+										     takes it for the biggest debt. -->
+										{#if settlement.paidTheBill}
+											<span class="text-xl font-semibold tracking-tight text-muted tabular-nums"
+												>+{money(settledUp.back)}</span
+											>
+										{:else}
+											<span
+												class="text-2xl font-bold tracking-tight tabular-nums {settlement.amount ===
+												0
+													? 'text-muted'
+													: ''}"
+											>
+												{money(settlement.amount)}
+											</span>
+										{/if}
 									</span>
 								{/snippet}
 								<li>
@@ -2533,8 +2607,8 @@
 								? 'border-accent-edge'
 								: 'border-border text-muted'}"
 						>
-							<strong>Not in anyone's share:</strong> items worth {money(totals.unassigned)} aren't tagged
-							or counted for anyone, so they're left out of the shares.
+							<strong>Not in anyone's share:</strong>
+							{SPLIT_BILL.untagged(unsharedItemNames(bill), money(totals.unassigned))}
 							{#if totals.unshared !== totals.unassigned}{SPLIT_BILL.unsharedOfTotal(
 									money(totals.unshared)
 								)}{/if}
@@ -2563,7 +2637,11 @@
 						{/if}
 						{#if bill.taxPercentage > 0}
 							<div class="flex justify-between gap-4 text-muted">
-								<dt>Tax ({bill.taxPercentage}%{bill.taxOnService ? ', on service too' : ''})</dt>
+								<dt>
+									Tax ({bill.taxPercentage}%{bill.taxOnService && bill.servicePercentage > 0
+										? ', on service too'
+										: ''})
+								</dt>
 								<dd>{bill.taxIncluded ? 'included' : money(totals.tax)}</dd>
 							</div>
 						{/if}
@@ -2596,7 +2674,9 @@
 				</div>
 			{/if}
 			<!-- Share and clear -->
-			{#if items.length || people.length}
+			<!-- Sharing, once there's something on the bill to share: a pink "Copy a link" over an empty
+			     bill asked for the wrong next step. -->
+			{#if items.length}
 				<div>
 					<!-- Each as wide as its words, sharing what's left over; a row too narrow for them all wraps a
 					     whole button, never its label. -->
@@ -2719,7 +2799,9 @@
 			<section
 				aria-label="The bill so far"
 				data-running-total
-				class="sticky bottom-0 z-10 mx-[calc(50%-50cqw)] border-t border-border bg-surface px-[calc(50cqw-50%)] pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:hidden"
+				class="sticky bottom-0 z-10 mx-[calc(50%-50cqw)] border-t border-border bg-surface px-[calc(50cqw-50%)] pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:hidden {splitInView
+					? 'invisible'
+					: ''}"
 			>
 				<div class="flex items-center justify-between gap-3">
 					{#if unsharedItem && totals.unshared > 0}

@@ -678,6 +678,14 @@ export function firstUnsharedItem(state: BillState): string | undefined {
 	return state.items.find((item) => partlyNobodys(item, people))?.id;
 }
 
+/** The items with some of them in nobody's share, by name ("2× Es Teh"), in the bill's order. */
+export function unsharedItemNames(state: BillState): string[] {
+	const people = new Set(state.people.map((person) => person.id));
+	return state.items
+		.filter((item) => partlyNobodys(item, people))
+		.map((item) => ((item.quantity ?? 1) > 1 ? `${item.quantity}× ${item.name}` : item.name));
+}
+
 /**
  * Whether some of an item is in nobody's share: nobody among `people` tagged to it, or, when it's
  * counted, fewer counted than there were.
