@@ -423,7 +423,9 @@ A field that opens a floating list: 0.5rem radius, control-edge border, the surf
 inset, and the floating-list shadow. The active option, where keyboard focus is in the list, fills pink like any focus; hovering one
 fills it with the page color. It's capped at
 16rem tall and scrolls. What's typed matches anywhere in a choice, and choices with a word starting
-with it come first: "mal" lists Malaysia before Guatemala (`src/lib/search.ts`).
+with it come first: "mal" lists Malaysia before Guatemala (`src/lib/search.ts`). A
+word that is exactly what's typed comes before both, and countries are found by the other names
+they go by too, never shown: "uk", "usa", "uae", or their names in Indonesian ("Jepang").
 
 ### Cards
 

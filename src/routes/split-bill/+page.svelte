@@ -15,7 +15,7 @@
 		type ScannedReceipt
 	} from '#lib/receipt.js';
 	import { SPLIT_BILL } from '#lib/content.js';
-	import { CURRENCIES } from '#lib/countries.js';
+	import { CURRENCIES, searchNames } from '#lib/countries.js';
 	import {
 		DEFAULT_CURRENCY_CODE,
 		DEFAULT_SERVICE_PERCENTAGE,
@@ -78,7 +78,7 @@
 		detail:
 			currency.countries.slice(0, 3).join(', ') +
 			(currency.countries.length > 3 ? ` and ${currency.countries.length - 3} more` : ''),
-		searchTerms: `${currency.symbol} ${currency.countries.join(' ')}`
+		searchTerms: `${currency.symbol} ${currency.countries.map(searchNames).join(' ')}`
 	}));
 
 	/* ─── The bill ─── */
