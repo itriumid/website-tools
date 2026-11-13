@@ -320,12 +320,31 @@
 	let newPriceText = $state('');
 	const newPriceRead = $derived(readTypedAmount(newPriceText));
 	const newPrice = $derived(amountOf(newPriceRead));
-	const newPriceNote = $derived(amountNote(newPriceRead, SPLIT_BILL.amounts.negativePrice));
+	/** With a quantity over one, the price is for one: the note says what the line comes to. */
+	function timesNote(
+		note: ReturnType<typeof amountNote>,
+		read: AmountRead,
+		quantity: number
+	): ReturnType<typeof amountNote> {
+		const each = amountOf(read);
+		if (!note || note.problem || quantity <= 1 || each === null) return note;
+		return {
+			text: SPLIT_BILL.amounts.readsTimes(quantity, money(each), money(each * quantity)),
+			problem: false
+		};
+	}
 	let newQuantity: number | null = $state(1);
 	const quantityOf = (value: number | null) =>
 		typeof value === 'number' && Number.isFinite(value)
 			? Math.min(MAX_QUANTITY, Math.max(1, Math.round(value)))
 			: 1;
+	const newPriceNote = $derived(
+		timesNote(
+			amountNote(newPriceRead, SPLIT_BILL.amounts.negativePrice),
+			newPriceRead,
+			quantityOf(newQuantity)
+		)
+	);
 	const canAddItem = $derived(newItem.trim() !== '' && newPrice !== null && newPrice > 0);
 	// Once there are items read from a receipt, the form for another waits behind a button, under
 	// the list: the items are what's next, not an empty form above them. Typed in, it stays open.
@@ -448,7 +467,12 @@
 	let editing: ItemEdit | undefined = $state();
 	const editPriceRead = $derived(editing && readTypedAmount(editing.priceText));
 	const editPriceNote = $derived(
-		editing && amountNote(editPriceRead, SPLIT_BILL.amounts.negativePrice)
+		editing &&
+			timesNote(
+				amountNote(editPriceRead, SPLIT_BILL.amounts.negativePrice),
+				editPriceRead,
+				quantityOf(editing.quantity)
+			)
 	);
 	const editReason = $derived.by(() => {
 		if (!editing || editPriceNote?.problem) return undefined;

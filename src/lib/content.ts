@@ -231,6 +231,9 @@ export const SPLIT_BILL = {
 	// What an amount field says under it as it's typed: what we read, or why we can't.
 	amounts: {
 		reads: (amount: string) => `= ${amount}`,
+		/** With a quantity: the line the bill gets, so a line total typed as "each" shows. */
+		readsTimes: (quantity: number, each: string, line: string) =>
+			`= ${quantity} × ${each} = ${line}`,
 		unreadable: "We can't read this amount. Use digits, with dots or commas if you like.",
 		noCents: 'This currency has no cents. Leave them off.',
 		zero: 'Enter an amount above zero.',
