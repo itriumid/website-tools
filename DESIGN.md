@@ -429,7 +429,9 @@ fills it with the page color. It's capped at
 16rem tall and scrolls. What's typed matches anywhere in a choice, and choices with a word starting
 with it come first: "mal" lists Malaysia before Guatemala (`src/lib/search.ts`). A
 word that is exactly what's typed comes before both, and countries are found by the other names
-they go by too, never shown: "uk", "usa", "uae", or their names in Indonesian ("Jepang").
+they go by too, never shown: "uk", "usa", "uae", or their names in Indonesian ("Jepang"). Those
+count only from a word's start: letters inside a name nobody can see would bring a choice with
+nothing to say why ("uk" in "Luksemburg").
 
 ### Cards
 
@@ -497,7 +499,8 @@ under the code, below its white margin, in Plus Jakarta Sans: a printed code can
 and used by someone without a camera. Nothing is sent anywhere to make either.
 With a message, a muted line says the code includes it ("whoever scans it starts with it typed"),
 with a "Leave the message out of the code" checkbox: a shop printing one code for everyone may not
-want one customer's message on it, and a shorter link makes a coarser code that scans better.
+want one customer's message on it, and a shorter link makes a coarser code that scans better. After Save, a line under it names the file ("Look for whatsapp-6281234567890.png in your
+downloads."), since a download can land with nothing on screen saying so.
 
 ### Running total (signature)
 
