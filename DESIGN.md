@@ -504,9 +504,10 @@ with the split's heading focused, scrolled to on a phone.
 ### A bill shared with you
 
 Someone who opens a shared bill that wasn't shared from their own device sees the split on its own,
-centered, under one line that says what this is ("This is the bill as it was shared with you. Find
-your name for your share.") and a small "Make changes" with a muted note that changes stay on the
-device until the bill is shared again. Who paid and rounding show only as their result in the rows;
+centered, under one line that says what this is ("This is the bill as it was shared with you. Find your
+name, and tap it to see what's in your share."). A small "Make changes", with a muted note that
+changes stay on the device until the bill is shared again, waits under the split, so the friend's
+own row is on a phone's first screen. Who paid and rounding show only as their result in the rows;
 there's no running total, since the split is already in view. The pink action is "Copy the link",
 which copies the link they opened: making a new link is for whoever changes the bill. "Make changes"
 brings back the whole editor, focused on its first card. Whoever shared the bill gets the editor

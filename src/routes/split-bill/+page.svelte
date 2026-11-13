@@ -2150,14 +2150,10 @@
 		<div
 			class="space-y-6 lg:sticky lg:top-6 lg:-m-2 lg:max-h-[calc(100dvh-3rem)] lg:overflow-y-auto lg:overscroll-contain lg:p-2"
 		>
+			<!-- For a friend opening the link: what this is, then straight to the split; changing it
+			     waits under it, so their own row is on a phone's first screen. -->
 			{#if viewing}
-				<div>
-					<p>{SPLIT_BILL.sharedWithYou.line}</p>
-					<button type="button" onclick={makeChanges} class="{smallButton} mt-3"
-						>{SPLIT_BILL.sharedWithYou.makeChanges}</button
-					>
-					<p class="mt-2 text-sm text-muted">{SPLIT_BILL.sharedWithYou.note}</p>
-				</div>
+				<p>{SPLIT_BILL.sharedWithYou.line}</p>
 			{/if}
 			<!-- The split -->
 			{#if items.length}
@@ -2420,6 +2416,14 @@
 				</p>
 			{/if}
 
+			{#if viewing}
+				<div>
+					<button type="button" onclick={makeChanges} class={smallButton}
+						>{SPLIT_BILL.sharedWithYou.makeChanges}</button
+					>
+					<p class="mt-2 text-sm text-muted">{SPLIT_BILL.sharedWithYou.note}</p>
+				</div>
+			{/if}
 			<!-- Share and clear -->
 			{#if items.length || people.length}
 				<div>
