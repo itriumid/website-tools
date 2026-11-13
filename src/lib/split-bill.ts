@@ -710,6 +710,70 @@ export function settleBill(state: BillState, totals = calculateBill(state)): Set
 	};
 }
 
+/** One item in someone's share: what of it they had, and what that comes to before charges. */
+export interface SharePart {
+	itemId: string;
+	/** The item's name, with how many there were when it's shared evenly: "2× Es Teh". */
+	name: string;
+	/** Their part of it, when it isn't all of it: "½", or "2 of 4" when it's counted. */
+	part?: string;
+	/** What their part costs, before discounts, tax and service: their share's base adds these up. */
+	amount: number;
+}
+
+const FRACTIONS: Record<number, string> = {
+	2: '½',
+	3: '⅓',
+	4: '¼',
+	5: '⅕',
+	6: '⅙',
+	7: '⅐',
+	8: '⅛',
+	9: '⅑',
+	10: '⅒'
+};
+
+/**
+ * What each person had, item by item, the way `calculateBill` divides the items: evenly among
+ * whoever's tagged, or by count. Their amounts add up to each person's share's base, so a share
+ * can be shown as what's in it.
+ */
+export function whatEachHad(state: BillState): Map<string, SharePart[]> {
+	const parts = new Map<string, SharePart[]>(state.people.map((person) => [person.id, []]));
+	for (const item of state.items) {
+		const quantity = item.quantity ?? 1;
+		if (item.counts && quantity > 1) {
+			const counted = Object.entries(item.counts).filter(([id, n]) => parts.has(id) && n > 0);
+			const units = Math.max(
+				quantity,
+				counted.reduce((sum, [, n]) => sum + n, 0)
+			);
+			for (const [id, n] of counted) {
+				parts.get(id)!.push({
+					itemId: item.id,
+					name: item.name,
+					part: `${n} of ${units}`,
+					amount: (item.price * n) / units
+				});
+			}
+			continue;
+		}
+		const tagged = item.assignedPersonIds.filter((id) => parts.has(id));
+		const name = quantity > 1 ? `${quantity}× ${item.name}` : item.name;
+		for (const id of tagged) {
+			const part =
+				tagged.length > 1 ? (FRACTIONS[tagged.length] ?? `1/${tagged.length}`) : undefined;
+			parts.get(id)!.push({
+				itemId: item.id,
+				name,
+				...(part ? { part } : {}),
+				amount: item.price / tagged.length
+			});
+		}
+	}
+	return parts;
+}
+
 /* ─── Changing what's on the bill ─── */
 
 /**
@@ -763,11 +827,17 @@ export function billAsText(state: BillState, link?: string): string {
 	const { settlements, back } = settleBill(state, totals);
 	const money = (amount: number) => formatMoney(amount, state.currencyCode);
 	const payer = state.people.find((person) => person.id === state.paidBy);
-	const lines = state.people.map((person, index) => {
+	const had = whatEachHad(state);
+	const lines = state.people.flatMap((person, index) => {
 		const { amount, paidTheBill } = settlements[index];
-		if (paidTheBill) return `${person.name}: ${SPLIT_BILL.text.getsBack(money(back))}`;
-		const line = `${person.name}: ${money(amount)}`;
-		return payer ? `${line} ${SPLIT_BILL.text.to(payer.name)}` : line;
+		let line = `${person.name}: ${money(amount)}`;
+		if (paidTheBill) line = `${person.name}: ${SPLIT_BILL.text.getsBack(money(back))}`;
+		else if (payer) line = `${line} ${SPLIT_BILL.text.to(payer.name)}`;
+		// Under each person, what's in their share, so whoever reads it in the chat can check it.
+		const items = (had.get(person.id) ?? []).map((part) =>
+			part.part ? `${part.name} ${part.part}` : part.name
+		);
+		return items.length ? [line, `  ${items.join(', ')}`] : [line];
 	});
 	if (totals.unshared > 0) lines.push(`${SPLIT_BILL.text.unshared}: ${money(totals.unshared)}`);
 	lines.push(`${SPLIT_BILL.text.total}: ${money(totals.grandTotal)}`);
