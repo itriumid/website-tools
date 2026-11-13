@@ -214,8 +214,12 @@ export function chatTarget(
 	if (number.length < SHORTEST_NUMBER || (lengths && national.length < lengths[0])) {
 		return { problem: lettersDropped ? 'too-short-letters' : 'too-short' };
 	}
-	// More digits than any phone number anywhere has: not a doubled country code, just too many.
-	if (number.length > LONGEST_NUMBER) return { problem: 'too-many-digits' };
+	// More digits than any phone number anywhere has. When the number after the code starts with
+	// the code again ("62 62 812…"), that's the likely reason, and "too long" says so; otherwise
+	// it's just too many.
+	if (number.length > LONGEST_NUMBER) {
+		return { problem: national.startsWith(code) ? 'too-long' : 'too-many-digits' };
+	}
 	if (lengths && national.length > lengths[1]) return { problem: 'too-long' };
 	const text = message.trim();
 	const target: ChatTarget = {

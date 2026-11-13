@@ -463,7 +463,8 @@ line to check it against. Then the message as plain text, then
 anything decided on the person's behalf, each with the drawn warning sign in medium weight (letters
 left out, an extension WhatsApp can't dial, a number at the short end for its country). Then "Open
 in WhatsApp" and "Copy link" side by side, neither ever breaking onto two lines (on the narrowest
-phones Copy moves under Open), and the raw link in small muted monospace, selectable.
+phones Copy moves under Open); Copy says "Copied" for three seconds after a press, where the
+press was, as well as in the status line under the result, and the raw link in small muted monospace, selectable.
 Under it, one muted line on using the link: in a profile or a message, or as a QR code checked once
 before it's printed. Everything about the answer sits together, right under the field it comes from:
 nothing floats over it, so nothing can cover it on a short phone. A number too short or too long for
@@ -575,7 +576,10 @@ dark mode), rounded 1.5rem, inset and wider than the content. On the index it's 
 holds the title and the tagline and nothing above the title, and a closing panel ends the page.
 The error page is one panel: its heading in display type and a ruled list of where to go instead,
 each row with the arrow. On a tool
-page it's a title band holding just the title and the introduction.
+page it's a title band holding just the title and the introduction. The band is a little wider than the
+tool under it: Split bill's goes to 72rem, where the split has its own column, and WhatsApp
+click-to-chat's to 42rem, around its 36rem form, so on a wide screen the form isn't a small card
+under a long slab.
 
 ### Navigation
 
