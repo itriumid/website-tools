@@ -506,23 +506,25 @@ saying what rounding added and who gets it back. The breakdown (subtotal, charge
 comes last, in an inset list: it's how the answer was reached, not the answer. Each row with something
 tagged opens, tapping anywhere on it, to what's in that share, in an inset: the items with the
 person's part of each ("Es Teh, ½", "Jus, 3 of 4") and what they come to, then "Charges and
-adjustments" and, when rounding added to it, "Rounded up", adding up to the big number. For whoever
-paid, it ends with "Their own share", after the rounding note's sentence when the others' rounding
-comes back to them. The drawn arrow follows the name, turning down when open; an indent before the
+adjustments" and, when rounding added to it, "Rounded up", adding up to the big number. For whoever paid, the row shows the subtraction: "Rounding from the others" as a minus, "Not in
+anyone's share, on Budi for now" while something is untagged, and "Budi pays in the end", which is
+the total less what comes back. The drawn arrow follows the name, turning down when open; an indent before the
 name would take the width the muted line under it needs. A shared link opens
 with the split's heading focused, scrolled to on a phone.
 
 ### A bill shared with you
 
 Someone who opens a shared bill that wasn't shared from their own device sees the split on its own,
-centered, under one line that says what this is ("This is the bill as it was shared with you. Find your
+centered. The title band says what this bill is instead of how to make one ("A bill shared with you:
+Rp 459.250 in all, paid by Budi."), and one line above the split says where to look ("Find your
 name, and tap it to see what's in your share."). A small "Make changes", with a muted note that
-changes stay on the device until the bill is shared again, waits under the split, so the friend's
-own row is on a phone's first screen. Who paid and rounding show only as their result in the rows;
-there's no running total, since the split is already in view. The pink action is "Copy the link",
-which copies the link they opened: making a new link is for whoever changes the bill. "Make changes"
-brings back the whole editor, focused on its first card. Whoever shared the bill gets the editor
-straight away, as before.
+changes stay on the device until the bill is shared again, waits under the split, so the friend's own
+row is on a phone's first screen. Who paid and rounding show only as their result in the rows;
+there's no running total, since the split is already in view. "Copy the link", which copies the
+link they opened, is secondary: reading their row and paying is the friend's job, and there's no
+pink on the page. The note on what sharing keeps on our server is left out, since a long link keeps
+nothing there. "Make changes" brings back the whole editor, focused on its first card. Whoever shared
+the bill gets the editor straight away, as before.
 
 ### More on the receipt
 
@@ -560,7 +562,10 @@ for the next.
 ### Links that can't open
 
 A shared link cut off when it was pasted, or changed on the way, says so ("This link looks
-incomplete…") with "Start a new bill", rather than opening an empty bill as if nothing were wrong.
+incomplete…") with "Start a new bill", rather than opening an empty bill as if nothing were wrong. That line, and the ones for a bill
+that's gone or a server out of reach, carry the warning sign in medium weight. A link that fails after
+one that opened in the same tab clears the bill it showed, so the old one isn't left under the
+error still headed as shared; someone's own bill stays.
 
 ### Graphite panel and title band
 
@@ -593,7 +598,9 @@ tall on touch screens, like every other control: "Free tools" is the only way ba
 - **Do** give every field, button and chip a `--control-border` edge and a touch target at least
   2.75rem tall on touch screens.
 - **Do** show every state in two ways: a check mark with the pink fill, words with the pink edge,
-  and a reason beside a disabled button.
+  and the reason a
+  button can't be pressed yet, said under it when someone presses or reaches it (not at rest, and
+  not read out again after every add).
 - **Do** design and check every new pairing in light and dark, on every surface it sits on.
 - **Do** use the drawn arrow wherever a link points onward.
 - **Do** keep motion in CSS, gated on `motion-safe` or `prefers-reduced-motion: no-preference`:

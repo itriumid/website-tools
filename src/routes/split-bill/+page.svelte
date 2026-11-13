@@ -2,6 +2,7 @@
 	import { onMount, tick } from 'svelte';
 	import SearchableSelect, { type Choice } from '#lib/SearchableSelect.svelte';
 	import Arrow from '#lib/Arrow.svelte';
+	import Caution from '#lib/Caution.svelte';
 	import Check from '#lib/Check.svelte';
 	import Step from '#lib/Step.svelte';
 	import Seo from '#lib/Seo.svelte';
@@ -191,11 +192,23 @@
 	// Not a secret and not for security: just a name for a row that doesn't change when others do.
 	const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 
+	// Why "Add person" or "Add item" can't be pressed yet is said when someone presses or reaches
+	// it, not under the empty form all the time: at rest it was noise, and as a live region it was
+	// read out again after every add, like an error right after a success.
+	let explainPerson = $state(false);
+	/** Looks like a disabled button but can still be pressed or reached, to say why it can't add. */
+	const unavailable = 'aria-disabled:cursor-not-allowed aria-disabled:opacity-50';
+	let explainItem = $state(false);
+
 	function addPerson() {
 		const name = newPerson.trim();
-		if (!name) return;
+		if (!name) {
+			explainPerson = true;
+			return;
+		}
 		people.push({ id: newId(), name });
 		newPerson = '';
+		explainPerson = false;
 	}
 
 	// Renaming someone keeps everything they're tagged to: it's the same person.
@@ -320,7 +333,11 @@
 	}
 
 	function addItem() {
-		if (!canAddItem || newPrice === null) return;
+		if (!canAddItem || newPrice === null) {
+			explainItem = true;
+			return;
+		}
+		explainItem = false;
 		// People know a menu's price for one, so the form asks for that; the bill keeps the line's.
 		const quantity = quantityOf(newQuantity);
 		items.push({
@@ -744,12 +761,35 @@
 		if (settled || !billIsEmpty) saveDraft(bill, location.hash);
 	});
 
+	/**
+	 * A link that can't open a bill, after one that did in this tab: the bill on screen is the old
+	 * link's, still headed as shared with you, so it goes. The address stays, so "Try again" can
+	 * still reach a server that was only out of reach. Someone's own bill, not one they were
+	 * shown, stays as it is.
+	 */
+	function forgetViewedBill() {
+		if (!viewing) return;
+		open({
+			people: [],
+			items: [],
+			taxPercentage: DEFAULT_TAX_PERCENTAGE,
+			servicePercentage: DEFAULT_SERVICE_PERCENTAGE,
+			currencyCode: DEFAULT_CURRENCY_CODE
+		});
+		viewing = false;
+		deletable = undefined;
+		lastShared = undefined;
+	}
+
 	async function readLink() {
 		const code = codeFromHash(location.hash);
 		if (!code) {
 			const shared = billFromHash(location.hash);
 			if (shared) open(shared);
-			else if (isBrokenLink(location.hash)) status = { kind: 'broken' };
+			else if (isBrokenLink(location.hash)) {
+				forgetViewedBill();
+				status = { kind: 'broken' };
+			}
 			settled = true;
 			if (shared) await landOnSplit();
 			return;
@@ -760,6 +800,7 @@
 		const result = await openBill(code);
 		if (codeFromHash(location.hash) !== code) return;
 		if ('problem' in result) {
+			forgetViewedBill();
 			status = { kind: result.problem === 'gone' ? 'gone' : 'unreachable' };
 			return;
 		}
@@ -1025,9 +1066,12 @@
 	}}
 />
 
+<!-- For a friend who opened a link, the band says what this bill is, not how to make one. -->
 <TitleBand
 	title={SPLIT_BILL.name}
-	introduction={SPLIT_BILL.introduction}
+	introduction={viewing
+		? SPLIT_BILL.sharedWithYou.band(money(totals.grandTotal), payerName)
+		: SPLIT_BILL.introduction}
 	width="max-w-2xl lg:max-w-6xl"
 />
 
@@ -1056,12 +1100,16 @@
 						? SPLIT_BILL.sharing.updatedAt
 						: SPLIT_BILL.sharing.sharedAt)(when(status.version.updatedAt))}{/if}
 			</p>
-		{:else if status?.kind === 'gone'}
-			<p>{SPLIT_BILL.sharing.gone}</p>
-		{:else if status?.kind === 'unreachable'}
-			<p>{SPLIT_BILL.sharing.unreachable}</p>
-		{:else if status?.kind === 'broken'}
-			<p>{SPLIT_BILL.sharing.broken}</p>
+		{:else if status?.kind === 'gone' || status?.kind === 'unreachable' || status?.kind === 'broken'}
+			<!-- A link that didn't open a bill: said with the warning sign and some weight, so it doesn't
+			     read as one more line of instructions above an empty bill. -->
+			<p class="flex gap-2 font-medium">
+				<Caution class="mt-1 shrink-0" />{status.kind === 'gone'
+					? SPLIT_BILL.sharing.gone
+					: status.kind === 'unreachable'
+						? SPLIT_BILL.sharing.unreachable
+						: SPLIT_BILL.sharing.broken}
+			</p>
 		{/if}
 	</div>
 	{#if status?.kind === 'gone' || status?.kind === 'unreachable' || status?.kind === 'broken'}
@@ -1149,10 +1197,11 @@
 							bind:value={receiptText}
 							class={field}></textarea>
 						<div class="mt-3 flex flex-wrap gap-3">
-							<button type="submit" disabled={!receiptText.trim()} class={smallButton}
+							<!-- Reading the receipt is this form's one main action, so it's the pink one. -->
+							<button type="submit" disabled={!receiptText.trim()} class={primaryButton}
 								>{SPLIT_BILL.scanning.read}</button
 							>
-							<button type="button" onclick={cancelScan} class={smallButton}
+							<button type="button" onclick={cancelScan} class={secondaryButton}
 								>{SPLIT_BILL.scanning.cancel}</button
 							>
 						</div>
@@ -1419,13 +1468,14 @@
 					</div>
 					<button
 						type="submit"
-						disabled={!newPerson.trim()}
+						aria-disabled={!newPerson.trim()}
 						aria-describedby="add-person-reason"
-						class={`${smallButton} ${besideField}`}>Add person</button
+						onfocus={() => (explainPerson = !newPerson.trim())}
+						class={`${smallButton} ${besideField} ${unavailable}`}>Add person</button
 					>
 				</form>
 				<p id="add-person-reason" role="status" class="mt-2 text-sm text-muted empty:mt-0">
-					{#if !newPerson.trim()}{SPLIT_BILL.missing.personName}{/if}
+					{#if explainPerson && !newPerson.trim()}{SPLIT_BILL.missing.personName}{/if}
 				</p>
 
 				{#if people.length}
@@ -1555,7 +1605,7 @@
 							<li
 								id="item-{item.id}"
 								tabindex="-1"
-								class="rounded-xl border border-border bg-bg p-4"
+								class="rounded-xl border border-border bg-bg p-3 sm:p-4"
 							>
 								{#if editing?.id === item.id}
 									<form
@@ -1700,7 +1750,7 @@
 								{#if people.length && item.counts}
 									{@const quantity = item.quantity ?? 1}
 									{@const counted = countedOf(item)}
-									<fieldset class="mt-3">
+									<fieldset class="mt-2 sm:mt-3">
 										<legend class="mb-2 text-sm text-muted">How many each had</legend>
 										<div class="flex flex-wrap gap-2">
 											{#each people as person (person.id)}
@@ -1752,7 +1802,7 @@
 										>
 									</fieldset>
 								{:else if people.length}
-									<fieldset class="mt-3">
+									<fieldset class="mt-2 sm:mt-3">
 										<legend class="sr-only">Who had this?</legend>
 										<!-- "Everyone" sits on the question's line, not in the row of names: at six people
 										     it took a row of its own under them on most items. -->
@@ -1874,9 +1924,11 @@
 							</div>
 							<button
 								type="submit"
-								disabled={!canAddItem}
+								aria-disabled={!canAddItem}
 								aria-describedby="add-item-reason price-note"
-								class="{smallButton} {besideField} col-span-2 sm:col-span-1">Add item</button
+								onfocus={() => (explainItem = !canAddItem)}
+								class="{smallButton} {besideField} {unavailable} col-span-2 sm:col-span-1"
+								>Add item</button
 							>
 						</form>
 						<p
@@ -1887,7 +1939,7 @@
 							{#if newPriceNote}{newPriceNote.text}{/if}
 						</p>
 						<p id="add-item-reason" role="status" class="mt-2 text-sm text-muted empty:mt-0">
-							{#if addItemReason}{addItemReason}{/if}
+							{#if explainItem && addItemReason}{addItemReason}{/if}
 						</p>
 					</div>
 				{:else}
@@ -2282,21 +2334,29 @@
 														</div>
 													{/if}
 												</dl>
-												<!-- Whoever paid: what the rest rounded up comes back to them, so their own share is
-												     what's above less that, said in the words the rounding note uses. -->
+												<!-- Whoever paid: the subtraction, shown. What the rest rounded up comes back to them;
+												     anything in nobody's share is theirs to cover for now. What's left is what they're
+												     out once everyone has paid them, the total less what comes back. -->
 												{#if settlement.paidTheBill}
-													{#if settledUp.extra > 0}
-														<p class="mt-1 text-muted">
-															{SPLIT_BILL.split.extraToPayer(
-																money(settledUp.extra),
-																nameOf(settlement.personId)
-															)}
-														</p>
-													{/if}
-													<dl class="mt-1 border-t border-border pt-1 font-semibold">
-														<div class="flex justify-between gap-4">
-															<dt>{SPLIT_BILL.split.ownShare}</dt>
-															<dd class="shrink-0">{money(settlement.amount)}</dd>
+													{@const payer = nameOf(settlement.personId)}
+													<dl class="mt-1 space-y-1">
+														{#if settledUp.extra > 0}
+															<div class="flex justify-between gap-4 text-muted">
+																<dt>{SPLIT_BILL.split.roundingBack}</dt>
+																<dd class="shrink-0">−{money(settledUp.extra)}</dd>
+															</div>
+														{/if}
+														{#if totals.unshared > 0}
+															<div class="flex justify-between gap-4 text-muted">
+																<dt>{SPLIT_BILL.split.unsharedOnPayer(payer)}</dt>
+																<dd class="shrink-0">{money(totals.unshared)}</dd>
+															</div>
+														{/if}
+														<div
+															class="flex justify-between gap-4 border-t border-border pt-1 font-semibold"
+														>
+															<dt>{SPLIT_BILL.split.paysInTheEnd(payer)}</dt>
+															<dd class="shrink-0">{money(settlement.amount + totals.unshared)}</dd>
 														</div>
 													</dl>
 												{/if}
@@ -2456,7 +2516,7 @@
 							<button
 								type="button"
 								onclick={copyOpenedLink}
-								class="{primaryButton} whitespace-nowrap sm:grow-[2]"
+								class="{secondaryButton} whitespace-nowrap sm:grow-[2]"
 								>{SPLIT_BILL.sharedWithYou.copyLink}</button
 							>
 						{:else}
@@ -2548,7 +2608,11 @@
 							>
 						{/if}
 					</div>
-					<p class="mt-3 text-sm text-muted">{SPLIT_BILL.privacy}</p>
+					<!-- What sharing keeps on our server: for whoever shares, not for a friend reading a
+					     link, whose long link keeps nothing there at all. -->
+					{#if !viewing}
+						<p class="mt-3 max-w-prose text-sm text-muted">{SPLIT_BILL.privacy}</p>
+					{/if}
 				</div>
 			{/if}
 		</div>
