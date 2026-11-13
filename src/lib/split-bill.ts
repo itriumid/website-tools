@@ -907,6 +907,9 @@ export function billAsText(state: BillState, link?: string): string {
 	if (totals.unshared > 0) {
 		const label = payer ? SPLIT_BILL.split.unsharedOnPayer(payer.name) : SPLIT_BILL.text.unshared;
 		lines.push(`${label}: ${money(totals.unshared)}`);
+		// Named, as each person's items are: someone in the chat may be the one who had it.
+		const names = unsharedItemNames(state);
+		if (names.length) lines.push(`  ${names.join(', ')}`);
 	}
 	lines.push(`${SPLIT_BILL.text.total}: ${money(totals.grandTotal)}`);
 	if (link) lines.push(link);

@@ -520,10 +520,13 @@ even empty, and every note in it is short, so choosing who paid never changes a 
 muted ("+Rp 437.000").
 Someone with nothing tagged gets "Nothing tagged yet" and a muted Rp 0, never "To Budi": the split
 doesn't tell anyone to pay nothing. The "Not in anyone's share" note is gray until anything is
-tagged, and pink once tagging has begun and something is still left out, and it names the items, up
-to three and then how many more, adding who covers them once someone's paid ("Budi covers it
-for now."); a friend reading the bill gets just the fact ("Rp 37.400 isn't in anyone's share: Budi
-covers it for now."), and by the share buttons one line says it again, with "Show it": a state isn't an error
+tagged, and pink once tagging has begun and something is still left out, and it names the items, up to three and then how many more, with one amount, their part of the
+total with tax and service, adding who covers them once someone's paid ("Budi covers it for now.").
+A friend reading the bill gets the items and the fact, with the warning sign and a gray edge, no
+pink ("2× Kerupuk and Jus Alpukat (Rp 37.400) aren't in anyone's share: Budi covers them for
+now."), and the copied text names them on a line under its own, as it does each person's. By the
+share buttons one line says it again, with "Show it", which gives the item it goes to a pink edge
+for three seconds: a state isn't an error
 before anyone has started. The two lines under the rounding choice are kept even when empty, so
 picking a step never shifts what's below it. Then two radio groups, "Who paid?" and "Round shares
 up" (to two steps people actually hand over, Rp 500 and Rp 1.000 for rupiah), with a muted line
@@ -562,9 +565,11 @@ the currency's usual way.
 
 ### Undo line
 
-After removing a person or an item, or clearing who had an item with "Nobody"
-("Cleared who had Nasi Goreng."), the card it was removed from says so in one line, "Removed
-Citra.", with an underlined "Undo" beside it at touch-target height. It stays until the bill
+After removing a person or an item, or clearing who had an item with "Nobody" ("Cleared who had
+Nasi Goreng."), one line says so, "Removed Citra.", with an underlined "Undo" beside it at
+touch-target height. For a person it ends the People card. For an item it's where the change was:
+a removed item leaves a dashed line in its place, and "Nobody" puts it inside the item, since on a
+phone the end of a long list is screens away; a region that's always there announces it. It stays until the bill
 changes some other way. There's no countdown and no confirmation dialog: one tap took it, one
 tap brings it back. The split repeats the line, with its Undo, under its heading, since a removal
 changes it and on a wide screen it's in the other column; only the card's own line is a live
@@ -577,8 +582,9 @@ anyone's share, as an amount: money leaving the split is the one thing that line
 A press that removes or replaces the control it was made on never leaves focus on nothing (which
 drops a keyboard or a screen reader at the top of the page). Opening the scan form focuses its
 first field, reading the receipt its review heading, adding it the People field when there's nobody
-yet (scrolled to), or else the Items heading; removing focuses the Undo, and Undo the person or
-item brought back. "Yes, clear" takes the card it was in with it: focus goes to "The bill", and the
+yet (scrolled to), or else the Items heading; removing focuses the Undo, and Undo the person or item brought back, each scrolled to the nearest
+edge of the screen, clear of the bar at the bottom. "Copy a link to this bill" keeps focus while it
+works (it's aria-disabled, not disabled, which would drop it) and says "Copied" for three seconds. "Yes, clear" takes the card it was in with it: focus goes to "The bill", and the
 line at the top of the page says "Cleared.". Asking ("Clear everything", "Delete the shared copy") focuses
 its "Yes, …", "Keep it" focuses the button that asked, and a deleted copy leaves focus on "Copy a
 link to this bill". "Clear everything" itself sits apart from the share
