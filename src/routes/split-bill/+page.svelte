@@ -329,8 +329,10 @@
 		newItem = '';
 		newPriceText = '';
 		newQuantity = 1;
-		// Someone typing the items in has more to come: the form stays open under them.
+		// Someone typing the items in has more to come: the form stays open under them, ready for
+		// the next one's name.
 		addingByHand = true;
+		void focusAfter('item');
 	}
 
 	const nameWithQuantity = (item: BillItem) =>

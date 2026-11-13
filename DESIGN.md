@@ -536,8 +536,8 @@ item brought back.
 
 With no items, the Items card is the form. Once there are items, they come first, and the form
 waits under them behind "Add an item by hand": after a receipt is read, the items are what's next,
-not an empty form above them. Items typed in by hand keep the form open under the list, for the
-next.
+not an empty form above them. Items typed in by hand keep the form open under the list, with focus back in its Item field
+for the next.
 
 ### Links that can't open
 
