@@ -1025,9 +1025,12 @@
 	}}
 />
 
+<!-- For a friend who opened a link, the band says what this bill is, not how to make one. -->
 <TitleBand
 	title={SPLIT_BILL.name}
-	introduction={SPLIT_BILL.introduction}
+	introduction={viewing
+		? SPLIT_BILL.sharedWithYou.band(money(totals.grandTotal), payerName)
+		: SPLIT_BILL.introduction}
 	width="max-w-2xl lg:max-w-6xl"
 />
 
@@ -2456,7 +2459,7 @@
 							<button
 								type="button"
 								onclick={copyOpenedLink}
-								class="{primaryButton} whitespace-nowrap sm:grow-[2]"
+								class="{secondaryButton} whitespace-nowrap sm:grow-[2]"
 								>{SPLIT_BILL.sharedWithYou.copyLink}</button
 							>
 						{:else}
@@ -2548,7 +2551,11 @@
 							>
 						{/if}
 					</div>
-					<p class="mt-3 text-sm text-muted">{SPLIT_BILL.privacy}</p>
+					<!-- What sharing keeps on our server: for whoever shares, not for a friend reading a
+					     link, whose long link keeps nothing there at all. -->
+					{#if !viewing}
+						<p class="mt-3 max-w-prose text-sm text-muted">{SPLIT_BILL.privacy}</p>
+					{/if}
 				</div>
 			{/if}
 		</div>

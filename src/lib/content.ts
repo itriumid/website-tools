@@ -146,7 +146,10 @@ export const SPLIT_BILL = {
 	},
 	// For someone who opened a bill shared with them: their share first, the editor one press away.
 	sharedWithYou: {
-		line: "This is the bill as it was shared with you. Find your name, and tap it to see what's in your share.",
+		/** In the title band, in place of how to make a bill: what this one is. */
+		band: (total: string, payer?: string) =>
+			`A bill shared with you: ${total} in all${payer ? `, paid by ${payer}` : ''}.`,
+		line: "Find your name, and tap it to see what's in your share.",
 		makeChanges: 'Make changes',
 		note: 'Changes stay on this device until you share the bill again.',
 		copyLink: 'Copy the link',

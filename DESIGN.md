@@ -515,14 +515,16 @@ with the split's heading focused, scrolled to on a phone.
 ### A bill shared with you
 
 Someone who opens a shared bill that wasn't shared from their own device sees the split on its own,
-centered, under one line that says what this is ("This is the bill as it was shared with you. Find your
+centered. The title band says what this bill is instead of how to make one ("A bill shared with you:
+Rp 459.250 in all, paid by Budi."), and one line above the split says where to look ("Find your
 name, and tap it to see what's in your share."). A small "Make changes", with a muted note that
-changes stay on the device until the bill is shared again, waits under the split, so the friend's
-own row is on a phone's first screen. Who paid and rounding show only as their result in the rows;
-there's no running total, since the split is already in view. The pink action is "Copy the link",
-which copies the link they opened: making a new link is for whoever changes the bill. "Make changes"
-brings back the whole editor, focused on its first card. Whoever shared the bill gets the editor
-straight away, as before.
+changes stay on the device until the bill is shared again, waits under the split, so the friend's own
+row is on a phone's first screen. Who paid and rounding show only as their result in the rows;
+there's no running total, since the split is already in view. "Copy the link", which copies the
+link they opened, is secondary: reading their row and paying is the friend's job, and there's no
+pink on the page. The note on what sharing keeps on our server is left out, since a long link keeps
+nothing there. "Make changes" brings back the whole editor, focused on its first card. Whoever shared
+the bill gets the editor straight away, as before.
 
 ### More on the receipt
 
