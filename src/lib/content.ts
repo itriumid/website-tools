@@ -304,6 +304,14 @@ export const SPLIT_BILL = {
 	}
 };
 
+// The searchable lists (countries, currencies): what's shown when nothing matches, and what a
+// screen reader hears as the list changes.
+export const SEARCH = {
+	noMatch: 'No match',
+	count: (shown: number) =>
+		shown === 0 ? 'No matches' : shown === 1 ? '1 choice' : `${shown} choices`
+};
+
 // Split bill first: it's the one people come for.
 export const TOOLS = [SPLIT_BILL, WHATSAPP];
 
