@@ -193,7 +193,7 @@
 				{placeholder}
 				aria-describedby="number-hint number-reads number-problem"
 				aria-invalid={problem ? true : undefined}
-				class={field}
+				class="{field} aria-invalid:border-accent-edge"
 			/>
 			<!-- One slot under the field, two lines tall, for whichever line has something to say: how a
 			     number with its country is read (before anything's typed), what the number reads as, or
@@ -209,8 +209,8 @@
 						{WHATSAPP.reads(target.display, countryOfTarget)}
 					</p>
 				{/if}
-				<p id="number-problem" class="font-medium" role="status">
-					{#if problem}{WHATSAPP.problems[problem]}{/if}
+				<p id="number-problem" class="flex gap-2 font-medium" role="status">
+					{#if problem}<Caution class="mt-0.5" />{WHATSAPP.problems[problem]}{/if}
 				</p>
 			</div>
 		</div>
