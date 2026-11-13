@@ -2670,25 +2670,29 @@
 
 					{#if totals.unassigned > 0}
 						<!-- Pink once tagging's begun and something's still left out; gray before that, when
-						     nothing's tagged yet only because nobody's started. -->
+						     nothing's tagged yet only because nobody's started. A friend's view has no pink:
+						     the warning sign marks it there. -->
 						<p
-							class="mt-4 rounded-lg border bg-bg p-3 text-sm {anyTagged
+							class="mt-4 rounded-lg border bg-bg p-3 text-sm {anyTagged && !viewing
 								? 'border-accent-edge'
-								: 'border-border text-muted'}"
+								: viewing
+									? 'flex gap-2 border-border'
+									: 'border-border text-muted'}"
 						>
 							<!-- A friend reading the bill can't tag anything: they get the fact, and who covers it.
 							     Whoever's making it gets the items to tag, and, once someone's paid, who covers
 							     them meanwhile. -->
 							{#if viewing}
-								{payerName
-									? SPLIT_BILL.unsharedCovered(money(totals.unshared), payerName)
-									: SPLIT_BILL.unsharedLeftOut(money(totals.unshared))}
+								<Caution class="mt-0.5" />{payerName
+									? SPLIT_BILL.unsharedCovered(
+											unsharedItemNames(bill),
+											money(totals.unshared),
+											payerName
+										)
+									: SPLIT_BILL.unsharedLeftOut(unsharedItemNames(bill), money(totals.unshared))}
 							{:else}
 								<strong>Not in anyone's share:</strong>
-								{SPLIT_BILL.untagged(unsharedItemNames(bill), money(totals.unassigned))}
-								{#if totals.unshared !== totals.unassigned}{SPLIT_BILL.unsharedOfTotal(
-										money(totals.unshared)
-									)}{/if}
+								{SPLIT_BILL.untagged(unsharedItemNames(bill), money(totals.unshared))}
 								{#if payerName}{SPLIT_BILL.coversForNow(payerName)}{/if}
 							{/if}
 						</p>

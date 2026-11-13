@@ -1016,7 +1016,7 @@ describe('the split as text', () => {
 		);
 	});
 
-	it("says what's in nobody's share, so the lines add up to the total", () => {
+	it("says what's in nobody's share, and which items, so the lines add up to the total", () => {
 		const text = billAsText(
 			bill({
 				items: [
@@ -1026,8 +1026,21 @@ describe('the split as text', () => {
 			})
 		);
 		expect(text).toBe(
-			"Ayu: Rp\u00a030.000\n  Nasi\nBudi: Rp\u00a00\nNot in anyone's share: Rp\u00a05.000\nTotal: Rp\u00a035.000"
+			"Ayu: Rp\u00a030.000\n  Nasi\nBudi: Rp\u00a00\nNot in anyone's share: Rp\u00a05.000\n  Teh\nTotal: Rp\u00a035.000"
 		);
+	});
+
+	it('names several untagged items with how many of each', () => {
+		const text = billAsText(
+			bill({
+				items: [
+					{ id: '1', name: 'Nasi', price: 30000, assignedPersonIds: ['a'] },
+					{ id: '2', name: 'Kerupuk', price: 4000, quantity: 2, assignedPersonIds: [] },
+					{ id: '3', name: 'Teh', price: 5000, assignedPersonIds: [] }
+				]
+			})
+		);
+		expect(text.split('\n')).toContain('  2× Kerupuk, Teh');
 	});
 });
 

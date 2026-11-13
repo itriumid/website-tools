@@ -109,6 +109,15 @@ export const WHATSAPP = {
 	}
 };
 
+/** Items by name: up to three, then how many more. */
+function itemList(names: string[]): string {
+	const shown = names.length > 3 ? names.slice(0, 3) : names;
+	const more = names.length - shown.length;
+	if (more > 0) return `${shown.join(', ')} and ${more} more`;
+	if (shown.length > 1) return `${shown.slice(0, -1).join(', ')} and ${shown.at(-1)}`;
+	return shown[0] ?? 'Items';
+}
+
 export const SPLIT_BILL = {
 	path: '/split-bill' as const,
 	name: 'Split bill',
@@ -239,28 +248,22 @@ export const SPLIT_BILL = {
 	cleared: 'Cleared.',
 	/** Read after the running total's untagged amount, which a press takes to the item. */
 	goToUnshared: "Go to the first item that's in nobody's share",
-	/** The split's note on what nobody's tagged to: up to three names, then how many more. */
-	untagged: (names: string[], worth: string) => {
-		const shown = names.length > 3 ? names.slice(0, 3) : names;
-		const more = names.length - shown.length;
-		const list =
-			more > 0
-				? `${shown.join(', ')} and ${more} more`
-				: shown.length > 1
-					? `${shown.slice(0, -1).join(', ')} and ${shown.at(-1)}`
-					: (shown[0] ?? 'Items');
-		const one = names.length === 1;
-		return `${list}, worth ${worth}, ${one ? "isn't" : "aren't"} tagged or counted for anyone, so ${one ? "it's" : "they're"} left out of the shares.`;
-	},
-	/** For a friend reading a shared bill: what's in nobody's share, as a fact. */
-	unsharedCovered: (amount: string, payer: string) =>
-		`${amount} isn't in anyone's share: ${payer} covers it for now.`,
-	unsharedLeftOut: (amount: string) =>
-		`${amount} isn't in anyone's share, so it's left out of everyone's share.`,
+	/**
+	 * The split's note on what nobody's tagged to, with the one amount every other place gives it:
+	 * their part of the total, tax and service included.
+	 */
+	untagged: (names: string[], amount: string) =>
+		`${itemList(names)} ${names.length === 1 ? "isn't" : "aren't"} tagged or counted for anyone, so ${amount} of the total is left out of the shares.`,
+	/**
+	 * For a friend reading a shared bill: what's in nobody's share, as a fact, named, since they
+	 * may be the one who had it.
+	 */
+	unsharedCovered: (names: string[], amount: string, payer: string) =>
+		`${itemList(names)} (${amount}) ${names.length === 1 ? "isn't" : "aren't"} in anyone's share: ${payer} covers ${names.length === 1 ? 'it' : 'them'} for now.`,
+	unsharedLeftOut: (names: string[], amount: string) =>
+		`${itemList(names)} (${amount}) ${names.length === 1 ? "isn't" : "aren't"} in anyone's share, so ${names.length === 1 ? "it's" : "they're"} left out of everyone's share.`,
 	/** After the untagged items, once someone's paid: who's out of pocket for them meanwhile. */
 	coversForNow: (payer: string) => `${payer} covers it for now.`,
-	/** Under the untagged items' worth, when their part of the total differs from it. */
-	unsharedOfTotal: (amount: string) => `That's ${amount} of the total.`,
 	// What an amount field says under it as it's typed: what we read, or why we can't.
 	amounts: {
 		reads: (amount: string) => `= ${amount}`,
