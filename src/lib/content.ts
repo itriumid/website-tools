@@ -82,6 +82,9 @@ export const WHATSAPP = {
 		heading: 'Your link',
 		copy: 'Copy link',
 		copied: 'Copied',
+		/** Under the result, for screen readers as much as anyone: what pressing Copy link did. */
+		linkCopied: 'Link copied.',
+		copyFailed: "We couldn't copy it. Select the link above and copy it yourself.",
 		empty: 'Enter a phone number and the link appears here.',
 		lettersDropped: 'We left out the letters and kept the digits: check this is the number.',
 		extension: (extension: string) =>
