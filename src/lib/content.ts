@@ -68,6 +68,8 @@ export const WHATSAPP = {
 	placeholder: '0812-xxxx-xxxx',
 	problems: {
 		'too-short': "That's too short for a phone number there. Check you have every digit.",
+		'too-short-letters':
+			"That's too short once the letters are left out. Type the number in digits.",
 		'too-long':
 			"That's too long for a phone number there. Check the country is right, and its code isn't in the number twice.",
 		'too-many-digits':
@@ -92,6 +94,8 @@ export const WHATSAPP = {
 	qr: {
 		heading: 'QR code to print',
 		save: 'Save the QR code',
+		/** Printed under the code in the saved image, above the number. */
+		printLabel: 'Chat on WhatsApp',
 		alt: (number: string) => `QR code that opens a chat with ${number}`
 	}
 };
