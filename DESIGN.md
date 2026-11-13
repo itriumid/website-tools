@@ -598,7 +598,9 @@ tall on touch screens, like every other control: "Free tools" is the only way ba
 - **Do** give every field, button and chip a `--control-border` edge and a touch target at least
   2.75rem tall on touch screens.
 - **Do** show every state in two ways: a check mark with the pink fill, words with the pink edge,
-  and a reason beside a disabled button.
+  and the reason a
+  button can't be pressed yet, said under it when someone presses or reaches it (not at rest, and
+  not read out again after every add).
 - **Do** design and check every new pairing in light and dark, on every surface it sits on.
 - **Do** use the drawn arrow wherever a link points onward.
 - **Do** keep motion in CSS, gated on `motion-safe` or `prefers-reduced-motion: no-preference`:

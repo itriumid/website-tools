@@ -192,11 +192,23 @@
 	// Not a secret and not for security: just a name for a row that doesn't change when others do.
 	const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 
+	// Why "Add person" or "Add item" can't be pressed yet is said when someone presses or reaches
+	// it, not under the empty form all the time: at rest it was noise, and as a live region it was
+	// read out again after every add, like an error right after a success.
+	let explainPerson = $state(false);
+	/** Looks like a disabled button but can still be pressed or reached, to say why it can't add. */
+	const unavailable = 'aria-disabled:cursor-not-allowed aria-disabled:opacity-50';
+	let explainItem = $state(false);
+
 	function addPerson() {
 		const name = newPerson.trim();
-		if (!name) return;
+		if (!name) {
+			explainPerson = true;
+			return;
+		}
 		people.push({ id: newId(), name });
 		newPerson = '';
+		explainPerson = false;
 	}
 
 	// Renaming someone keeps everything they're tagged to: it's the same person.
@@ -321,7 +333,11 @@
 	}
 
 	function addItem() {
-		if (!canAddItem || newPrice === null) return;
+		if (!canAddItem || newPrice === null) {
+			explainItem = true;
+			return;
+		}
+		explainItem = false;
 		// People know a menu's price for one, so the form asks for that; the bill keeps the line's.
 		const quantity = quantityOf(newQuantity);
 		items.push({
@@ -1451,13 +1467,14 @@
 					</div>
 					<button
 						type="submit"
-						disabled={!newPerson.trim()}
+						aria-disabled={!newPerson.trim()}
 						aria-describedby="add-person-reason"
-						class={`${smallButton} ${besideField}`}>Add person</button
+						onfocus={() => (explainPerson = !newPerson.trim())}
+						class={`${smallButton} ${besideField} ${unavailable}`}>Add person</button
 					>
 				</form>
 				<p id="add-person-reason" role="status" class="mt-2 text-sm text-muted empty:mt-0">
-					{#if !newPerson.trim()}{SPLIT_BILL.missing.personName}{/if}
+					{#if explainPerson && !newPerson.trim()}{SPLIT_BILL.missing.personName}{/if}
 				</p>
 
 				{#if people.length}
@@ -1906,9 +1923,11 @@
 							</div>
 							<button
 								type="submit"
-								disabled={!canAddItem}
+								aria-disabled={!canAddItem}
 								aria-describedby="add-item-reason price-note"
-								class="{smallButton} {besideField} col-span-2 sm:col-span-1">Add item</button
+								onfocus={() => (explainItem = !canAddItem)}
+								class="{smallButton} {besideField} {unavailable} col-span-2 sm:col-span-1"
+								>Add item</button
 							>
 						</form>
 						<p
@@ -1919,7 +1938,7 @@
 							{#if newPriceNote}{newPriceNote.text}{/if}
 						</p>
 						<p id="add-item-reason" role="status" class="mt-2 text-sm text-muted empty:mt-0">
-							{#if addItemReason}{addItemReason}{/if}
+							{#if explainItem && addItemReason}{addItemReason}{/if}
 						</p>
 					</div>
 				{:else}
