@@ -515,7 +515,9 @@ muted ("+Rp 437.000").
 Someone with nothing tagged gets "Nothing tagged yet" and a muted Rp 0, never "To Budi": the split
 doesn't tell anyone to pay nothing. The "Not in anyone's share" note is gray until anything is
 tagged, and pink once tagging has begun and something is still left out, and it names the items, up
-to three and then how many more: a state isn't an error
+to three and then how many more, adding who covers them once someone's paid ("Budi covers it
+for now."); a friend reading the bill gets just the fact ("Rp 37.400 isn't in anyone's share: Budi
+covers it for now."), and by the share buttons one line says it again, with "Show it": a state isn't an error
 before anyone has started. The two lines under the rounding choice are kept even when empty, so
 picking a step never shifts what's below it. Then two radio groups, "Who paid?" and "Round shares
 up" (to two steps people actually hand over, Rp 500 and Rp 1.000 for rupiah), with a muted line
@@ -554,7 +556,8 @@ the currency's usual way.
 
 ### Undo line
 
-After removing a person or an item, the card it was removed from says so in one line, "Removed
+After removing a person or an item, or clearing who had an item with "Nobody"
+("Cleared who had Nasi Goreng."), the card it was removed from says so in one line, "Removed
 Citra.", with an underlined "Undo" beside it at touch-target height. It stays until the bill
 changes some other way. There's no countdown and no confirmation dialog: one tap took it, one
 tap brings it back. The split repeats the line, with its Undo, under its heading, since a removal
@@ -570,12 +573,15 @@ drops a keyboard or a screen reader at the top of the page). Opening the scan fo
 first field, reading the receipt its review heading, adding it the People field when there's nobody
 yet (scrolled to), or else the Items heading; removing focuses the Undo, and Undo the person or
 item brought back. "Yes, clear" takes the card it was in with it: focus goes to "The bill", and the
-line at the top of the page says "Cleared.". "Clear everything" itself sits apart from the share
+line at the top of the page says "Cleared.". Asking ("Clear everything", "Delete the shared copy") focuses
+its "Yes, …", "Keep it" focuses the button that asked, and a deleted copy leaves focus on "Copy a
+link to this bill". "Clear everything" itself sits apart from the share
 buttons, under a hairline, as a quiet underlined button.
 
 ### Adding an item
 
-With no items, the Items card is the form. Once there are items, they come first, and the form
+An empty bill leads with "Scan or paste a receipt" as the pink primary, under a one-sentence
+introduction; once there are items it steps back to secondary. With no items, the Items card is the form. Once there are items, they come first, and the form
 waits under them behind "Add an item by hand": after a receipt is read, the items are what's next,
 not an empty form above them. Items typed in by hand keep the form open under the list, with focus back in its Item field
 for the next. With a quantity over one, the price asked for is for one, and the line under it says
@@ -584,7 +590,7 @@ what the line comes to ("= 4 × Rp 32.000 = Rp 128.000"), so a line total typed 
 ### Folded items
 
 An item that's someone's folds to one line once the person moves on to another: its name, "·",
-who had it in muted text (with counts when it was counted), "Everyone" when it's the whole table, and its price on the right; a tap
+who had it in muted text (with counts when it was counted), "Everyone" when it's the whole table, and its price on the right with a muted pencil after it; a tap
 opens it again, with focus on its first name, and screen readers hear "Change who had Nasi
 Goreng". The item last touched stays open, so tagging a second person on it doesn't fold it under
 the finger, and when items above fold or open, the one being worked on stays where it was on
@@ -594,7 +600,9 @@ reopened from a draft starts with its tagged items folded.
 ### Links that can't open
 
 A shared link cut off when it was pasted, or changed on the way, says so ("This link looks
-incomplete…") with "Start a new bill", rather than opening an empty bill as if nothing were wrong. That line, and the ones for a bill
+incomplete…") with "Start a new bill", rather than opening an empty bill as if nothing were wrong. The page goes to the top
+at once and focuses that line, so a link opened in a tab scrolled down doesn't show the bottom of an
+empty bill and no reason. That line, and the ones for a bill
 that's gone or a server out of reach, carry the warning sign in medium weight. A link that fails after
 one that opened in the same tab clears the bill it showed, so the old one isn't left under the
 error still headed as shared; someone's own bill stays.

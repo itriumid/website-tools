@@ -247,6 +247,8 @@
 		shared?: number;
 		/** For a person: what only they had, now in nobody's share. */
 		alone?: number;
+		/** For an item: only who had it was cleared ("Nobody"), not the item itself. */
+		cleared?: boolean;
 		before: Pick<BillState, 'people' | 'items'> & {
 			adjustments: BillAdjustment[];
 			paidBy?: string;
@@ -535,7 +537,14 @@
 		people.length > 0 && people.every((person) => item.assignedPersonIds.includes(person.id));
 
 	function toggleEveryone(item: BillItem) {
-		item.assignedPersonIds = everyoneHasIt(item) ? [] : people.map((person) => person.id);
+		if (!everyoneHasIt(item)) {
+			item.assignedPersonIds = people.map((person) => person.id);
+			return;
+		}
+		// "Nobody" undoes a whole row of tags in one press, sitting where a thumb lands: it can be
+		// undone like a removal.
+		undoable('items', item.id, item.name, () => (item.assignedPersonIds = []));
+		if (removal) removal.cleared = true;
 	}
 
 	/* ─── Charges and adjustments ─── */
@@ -878,6 +887,17 @@
 		lastShared = undefined;
 	}
 
+	/**
+	 * A link that didn't open a bill says so at the top of the page: taken there, at once, with
+	 * focus on the line, since a link opened in a tab that had scrolled down would otherwise show
+	 * the bottom of an empty bill and no reason.
+	 */
+	async function showLinkProblem() {
+		await tick();
+		window.scrollTo({ top: 0, behavior: 'instant' });
+		document.getElementById('link-problem')?.focus({ preventScroll: true });
+	}
+
 	async function readLink() {
 		const code = codeFromHash(location.hash);
 		if (!code) {
@@ -886,6 +906,7 @@
 			else if (isBrokenLink(location.hash)) {
 				forgetViewedBill();
 				status = { kind: 'broken' };
+				void showLinkProblem();
 			}
 			settled = true;
 			if (shared) await landOnSplit();
@@ -899,6 +920,7 @@
 		if ('problem' in result) {
 			forgetViewedBill();
 			status = { kind: result.problem === 'gone' ? 'gone' : 'unreachable' };
+			void showLinkProblem();
 			return;
 		}
 		open(result.bill);
@@ -1114,6 +1136,8 @@
 		if (!deletable) return;
 		const shared = deletable;
 		confirmingDelete = false;
+		// "Yes, delete" goes at once: focus waits on the button that asked, until the server answers.
+		void focusAfter('delete-open');
 		const problem = await deleteBill(shared);
 		if (problem) {
 			status = { kind: 'delete-failed' };
@@ -1126,6 +1150,8 @@
 			history.replaceState(null, '', location.pathname);
 		}
 		status = { kind: 'deleted' };
+		// Deleted, the button that asked is gone too: focus goes to the link button above it.
+		void focusAfter('copy-link');
 	}
 
 	let confirmingClear = $state(false);
@@ -1134,6 +1160,19 @@
 	 * "Yes, clear": the button, and the card it was in, go with the bill, so focus goes to the top
 	 * of the new one, and the line there says it's done.
 	 */
+	/**
+	 * Asking, and taking it back: the button pressed gives way to the other, so focus goes with it,
+	 * to "Yes, …" when asking and back to the button when it's kept.
+	 */
+	function askToClear(asking: boolean) {
+		confirmingClear = asking;
+		void focusAfter(asking ? 'confirm-clear' : 'clear-open');
+	}
+	function askToDelete(asking: boolean) {
+		confirmingDelete = asking;
+		void focusAfter(asking ? 'confirm-delete' : 'delete-open');
+	}
+
 	function confirmClear() {
 		clearEverything();
 		status = { kind: 'cleared' };
@@ -1226,7 +1265,7 @@
 		{:else if status?.kind === 'gone' || status?.kind === 'unreachable' || status?.kind === 'broken'}
 			<!-- A link that didn't open a bill: said with the warning sign and some weight, so it doesn't
 			     read as one more line of instructions above an empty bill. -->
-			<p class="flex gap-2 font-medium">
+			<p id="link-problem" tabindex="-1" class="flex gap-2 font-medium">
 				<Caution class="mt-1 shrink-0" />{status.kind === 'gone'
 					? SPLIT_BILL.sharing.gone
 					: status.kind === 'unreachable'
@@ -1277,11 +1316,14 @@
 				/>
 
 				{#if !scanning}
+					<!-- Until there's something on the bill, reading a receipt is the way to start: the pink
+					     button. After that it's one way among others to add, and steps back. -->
 					<button
 						id="scan-open"
 						type="button"
 						onclick={startScan}
-						class="{secondaryButton} mt-4 w-full">{SPLIT_BILL.scanning.open}</button
+						class="{items.length ? secondaryButton : primaryButton} mt-4 w-full"
+						>{SPLIT_BILL.scanning.open}</button
 					>
 				{:else if !scanned}
 					<form
@@ -1825,8 +1867,25 @@
 												class="font-medium">{nameWithQuantity(item)}</span
 											><span class="text-muted">{` · ${whoHad(item)}`}</span></span
 										>
-										<span class="shrink-0 text-sm text-muted tabular-nums">{money(item.price)}</span
-										>
+										<!-- With a muted pencil: the line opens to change who had it. -->
+										<span class="flex shrink-0 items-center gap-2 text-sm text-muted tabular-nums">
+											{money(item.price)}
+											<svg
+												class="size-3.5 shrink-0"
+												xmlns="http://www.w3.org/2000/svg"
+												fill="none"
+												viewBox="0 0 24 24"
+												stroke="currentColor"
+												stroke-width="2"
+												aria-hidden="true"
+											>
+												<path
+													stroke-linecap="round"
+													stroke-linejoin="round"
+													d="M16.9 3.6a2 2 0 0 1 2.9 2.9L8 18.3 4 19.5l1.2-4z"
+												/>
+											</svg>
+										</span>
 									</button>
 								{:else}
 									<div class="flex items-start justify-between gap-3">
@@ -1945,7 +2004,7 @@
 									</fieldset>
 								{:else if people.length}
 									<fieldset class="mt-2 sm:mt-3">
-										<legend class="sr-only">Who had this?</legend>
+										<legend class="sr-only">{SPLIT_BILL.whoHad(item.name)}</legend>
 										<!-- "Everyone" sits on the question's line, not in the row of names: at six people
 										     it took a row of its own under them on most items. -->
 										<div
@@ -2006,7 +2065,9 @@
 						: ''}"
 					role="status"
 				>
-					{#if removal?.from === 'items'}{SPLIT_BILL.removed(removal.name)}<button
+					{#if removal?.from === 'items'}{(removal.cleared
+							? SPLIT_BILL.clearedWho
+							: SPLIT_BILL.removed)(removal.name)}<button
 							id="undo-items"
 							type="button"
 							onclick={undoRemoval}
@@ -2155,19 +2216,25 @@
 								Prices include service
 							</label>
 						</div>
-						<div class="flex flex-wrap items-center gap-x-1">
-							<label class="{checkRow} {taxIncluded ? 'text-muted' : ''}">
-								<input
-									type="checkbox"
-									checked={taxOnService && !taxIncluded}
-									disabled={taxIncluded}
-									onchange={(event) => setTaxOnService(event.currentTarget.checked)}
-									class={checkbox}
+						<!-- Tax on service only means something when there's service: at 0% it's left out. -->
+						{#if percentage(serviceInput) > 0}
+							<div class="flex flex-wrap items-center gap-x-1">
+								<label class="{checkRow} {taxIncluded ? 'text-muted' : ''}">
+									<input
+										type="checkbox"
+										checked={taxOnService && !taxIncluded}
+										disabled={taxIncluded}
+										onchange={(event) => setTaxOnService(event.currentTarget.checked)}
+										class={checkbox}
+									/>
+									Tax is charged on service too
+								</label>
+								<Toggletip
+									label="About tax on service"
+									text={SPLIT_BILL.explanations.taxOnService}
 								/>
-								Tax is charged on service too
-							</label>
-							<Toggletip label="About tax on service" text={SPLIT_BILL.explanations.taxOnService} />
-						</div>
+							</div>
+						{/if}
 					</div>
 
 					<div class="mt-6 border-t border-border pt-5">
@@ -2388,7 +2455,9 @@
 										removal.shared ?? 0,
 										removal.alone ? money(removal.alone) : undefined
 									)
-								: SPLIT_BILL.removed(removal.name)}<button
+								: (removal.cleared ? SPLIT_BILL.clearedWho : SPLIT_BILL.removed)(
+										removal.name
+									)}<button
 								type="button"
 								onclick={undoRemoval}
 								class="min-h-11 font-medium underline underline-offset-4 hover:text-accent-text"
@@ -2607,11 +2676,21 @@
 								? 'border-accent-edge'
 								: 'border-border text-muted'}"
 						>
-							<strong>Not in anyone's share:</strong>
-							{SPLIT_BILL.untagged(unsharedItemNames(bill), money(totals.unassigned))}
-							{#if totals.unshared !== totals.unassigned}{SPLIT_BILL.unsharedOfTotal(
-									money(totals.unshared)
-								)}{/if}
+							<!-- A friend reading the bill can't tag anything: they get the fact, and who covers it.
+							     Whoever's making it gets the items to tag, and, once someone's paid, who covers
+							     them meanwhile. -->
+							{#if viewing}
+								{payerName
+									? SPLIT_BILL.unsharedCovered(money(totals.unshared), payerName)
+									: SPLIT_BILL.unsharedLeftOut(money(totals.unshared))}
+							{:else}
+								<strong>Not in anyone's share:</strong>
+								{SPLIT_BILL.untagged(unsharedItemNames(bill), money(totals.unassigned))}
+								{#if totals.unshared !== totals.unassigned}{SPLIT_BILL.unsharedOfTotal(
+										money(totals.unshared)
+									)}{/if}
+								{#if payerName}{SPLIT_BILL.coversForNow(payerName)}{/if}
+							{/if}
 						</p>
 					{/if}
 
@@ -2678,6 +2757,23 @@
 			     bill asked for the wrong next step. -->
 			{#if items.length}
 				<div>
+					<!-- Something in nobody's share, said where the bill is about to be sent: the note above the
+					     totals is easy to have scrolled past. -->
+					{#if !viewing && totals.unshared > 0}
+						<p class="mb-3 flex flex-wrap items-center gap-x-3 text-sm">
+							<span class="flex gap-2"
+								><Caution class="mt-0.5 shrink-0" />{SPLIT_BILL.sharing.unsharedYet(
+									money(totals.unshared)
+								)}</span
+							>
+							{#if unsharedItem}<button
+									type="button"
+									onclick={showUnshared}
+									class="min-h-9 font-medium underline underline-offset-4 hover:text-accent-text pointer-coarse:min-h-11"
+									>{SPLIT_BILL.sharing.showIt}</button
+								>{/if}
+						</p>
+					{/if}
 					<!-- Each as wide as its words, sharing what's left over; a row too narrow for them all wraps a
 					     whole button, never its label. -->
 					<div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap lg:flex-col">
@@ -2690,6 +2786,7 @@
 							>
 						{:else}
 							<button
+								id="copy-link"
 								type="button"
 								onclick={copyLink}
 								disabled={sharing}
@@ -2739,23 +2836,23 @@
 						{#if confirmingDelete}
 							<div class="mt-2 flex flex-wrap items-center gap-2" role="group" aria-label="Delete">
 								<span class="text-sm">{SPLIT_BILL.sharing.deleteQuestion}</span>
-								<button type="button" onclick={deleteShared} class={smallButton}>Yes, delete</button
+								<button id="confirm-delete" type="button" onclick={deleteShared} class={smallButton}
+									>Yes, delete</button
 								>
-								<button type="button" onclick={() => (confirmingDelete = false)} class={smallButton}
+								<button type="button" onclick={() => askToDelete(false)} class={smallButton}
 									>Keep it</button
 								>
 							</div>
 						{:else}
 							<button
 								type="button"
-								onclick={() => (confirmingDelete = true)}
+								id="delete-open"
+								onclick={() => askToDelete(true)}
 								class="mt-2 min-h-9 text-sm text-muted underline underline-offset-4 hover:text-text pointer-coarse:min-h-11"
 								>Delete the shared copy</button
 							>
 						{/if}
 					{/if}
-					<!-- What sharing keeps on our server: for whoever shares, not for a friend reading a
-					     link, whose long link keeps nothing there at all. -->
 					<!-- What sharing keeps on our server: for whoever shares, not for a friend reading a
 					     link, and not right after a long link was copied, which keeps nothing there. -->
 					{#if !viewing && status?.kind !== 'copied-long'}
@@ -2771,15 +2868,18 @@
 								aria-label="Clear everything?"
 							>
 								<span class="text-sm">Clear everything?</span>
-								<button type="button" onclick={confirmClear} class={smallButton}>Yes, clear</button>
-								<button type="button" onclick={() => (confirmingClear = false)} class={smallButton}
+								<button id="confirm-clear" type="button" onclick={confirmClear} class={smallButton}
+									>Yes, clear</button
+								>
+								<button type="button" onclick={() => askToClear(false)} class={smallButton}
 									>Keep it</button
 								>
 							</div>
 						{:else}
 							<button
 								type="button"
-								onclick={() => (confirmingClear = true)}
+								id="clear-open"
+								onclick={() => askToClear(true)}
 								class="min-h-9 text-sm text-muted underline underline-offset-4 hover:text-text pointer-coarse:min-h-11"
 								>Clear everything</button
 							>

@@ -115,7 +115,7 @@ export const SPLIT_BILL = {
 	description:
 		'Split a bill fairly: add the people and the items, tag who had what, add tax and service, and share the result as a short link. Shared bills are encrypted, and only people with the link can open them.',
 	introduction:
-		'Add the people and the items, tag each item to the people who had it, and we work out a fair share for each person, tax and service included.',
+		'Tag who had what, and we work out a fair share for each person, tax and service included.',
 	/** On the index, a glimpse of what the tool makes: each person's share. */
 	sample: [
 		{ label: 'Ayu', value: 'Rp 86.500' },
@@ -136,6 +136,9 @@ export const SPLIT_BILL = {
 		broken:
 			"This link looks incomplete, so we can't open the bill. Ask whoever sent it to copy it again.",
 		retry: 'Try again',
+		/** By the share buttons, while something's untagged, with "Show it" to go to it. */
+		unsharedYet: (amount: string) => `${amount} isn't in anyone's share yet.`,
+		showIt: 'Show it',
 		startNew: 'Start a new bill',
 		copied: 'Link copied. Anyone with it can open this bill for 30 days.',
 		copiedUpdated:
@@ -205,6 +208,8 @@ export const SPLIT_BILL = {
 	},
 	// After removing someone or something: one tap took it, one tap brings it back.
 	removed: (name: string) => `Removed ${name}.`,
+	/** After "Nobody" clears who had an item, with Undo beside it like a removal. */
+	clearedWho: (name: string) => `Cleared who had ${name}.`,
 	// What only they had leaves the split, and that's money someone has to notice.
 	removedPerson: (name: string, shared: number, alone?: string) => {
 		const theShared =
@@ -224,6 +229,8 @@ export const SPLIT_BILL = {
 	moreOnReceipt: 'More on the receipt',
 	moreOnReceiptHint: 'Prices with tax, discounts, rounding',
 	undo: 'Undo',
+	/** Each item's group of names, for screen readers: which item the names are for. */
+	whoHad: (item: string) => `Who had ${item}?`,
 	/** Read before a folded item's line, which opens it: "Change who had Nasi Goreng · Ayu". */
 	changeWhoHad: 'Change who had',
 	/** At the top of the page after "Yes, clear". */
@@ -243,6 +250,13 @@ export const SPLIT_BILL = {
 		const one = names.length === 1;
 		return `${list}, worth ${worth}, ${one ? "isn't" : "aren't"} tagged or counted for anyone, so ${one ? "it's" : "they're"} left out of the shares.`;
 	},
+	/** For a friend reading a shared bill: what's in nobody's share, as a fact. */
+	unsharedCovered: (amount: string, payer: string) =>
+		`${amount} isn't in anyone's share: ${payer} covers it for now.`,
+	unsharedLeftOut: (amount: string) =>
+		`${amount} isn't in anyone's share, so it's left out of everyone's share.`,
+	/** After the untagged items, once someone's paid: who's out of pocket for them meanwhile. */
+	coversForNow: (payer: string) => `${payer} covers it for now.`,
 	/** Under the untagged items' worth, when their part of the total differs from it. */
 	unsharedOfTotal: (amount: string) => `That's ${amount} of the total.`,
 	// What an amount field says under it as it's typed: what we read, or why we can't.
