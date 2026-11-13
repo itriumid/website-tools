@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+	chatLink,
 	chatTarget,
 	countriesWithCode,
 	digitsOnly,
@@ -302,5 +303,14 @@ describe('letters typed with a number', () => {
 	it('says when a number is too short once the letters are left out', () => {
 		expect(chatTarget('62', '0812-FLOWERS', '')).toEqual({ problem: 'too-short-letters' });
 		expect(chatTarget('62', '0812', '')).toEqual({ problem: 'too-short' });
+	});
+});
+
+describe('chatLink', () => {
+	it('opens a chat with the number, with the message typed in when there is one', () => {
+		expect(chatLink('6281234567890')).toBe('https://wa.me/6281234567890');
+		expect(chatLink('6281234567890', ' Halo, kak ')).toBe(
+			'https://wa.me/6281234567890?text=Halo%2C%20kak'
+		);
 	});
 });

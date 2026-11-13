@@ -99,6 +99,8 @@ export const WHATSAPP = {
 		save: 'Save the QR code',
 		/** Printed under the code in the saved image, above the number. */
 		printLabel: 'Chat on WhatsApp',
+		includesMessage: 'This code includes your message: whoever scans it starts with it typed.',
+		leaveMessageOut: 'Leave the message out of the code',
 		alt: (number: string) => `QR code that opens a chat with ${number}`
 	}
 };

@@ -44,6 +44,12 @@ export type ChatProblem =
 	| 'several'
 	| 'no-digits';
 
+/** The link that opens a chat with a number (digits, country code first), with a message typed in. */
+export function chatLink(number: string, message = ''): string {
+	const text = message.trim();
+	return `https://wa.me/${number}${text ? `?text=${encodeURIComponent(text)}` : ''}`;
+}
+
 /**
  * Whether a problem is true of every number halfway typed ("too short", "add the area code"), so
  * it waits until the typing stops. The others can't be right however the number ends.
@@ -225,7 +231,7 @@ export function chatTarget(
 	const target: ChatTarget = {
 		number,
 		display: code ? `+${code} ${grouped(code, national)}` : `+${number}`,
-		link: `https://wa.me/${number}${text ? `?text=${encodeURIComponent(text)}` : ''}`,
+		link: chatLink(number, text),
 		countryCode: code,
 		short: Boolean(lengths && lengths[0] < lengths[1] && national.length === lengths[0]),
 		lettersDropped

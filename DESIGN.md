@@ -490,6 +490,9 @@ both themes, because scanners read dark on light and that's what prints. "Save t
 it over as a PNG made on the device, 24 pixels a module, with "Chat on WhatsApp" and the number
 under the code, below its white margin, in Plus Jakarta Sans: a printed code can be checked by eye,
 and used by someone without a camera. Nothing is sent anywhere to make either.
+With a message, a muted line says the code includes it ("whoever scans it starts with it typed"),
+with a "Leave the message out of the code" checkbox: a shop printing one code for everyone may not
+want one customer's message on it, and a shorter link makes a coarser code that scans better.
 
 ### Running total (signature)
 

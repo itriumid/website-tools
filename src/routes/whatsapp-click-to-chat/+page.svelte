@@ -4,8 +4,16 @@
 	import TitleBand from '#lib/TitleBand.svelte';
 	import { WHATSAPP } from '#lib/content.js';
 	import { COUNTRIES, DEFAULT_COUNTRY_NAME, searchNames } from '#lib/countries.js';
-	import { card, field, label, primaryButton, secondaryButton } from '#lib/styles.js';
-	import { chatTarget, countriesWithCode, waitsForTyping } from '#lib/whatsapp.js';
+	import {
+		card,
+		checkbox,
+		checkRow,
+		field,
+		label,
+		primaryButton,
+		secondaryButton
+	} from '#lib/styles.js';
+	import { chatLink, chatTarget, countriesWithCode, waitsForTyping } from '#lib/whatsapp.js';
 	import Caution from '#lib/Caution.svelte';
 	import Arrow from '#lib/Arrow.svelte';
 	import { drawnSize, qrFileName, qrModules, qrPath } from '#lib/qr.js';
@@ -69,7 +77,14 @@
 
 	// The code is only drawn once someone opens it: most people came to message a number.
 	let qrOpen = $state(false);
-	const modules = $derived(qrOpen && target ? qrModules(target.link) : undefined);
+	// A message goes into the code too, unless the person leaves it out: a shop printing one code
+	// for everyone may not want one customer's message on it, and a shorter link scans better.
+	let messageOutOfCode = $state(false);
+	const hasMessage = $derived(message.trim() !== '');
+	const codeLink = $derived(
+		target && hasMessage && messageOutOfCode ? chatLink(target.number) : target?.link
+	);
+	const modules = $derived(qrOpen && codeLink ? qrModules(codeLink) : undefined);
 
 	/**
 	 * The code as a PNG, drawn on a canvas here and handed over as a file: nothing is uploaded.
@@ -268,6 +283,15 @@
 							<Arrow class="group-open:rotate-90 motion-safe:transition-transform" />
 							{WHATSAPP.qr.heading}
 						</summary>
+						{#if hasMessage}
+							{#if !messageOutOfCode}
+								<p class="mt-1 text-sm text-muted">{WHATSAPP.qr.includesMessage}</p>
+							{/if}
+							<label class="{checkRow} mt-1">
+								<input type="checkbox" bind:checked={messageOutOfCode} class={checkbox} />
+								{WHATSAPP.qr.leaveMessageOut}
+							</label>
+						{/if}
 						{#if modules}
 							<!-- Graphite on white in both themes: scanners read dark on light, and it's what prints. -->
 							<svg
